@@ -1,0 +1,74 @@
+// Compatibility phrases for an HZS source-only installation.
+"Phrases"
+{
+    "HUD"
+    {
+        "#format" "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d},{7:d},{8:s}"
+        "en" "HZS {1} | Wave {2}/{3} | Kills {4}/{5} | Humans {6} | Zombies {7} | {8}"
+        "chi" "大灾变 {1} | 关卡 {2}/{3} | 击杀 {4}/{5} | 人类 {6} | 丧尸 {7} | {8}"
+    }
+    "HUD target"
+    {
+        "#format" "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d},{7:d},{8:s},{9:d}"
+        "en" "HZS {1} | Wave {2}/{3} | Kills {4}/{5} | Humans {6} | Zombies {7} | {8} HP {9}"
+        "chi" "大灾变 {1} | 关卡 {2}/{3} | 击杀 {4}/{5} | 人类 {6} | 丧尸 {7} | {8} 生命 {9}"
+    }
+    "Damage info"
+    {
+        "#format" "{1:d}"
+        "en" "Damage: {1}"
+        "chi" "伤害：{1}"
+    }
+    "Death countdown"
+    {
+        "#format" "{1:d}"
+        "en" "Respawn in {1}s"
+        "chi" "{1}秒后复活"
+    }
+    "Round remaining"
+    {
+        "#format" "{1:d}"
+        "en" "Zombies arrive in {1}s"
+        "chi" "丧尸将在{1}秒后出现"
+    }
+    "Remaining"
+    {
+        "en" "Prepare for the next wave"
+        "chi" "准备迎接丧尸"
+    }
+    "Start info1"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "守住阵地，掩护队友。"
+    }
+    "Start info2"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "注意补充弹药。"
+    }
+    "Start info3"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "合作能够降低防守压力。"
+    }
+    "Start info4"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "不要让丧尸包围你。"
+    }
+    "Start info5"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "受伤时及时寻找掩护。"
+    }
+    "Start info6"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "留意大型丧尸。"
+    }
+    "Start info7"
+    {
+        "en" "HZS has started. Work together."
+        "chi" "大灾变已经开始。"
+    }
+}
