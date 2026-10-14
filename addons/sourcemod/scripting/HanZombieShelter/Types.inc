@@ -1,7 +1,7 @@
-#define SHELTER_VERSION "0.1.0"
+#define SHELTER_VERSION "0.3.0"
 #define MAX_BUILDINGS 128
 #define MAX_NODES 80
-#define MAX_NPCS 128
+#define MAX_NPCS 256
 #define MAX_CORES 8
 #define MAX_BOSSES 8
 #define MAX_BOXES 8
@@ -10,8 +10,8 @@
 #define MATERIALS 5
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
-enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine }
-enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Count }
+enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier }
+enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Count }
 
 enum struct MaterialDef
 {
@@ -86,6 +86,13 @@ enum struct Building
     int burnDamage;
     float burnInterval;
     bool upgraded;
+    int ownerSerial;
+    char ownerKey[64];
+    int invested[MATERIALS];
+    float lastAttackAt;
+    float restoreMins[3];
+    float restoreMaxs[3];
+    bool boundsKnown;
 }
 
 enum struct ResourceNode
@@ -99,6 +106,7 @@ enum struct ResourceNode
     float origin[3];
     float angles[3];
     bool growing;
+    bool rerollPending;
     float elapsed;
 }
 
@@ -160,7 +168,8 @@ ResourceNode gNodes[MAX_NODES];
 NPC gNPCs[MAX_NPCS];
 Recipe gRecipes[MAX_RECIPES];
 int gCoreCount, gBossCount, gNodeCount, gRecipeCount;
-int gInventory[MATERIALS];
+int gPlayerInventory[MAXPLAYERS+1][MATERIALS];
+int gBaseInventory[MAX_CORES][MATERIALS];
 int gEpoch, gUID;
 int gDay=1, gNativeKills;
 Phase gPhase=Phase_Waiting;
@@ -241,13 +250,24 @@ int FindMaterial(const char[] id)
 
 void Tell(int client, const char[] format, any ...)
 {
+    SetGlobalTransTarget(client>0 && client<=MaxClients && IsClientInGame(client) ? client : LANG_SERVER);
     char text[512];VFormat(text,sizeof(text),format,3);
-    if(client>0 && IsClientInGame(client))PrintToChat(client,"\x04[昼夜求生]\x01 %s",text);
+    if(client>0 && IsClientInGame(client))PrintToChat(client,"\x04[HZS Shelter]\x01 %s",text);
     else PrintToServer("[Shelter] %s",text);
 }
 
-void Announce(const char[] text)
+void AnnouncePhrase(const char[] key,any ...)
 {
-    PrintToChatAll("\x04[昼夜求生]\x01 %s",text);
-    PrintToServer("[Shelter] %s",text);
+    if(!key[0])return;
+    char text[512];SetGlobalTransTarget(LANG_SERVER);VFormat(text,sizeof(text),"%t",1);PrintToServer("[Shelter] %s",text);
+    for(int client=1;client<=MaxClients;client++)if(IsClientInGame(client) && !IsFakeClient(client))
+    {
+        SetGlobalTransTarget(client);VFormat(text,sizeof(text),"%t",1);PrintToChat(client,"\x04[HZS Shelter]\x01 %s",text);
+    }
+}
+
+void TranslateLabel(int client,const char[] key,char[] buffer,int size)
+{
+    if(TranslationPhraseExists(key))Format(buffer,size,"%T",key,client);
+    else strcopy(buffer,size,key); // Administrators may supply a literal custom label in config.
 }

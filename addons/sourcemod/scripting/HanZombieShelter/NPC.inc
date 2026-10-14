@@ -169,6 +169,20 @@ int ActiveOrdinary()
     return count;
 }
 
+void TrimOrdinary(int target)
+{
+    // Keep the daytime population in place. Only excess ordinary NPCs are
+    // parked; fixed Bosses never enter this population or the dawn cleanup.
+    int retained;
+    for(int i=0;i<MAX_NPCS;i++)
+    {
+        if(!gNPCs[i].used || !gNPCs[i].ready || !gNPCs[i].active || gNPCs[i].dead || gNPCs[i].boss>=0)continue;
+        int entity=Resolve(gNPCs[i].ref);if(entity<0 || GetEntProp(entity,Prop_Data,"m_iHealth")<=0)continue;
+        if(retained<target)retained++;
+        else ParkNPC(i);
+    }
+}
+
 void StopBuildingAttack(int n)
 {
     if(!gNPCs[n].attackingUID)return;
@@ -178,10 +192,13 @@ void StopBuildingAttack(int n)
 
 void NPCTick(float now)
 {
-    if(gPhase==Phase_Night && now>=gNextAdmissions)
+    if(Running() && now>=gNextAdmissions)
     {
-        int target=NightTarget(),active=ActiveOrdinary();SelectDay();
-        int batch=gCfg[C_Days].GetNum("spawn_batch",2);gNextAdmissions=now+gCfg[C_Days].GetFloat("spawn_interval_seconds",1.0);
+        int target=OrdinaryTarget();TrimOrdinary(target);
+        int active=ActiveOrdinary();SelectDay();
+        bool daytime=gPhase==Phase_Day;
+        int batch=gCfg[C_Days].GetNum(daytime ? "day_spawn_batch" : "spawn_batch",2);
+        gNextAdmissions=now+gCfg[C_Days].GetFloat(daytime ? "day_spawn_interval_seconds" : "spawn_interval_seconds",daytime ? 2.0 : 1.0);
         for(int i=0;i<MAX_NPCS && active<target && batch>0;i++)
             if(gNPCs[i].used && !gNPCs[i].active && !gNPCs[i].dead && gNPCs[i].boss<0 && ActivateOrdinary(i)){active++;batch--;}
     }
@@ -194,7 +211,7 @@ void NPCTick(float now)
         {
             if(health>0 && health<gNPCs[i].lastHP && !gBosses[boss].awakened)
             {
-                gBosses[boss].awakened=true;RestoreNPCBody(i);Announce("Boss已经苏醒！");
+                gBosses[boss].awakened=true;RestoreNPCBody(i);AnnouncePhrase("BossAwakened");
             }
             if(health>0)gBosses[boss].savedHP=health;gNPCs[i].lastHP=health;
         }
@@ -205,7 +222,7 @@ void NPCTick(float now)
         if(gNPCs[i].burnUntil>now && now>=gNPCs[i].nextBurn)
         {
             gNPCs[i].nextBurn=now+gNPCs[i].burnInterval;
-            DamageNPC(i,gNPCs[i].burnDamage,gNPCs[i].burnClientSerial);
+            DamageNPC(i,gNPCs[i].burnDamage,gNPCs[i].burnClientSerial,true);
             if(gNPCs[i].dead || Resolve(gNPCs[i].ref)<0)continue;
         }
         // HZS owns acquisition. Consume its current leader/target; do not choose
@@ -226,7 +243,7 @@ void NPCTick(float now)
                 float interval=boss>=0 ? gBosses[boss].interval : Decimal(C_Zombies,"BuildingAttack","interval_seconds",1.0);
                 float damage=boss>=0 ? gBosses[boss].damage : Decimal(C_Zombies,"BuildingAttack","damage",20.0)*HPScale();
                 Han_SetCustomAnimationEx(entity,gNPCs[i].attack,interval+0.1);
-                gNPCs[i].nextAttack=now+interval;DamageBuilding(building,RoundToNearest(damage));
+                gNPCs[i].nextAttack=now+interval;WallImpactSound(building);DamageBuilding(building,RoundToNearest(damage),true);
             }
         }
         else
@@ -251,7 +268,9 @@ public void Han_OnZombieDamagePre(int zombie,int attacker,int &damage)
 {
     int n=FindNPC(zombie);if(n<0)return;
     if(!Running() || !gNPCs[n].active){damage=0;return;}
-    if(gDamageNPCRef==gNPCs[n].ref)damage=gDamageValue;
+    bool external=gDamageNPCRef==gNPCs[n].ref;
+    if(external)damage=gDamageValue;
+    ApplyProgressionDamage(n,attacker,damage,external && gDamageIsDefense);
 }
 
 public void Han_OnZombieDeath(int zombie,int killer)
@@ -266,13 +285,14 @@ public void Han_OnZombieDeath(int zombie,int killer)
     }
     else if(active && Running())
     {
-        gNativeKills++;GrantDeathDrop();
+        gNativeKills++;GrantDeathDrop(killer);
         if(gNativeKills==90000)LogError("[Shelter] Native count is nearing the finite 99999 bridge threshold");
     }
 }
 
-void GrantDeathDrop()
+void GrantDeathDrop(int client)
 {
+    if(client<1 || client>MaxClients || !IsClientInGame(client))return;
     if(!SelectDay())return;
     char profile[64];gCfg[C_Days].GetString("drop_profile",profile,sizeof(profile),"night_raider");
     float multiplier=gCfg[C_Days].GetFloat("drop_multiplier",1.0);char path[128];Format(path,sizeof(path),"Profiles/%s",profile);
@@ -280,7 +300,7 @@ void GrantDeathDrop()
     float chance=gCfg[C_Drops].GetFloat("drop_chance",0.25);int low=gCfg[C_Drops].GetNum("amount_min",1),high=gCfg[C_Drops].GetNum("amount_max",2);
     if(GetRandomFloat(0.0,1.0)>chance || low<1 || high<low)return;
     Format(path,sizeof(path),"Profiles/%s/Weights",profile);int material=WeightedMaterial(C_Drops,path);
-    if(material>=0)Grant(material,RoundToNearest(float(GetRandomInt(low,high))*multiplier));
+    if(material>=0)Grant(material,RoundToNearest(float(GetRandomInt(low,high))*multiplier),client);
 }
 
 bool AllBossesDefeated()

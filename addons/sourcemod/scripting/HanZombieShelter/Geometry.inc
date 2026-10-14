@@ -16,16 +16,49 @@ bool InBox(const float position[3],const float mins[3],const float maxs[3])
     return true;
 }
 
-bool InSafeBase(const float position[3])
+int SafeCoreAt(const float position[3])
 {
+    // The zone belongs to the map/campaign, not the destructible prop.
+    if(AliveCores()==0)return -1;
+    int closest=-1;float best=999999999.0;
     for(int i=0;i<gCoreCount;i++)
     {
-        int b=gCores[i].building;
-        if(b<0 || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0)continue;
         float local[3];LocalPoint(position,gCores[i].origin,gCores[i].angles,local);
-        for(int box=0;box<gCores[i].boxCount;box++)if(InBox(local,gCoreMins[i][box],gCoreMaxs[i][box]))return true;
+        for(int box=0;box<gCores[i].boxCount;box++)if(InBox(local,gCoreMins[i][box],gCoreMaxs[i][box]))
+        {
+            float distance=GetVectorDistance(position,gCores[i].origin,true);
+            if(distance<best){best=distance;closest=i;}break;
+        }
     }
-    return false;
+    return closest;
+}
+
+bool InSafeBase(const float position[3])
+{
+    return SafeCoreAt(position)>=0;
+}
+
+void DrawSafeZones()
+{
+    if(!Running() || AliveCores()==0 || !Number(C_Mode,"SafeZoneDisplay","enabled",1))return;
+    int color[4]={40,255,80,220};
+    float width=Decimal(C_Mode,"SafeZoneDisplay","line_width",3.0);
+    float height=Decimal(C_Mode,"SafeZoneDisplay","height_above_base",4.0);
+    for(int c=0;c<gCoreCount;c++)for(int box=0;box<gCores[c].boxCount;box++)
+    {
+        float corners[4][3];
+        for(int p=0;p<4;p++)
+        {
+            float local[3];local[0]=(p==0 || p==3) ? gCoreMins[c][box][0] : gCoreMaxs[c][box][0];
+            local[1]=p<2 ? gCoreMins[c][box][1] : gCoreMaxs[c][box][1];local[2]=height;
+            WorldPoint(local,gCores[c].origin,gCores[c].angles,corners[p]);
+        }
+        for(int p=0;p<4;p++)
+        {
+            TE_SetupBeamPoints(corners[p],corners[(p+1)%4],gBeamSprite,0,0,0,1.2,width,width,0,0.0,color,0);
+            TE_SendToAll();
+        }
+    }
 }
 
 public bool FilterExcept(int entity,int mask,any ignored)

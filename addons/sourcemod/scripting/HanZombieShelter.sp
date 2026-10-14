@@ -7,13 +7,22 @@
 #include <nextmap>
 #include <HanZombieScenarioAPI>
 #include "HanZombieShelter/Types.inc"
+#include "HanZombieShelter/Levels.inc"
+#include "HanZombieShelter/Progression.inc"
 #include "HanZombieShelter/Config.inc"
+#include "HanZombieShelter/DayCvars.inc"
 #include "HanZombieShelter/Geometry.inc"
+#include "HanZombieShelter/Inventory.inc"
+#include "HanZombieShelter/Management.inc"
+#include "HanZombieShelter/EntityBudget.inc"
+#include "HanZombieShelter/Audio.inc"
 #include "HanZombieShelter/World.inc"
 #include "HanZombieShelter/NPC.inc"
 #include "HanZombieShelter/Combat.inc"
+#include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
+#include "HanZombieShelter/Admin.inc"
 
 public Plugin myinfo={name="HZS Zombie Shelter",author="H-AN / Codex",description="External cooperative day/night shelter mode; no core source changes",version=SHELTER_VERSION,url=""};
 
@@ -26,12 +35,16 @@ public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 
 public void OnPluginStart()
 {
+    LoadTranslations("HanZombieShelter.phrases");
+    LoadTranslations("common.phrases");
+    ResetInventories();
     HookEvent("round_start",RoundStart);HookEvent("round_end",RoundEnd);HookEvent("player_spawn",PlayerSpawn);
     RegConsoleCmd("sm_build",BuildMenuCommand);RegConsoleCmd("sm_materials",MaterialsCommand);
     RegConsoleCmd("sm_zsh_status",StatusCommand);
     RegAdminCmd("sm_zsh_phase",PhaseCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_day",DayCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_grant",GrantCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_fail",FailCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_reload",ReloadCommand,ADMFLAG_ROOT);
+    RegisterShelterAdminCommands();
     for(int i=1;i<=MaxClients;i++)if(IsClientInGame(i))OnClientPutInServer(i);
     gTick=CreateTimer(0.25,WorldTick,_,TIMER_REPEAT);
 }
@@ -40,7 +53,7 @@ public void OnMapStart()
 {
     gEpoch++;gEnabled=false;gCoreReady=false;gRoundPrepared=false;gSnapshot=false;gRollback=false;gTerminal=false;
     gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;
-    for(int i=0;i<MATERIALS;i++)gInventory[i]=0;
+    ResetInventories();
     for(int i=0;i<MAX_BUILDINGS;i++){gBuildings[i].used=false;gBuildings[i].alive=false;gBuildings[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<sizeof(gNPCBinding);i++){gNPCBinding[i]=0;gWorldBinding[i]=0;}
@@ -60,18 +73,20 @@ void BootMode()
     if(!gEnabled)return;
     if(!gCoreReady){LogError("[Shelter] HZS natives unavailable; load HZS and reload this map before play");gEnabled=false;return;}
     if(gLeaderOffset<0){LogError("[Shelter] CHostage leader unavailable; mode cannot consume the core target");gEnabled=false;return;}
-    LoadHanData();OverrideCorePool();OverrideServerPolicy();PrepareRound();
+    LoadHanData();LoadInteractionSounds();OverrideCorePool();OverrideServerPolicy();PrepareRound();
     PrintToServer("[Shelter] configuration loaded map=%s cores=%d resources=%d bosses=%d native_pool=%d",gMap,gCoreCount,gNodeCount,gBossCount,gNativePoolSize);
 }
 
 public void OnClientPutInServer(int client)
 {
+    StartClientInventory(client);
     gLastButtons[client]=0;gNextGather[client]=0.0;gNextRepair[client]=0.0;gNextUse[client]=0.0;
     SDKHook(client,SDKHook_OnTakeDamage,HumanDamageHook);
 }
 
 public void OnClientDisconnect(int client)
 {
+    SaveClientInventory(client);
     if(!gEnabled || !APIAvailable())return;
     int serial=GetClientSerial(client);
     for(int n=0;n<MAX_NPCS;n++)
@@ -80,6 +95,11 @@ public void OnClientDisconnect(int client)
         int entity=Resolve(gNPCs[n].ref);if(entity<0)continue;
         if(gNPCs[n].targetClientSerial==serial){gNPCs[n].targetClientSerial=0;StopBuildingAttack(n);}
     }
+}
+
+public void OnClientAuthorized(int client,const char[] auth)
+{
+    if(IsClientInGame(client))BindClientInventory(client);
 }
 
 public void OnEntityDestroyed(int entity)
@@ -132,5 +152,5 @@ public void OnPluginEnd()
 {
     gEpoch++;
     if(gCoreReady && APIAvailable())for(int i=0;i<MAX_NPCS;i++)if(gNPCs[i].used)RestoreNPCOnUnload(i);
-    gEnabled=false;CleanWorld();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;
+    gEnabled=false;CleanWorld();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gSharedOverflow;
 }

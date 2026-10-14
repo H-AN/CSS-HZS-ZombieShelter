@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -34,7 +34,7 @@ void ReleaseConfigs()
 
 bool ConfigFailure(const char[] message)
 {
-    LogError("[Shelter] 配置拒绝启动: %s",message);
+    LogError("[Shelter] %T","ConfigurationRejected",LANG_SERVER,message);
     return false;
 }
 
@@ -60,22 +60,21 @@ bool LoadConfigs()
     gNightSeconds=Decimal(C_Mode,"Rules","night_seconds",180.0);
     gWarningSeconds=Decimal(C_Mode,"Rules","warning_seconds_before_night",30.0);
     gExposureEnabled=Number(C_Mode,"Rules","night_exposure_enabled",1)!=0;
-    gExposureDamage=Number(C_Mode,"Rules","night_exposure_damage",10);
+    gExposureDamage=Number(C_Mode,"Rules","night_exposure_damage",1);
     gExposureInterval=Decimal(C_Mode,"Rules","night_exposure_interval_seconds",1.0);
     gUseDistance=Decimal(C_Mode,"Interactions","maximum_distance",128.0);
     gUseCooldown=Decimal(C_Mode,"Interactions","cooldown_seconds",0.3);
     gGatherCooldown=Decimal(C_Resources,"Gathering","cooldown_seconds",0.5);
     gRepairCooldown=Decimal(C_Bases,"Profiles/shelter_basic","repair_interval_seconds",0.5);
-    gSummonLimit=Number(C_Mode,"ManagedDefensePolicy","max_summons_team_test_budget",20);
     gInventoryCap=Number(C_Resources,"Inventory","capacity",0);
-    gPopulationLimit=Number(C_Zombies,"Population","raider_alive_limit",60);
-    gNativePoolSize=Number(C_Zombies,"NativePool","initial_ordinary_count",60);
+    gPopulationLimit=Number(C_Zombies,"Population","raider_alive_limit",100);
+    gNativePoolSize=Number(C_Zombies,"NativePool","initial_ordinary_count",100);
     if(!Node(C_Zombies,"NativePool"))return ConfigFailure("NativePool required; generation APIs are not used in this version");
     gCfg[C_Zombies].GetVector("parking_origin",gParking);
     if(gDaySeconds<1.0 || gNightSeconds<1.0 || gExposureInterval<0.1 || gExposureDamage<0
         || gUseDistance<16.0 || gUseDistance>512.0 || gUseCooldown<0.1 || gGatherCooldown<0.1
         || gPopulationLimit<1 || gPopulationLimit>(MAX_NPCS-MAX_BOSSES)/2 || gNativePoolSize<gPopulationLimit
-        || gNativePoolSize>(MAX_NPCS-MAX_BOSSES)/2 || gSummonLimit<1 || gSummonLimit>MAX_BUILDINGS-MAX_CORES
+        || gNativePoolSize>(MAX_NPCS-MAX_BOSSES)/2
         || gInventoryCap<0)return ConfigFailure("invalid time/range/entity limits");
     for(int axis=0;axis<3;axis++)if(FloatAbs(gParking[axis])>15000.0)return ConfigFailure("parking must remain inside engine +/-15000 bounds");
     if(FloatAbs(gParking[0])<8000.0 && FloatAbs(gParking[1])<8000.0)return ConfigFailure("parking point must be outside playable area");
@@ -88,22 +87,38 @@ bool LoadConfigs()
     gRecoveryFraction=Decimal(C_Lifecycle,"BaseRecovery","upgraded_hp_fraction",0.5);
     gOutcomeSeconds=Decimal(C_Lifecycle,"Outcome","display_seconds",8.0);
     if(gRecoveryFraction<=0.0 || gRecoveryFraction>=1.0 || gOutcomeSeconds<1.0 || gRollbackDays<0 || gMinimumDay<1)return ConfigFailure("failure/recovery ranges");
-    Text(C_Lifecycle,"Outcome","victory_message",gVictoryText,sizeof(gVictoryText),"你战胜了Boss，本地图已经肃清");
-    Text(C_Lifecycle,"Outcome","loss_message",gFailureText,sizeof(gFailureText),"你失败了，此地被丧尸统治");
+    Text(C_Lifecycle,"Outcome","victory_phrase",gVictoryText,sizeof(gVictoryText),"CampaignVictory");
+    Text(C_Lifecycle,"Outcome","loss_phrase",gFailureText,sizeof(gFailureText),"CampaignLoss");
     Text(C_Mode,"HumanTeamPolicy","t_client_spawn_policy",gSpawnPolicy,sizeof(gSpawnPolicy),"native_position");
     if(!StrEqual(gSpawnPolicy,"native_position") && !StrEqual(gSpawnPolicy,"alive_base") && !StrEqual(gSpawnPolicy,"random_ct_spawn"))return ConfigFailure("t_client_spawn_policy");
-    return ReadMaterials() && ReadMapData() && ReadRecipes() && ValidateDayRanges() && ValidateNativeBridge();
+    return ReadMaterials() && ReadMapData()
+        && (ValidateResourcePools() || ConfigFailure("resource pool weights, regrow option or map pool reference"))
+        && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
+        && LoadManagementSettings() && LoadEntitySettings() && ValidateDayRanges() && ValidateNativeBridge();
+}
+
+bool ValidResourceGrowth(float hold,float grow,float scale)
+{
+    // Ordered comparisons alone do not reject NaN; non-finite timing or scale
+    // must never reach transparency calculations, maturity checks or the model.
+    if((view_as<int>(hold)&0x7f800000)==0x7f800000
+        || (view_as<int>(grow)&0x7f800000)==0x7f800000
+        || (view_as<int>(scale)&0x7f800000)==0x7f800000)return false;
+    float total=hold+grow;
+    return (view_as<int>(total)&0x7f800000)!=0x7f800000
+        && hold>=0.0 && grow>=0.25 && scale>0.0 && scale<=4.0;
 }
 
 bool ReadMaterials()
 {
     static const char ids[][]={"wood","iron","copper","silver","gold"};
+    static const char labels[][]={"MaterialWood","MaterialIron","MaterialCopper","MaterialSilver","MaterialGold"};
     for(int i=0;i<MATERIALS;i++)
     {
         char path[96];Format(path,sizeof(path),"Materials/%s",ids[i]);
         if(!Node(C_Resources,path))return ConfigFailure(path);
         strcopy(gMaterials[i].id,sizeof(gMaterials[].id),ids[i]);
-        gCfg[C_Resources].GetString("display_name",gMaterials[i].label,sizeof(gMaterials[].label),ids[i]);
+        gCfg[C_Resources].GetString("display_name",gMaterials[i].label,sizeof(gMaterials[].label),labels[i]);
         gCfg[C_Resources].GetString("model",gMaterials[i].model,sizeof(gMaterials[].model));
         gMaterials[i].quota=gCfg[C_Resources].GetNum("hits_per_cycle");
         gMaterials[i].yield=gCfg[C_Resources].GetNum("yield_per_successful_hit");
@@ -115,8 +130,9 @@ bool ReadMaterials()
         for(int axis=0;axis<3;axis++)gMaterials[i].rgb[axis]=StringToInt(parts[axis]);
         char curve[32];gCfg[C_Resources].GetString("render_alpha_curve",curve,sizeof(curve),"linear");
         gMaterials[i].ease=StrEqual(curve,"ease_in");
-        if(gMaterials[i].quota<1 || gMaterials[i].yield<1 || gMaterials[i].grow<0.25 || gMaterials[i].hold<0.0
-           || gMaterials[i].scale<=0.0 || gMaterials[i].scale>4.0 || PrecacheModel(gMaterials[i].model,true)<=0)return ConfigFailure("material model/quota/growth");
+        if(gMaterials[i].quota<1 || gMaterials[i].yield<1
+           || !ValidResourceGrowth(gMaterials[i].hold,gMaterials[i].grow,gMaterials[i].scale)
+           || PrecacheModel(gMaterials[i].model,true)<=0)return ConfigFailure("material model/quota/growth");
     }
     return true;
 }
@@ -223,9 +239,9 @@ bool TokenPresent(const char[] tokens,const char[] word)
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines};
-    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine};
-    for(int file=0;file<4;file++)
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers};
+    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier};
+    for(int file=0;file<sizeof(files);file++)
     {
         KeyValues kv=gCfg[files[file]];kv.Rewind();
         if(!kv.JumpToKey("BuildRecipes") || !kv.GotoFirstSubKey())return ConfigFailure("BuildRecipes");
@@ -262,8 +278,17 @@ bool ValidateDayRanges()
     do
     {
         int low=gCfg[C_Days].GetNum("from_day"),high=gCfg[C_Days].GetNum("to_day"),target=gCfg[C_Days].GetNum("night_target_alive");
-        if(unlimited || low!=expected || target<1 || target>gPopulationLimit || (high!=0 && high<low))return ConfigFailure("day range/target");
-        if(gCfg[C_Days].GetFloat("raider_hp_multiplier",1.0)<=0.0 || gCfg[C_Days].GetFloat("spawn_interval_seconds",1.0)<0.25)return ConfigFailure("day growth/timing");
+        int dayTarget=gCfg[C_Days].GetNum("day_target_alive",8);
+        if(unlimited || low!=expected || target<1 || target>gPopulationLimit || dayTarget<0 || dayTarget>target || (high!=0 && high<low))return ConfigFailure("day range/target");
+        int extra=gCfg[C_Days].GetNum("extra_alive_per_day_after_from",0),cap=gCfg[C_Days].GetNum("night_target_cap",gPopulationLimit);
+        float hp=gCfg[C_Days].GetFloat("raider_hp_multiplier",1.0),hpExtra=gCfg[C_Days].GetFloat("extra_hp_multiplier_per_day",0.0);
+        float hpCap=gCfg[C_Days].GetFloat("hp_multiplier_cap",10.0);
+        if(extra<0 || extra>gPopulationLimit || cap<target || cap>gPopulationLimit
+            || !(hp>0.0 && hp<=1000.0) || !(hpExtra>=0.0 && hpExtra<=1000.0) || !(hpCap>=hp && hpCap<=1000.0))return ConfigFailure("day growth/caps");
+        if(gCfg[C_Days].GetFloat("raider_hp_multiplier",1.0)<=0.0 || gCfg[C_Days].GetFloat("spawn_interval_seconds",1.0)<0.25
+            || gCfg[C_Days].GetFloat("day_spawn_interval_seconds",2.0)<0.25 || gCfg[C_Days].GetNum("spawn_batch",2)<1
+            || gCfg[C_Days].GetNum("day_spawn_batch",2)<1)return ConfigFailure("day growth/timing");
+        if(!ValidateStageCvars(gCfg[C_Days]))return ConfigFailure("stage Cvars: unknown option, unsafe value or count exceeds native pool");
         unlimited=high==0;expected=high+1;
     }while(gCfg[C_Days].GotoNextKey());
     return unlimited || ConfigFailure("last day range must be unbounded");
@@ -304,10 +329,32 @@ int NightTarget()
 {
     if(!SelectDay())return 0;
     int target=gCfg[C_Days].GetNum("night_target_alive");
-    target+=(gDay-gCfg[C_Days].GetNum("from_day"))*gCfg[C_Days].GetNum("extra_alive_per_day_after_from",0);
+    int elapsed=gDay-gCfg[C_Days].GetNum("from_day"),extra=gCfg[C_Days].GetNum("extra_alive_per_day_after_from",0);
     int cap=gCfg[C_Days].GetNum("night_target_cap",gPopulationLimit);
-    if(target>cap)target=cap;if(target>gPopulationLimit)target=gPopulationLimit;
+    int stageCap=StagePopulationCap();if(cap>stageCap)cap=stageCap;
+    if(target>cap)target=cap;
+    if(extra>0 && elapsed>0 && target<cap)
+    {
+        // Saturate BEFORE multiplication; even an INT_MAX day cannot overflow.
+        int remaining=cap-target,daysToCap=remaining/extra+(remaining%extra!=0 ? 1 : 0);
+        target=elapsed>=daysToCap ? cap : target+elapsed*extra;
+    }
     return target;
+}
+
+int DayTarget()
+{
+    if(!SelectDay())return 0;
+    int target=gCfg[C_Days].GetNum("day_target_alive",8);
+    int cap=StagePopulationCap();if(target>cap)target=cap;
+    return target;
+}
+
+int OrdinaryTarget()
+{
+    if(gPhase==Phase_Day)return DayTarget();
+    if(gPhase==Phase_Night)return NightTarget();
+    return 0;
 }
 
 float HPScale()

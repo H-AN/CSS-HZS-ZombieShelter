@@ -1,0 +1,15 @@
+{
+  "HUDAmplifierName": {
+    "en": "Damage amplifier",
+    "chi": "伤害增强器"
+  },
+  "RecipeDamageAmplifier": {
+    "en": "Damage amplifier",
+    "chi": "伤害增强器"
+  },
+  "AmplifierBaseLevelRequired": {
+    "format": "{1:d}",
+    "en": "This amplifier level requires a surviving base at level {1}.",
+    "chi": "此阶增强器需要至少一座存活基地达到 {1} 级。"
+  }
+}

@@ -1,0 +1,265 @@
+{
+  "HUDBaseName": {
+    "format": "{1:s}",
+    "en": "Base {1}",
+    "chi": "基地{1}"
+  },
+  "HUDBaseGeneric": {
+    "en": "Base",
+    "chi": "基地"
+  },
+  "HUDTurretName": {
+    "en": "Turret",
+    "chi": "炮塔"
+  },
+  "HUDFlameName": {
+    "en": "Flame turret",
+    "chi": "火焰喷射器"
+  },
+  "HUDFenceName": {
+    "en": "Fence",
+    "chi": "围栏"
+  },
+  "HUDMineName": {
+    "en": "Mine",
+    "chi": "地雷"
+  },
+  "HUDBaseUseHint": {
+    "en": "E in safe area: base menu",
+    "chi": "安全区内 E 基地菜单"
+  },
+  "HUDDefenseUseHint": {
+    "en": "Aim and press E: manage",
+    "chi": "瞄准按 E 管理"
+  },
+  "HUDBuildingTarget": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:s}",
+    "en": "{1} | Level {2}\nHP {3}/{4}\nKnife: repair | {5}",
+    "chi": "{1} | 等级 {2}\n血量 {3}/{4}\n刀修复 | {5}"
+  },
+  "HUDResourceGrowing": {
+    "en": "Regrowing",
+    "chi": "正在恢复"
+  },
+  "HUDResourceKnife": {
+    "en": "Use your knife to gather",
+    "chi": "使用刀采集"
+  },
+  "HUDResourceTarget": {
+    "format": "{1:s},{2:d},{3:d},{4:s}",
+    "en": "{1} | Gather {2}/{3}\n{4}",
+    "chi": "{1} | 可采集 {2}/{3}\n{4}"
+  },
+  "HUDGather": {
+    "format": "{1:s},{2:d},{3:d},{4:d}",
+    "en": "{1} +{2} | Gather {3}/{4}",
+    "chi": "{1} +{2} | 可采集 {3}/{4}"
+  },
+  "HUDGatherDepleted": {
+    "format": "{1:s},{2:d},{3:d},{4:d}",
+    "en": "{1} +{2} | Gather {3}/{4}\nDepleted. Waiting to regrow.",
+    "chi": "{1} +{2} | 可采集 {3}/{4}\n已采尽, 等待恢复"
+  },
+  "HUDRepair": {
+    "format": "{1:s},{2:d},{3:d},{4:d}",
+    "en": "{1} repair +{2}\nHP {3}/{4}",
+    "chi": "{1} 修复 +{2}\n血量 {3}/{4}"
+  },
+  "HUDRepairFull": {
+    "format": "{1:s},{2:d},{3:d}",
+    "en": "{1} HP {2}/{3} | Full health",
+    "chi": "{1} 血量 {2}/{3} | 已满血"
+  },
+  "HUDUpgrade": {
+    "format": "{1:s},{2:d},{3:d},{4:d}",
+    "en": "{1} upgraded to level {2}\nHP {3}/{4}",
+    "chi": "{1} 升至 {2} 级\n血量 {3}/{4}"
+  },
+  "HUDPhaseDay": {
+    "en": "Day",
+    "chi": "白天"
+  },
+  "HUDPhaseNight": {
+    "en": "Night",
+    "chi": "黑夜"
+  },
+  "HUDCampaign": {
+    "format": "{1:d},{2:s},{3:d},{4:d},{5:d},{6:d},{7:d},{8:d},{9:d}",
+    "en": "Day {1} {2} | {3}s\nBases {4}/{5} | Boss {8}/{9}\nZombies {6}/{7}",
+    "chi": "第{1}天 {2} | {3}秒\n基地 {4}/{5} | Boss {8}/{9}\n丧尸 {6}/{7}"
+  },
+  "HUDInventory": {
+    "format": "{1:d},{2:d},{3:d},{4:d},{5:d}",
+    "en": "Personal backpack\nWood {1} | Iron {2}\nCopper {3} | Silver {4}\nGold {5}\n!build | E: base/storage",
+    "chi": "个人背包\n木 {1} | 铁 {2}\n铜 {3} | 银 {4}\n金 {5}\n!build 建造 | E 基地/仓库"
+  },
+  "CmdNotStarted": {
+    "en": "Zombie Shelter has not started.",
+    "chi": "昼夜求生尚未开始。"
+  },
+  "MenuBuildTitle": {
+    "en": "Build defenses (uses your backpack)",
+    "chi": "建造防御设施 (消耗个人背包)"
+  },
+  "MenuBuildRecipe": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d}",
+    "en": "{1} W{2} I{3} C{4} S{5} G{6}",
+    "chi": "{1} 木{2} 铁{3} 铜{4} 银{5} 金{6}"
+  },
+  "CmdPlayerInventoryOnly": {
+    "en": "[Shelter] Check your backpack from an in-game client.",
+    "chi": "[昼夜求生] 请由游戏内玩家查询个人背包。"
+  },
+  "CmdInventory": {
+    "format": "{1:d},{2:d},{3:d},{4:d},{5:d}",
+    "en": "Backpack: wood {1}, iron {2}, copper {3}, silver {4}, gold {5}. Press E in a base safe area to deposit or withdraw shared supplies.",
+    "chi": "个人背包: 木{1} 铁{2} 铜{3} 银{4} 金{5}; 安全区内按 E 可存取该基地的共享物资。"
+  },
+  "CmdStatus": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d},{7:d},{8:d},{9:d},{10:d},{11:d},{12:d},{13:d},{14:d},{15:d}",
+    "en": "[Shelter] version={1} enabled={2} ready={3} phase={4} day={5} bases={6}/{7} nodes={8} summons={9} tracked={10} parked={11} raiders={12} bosses={13} epoch={14} rollback={15}",
+    "chi": "[Shelter] version={1} enabled={2} ready={3} phase={4} day={5} bases={6}/{7} nodes={8} summons={9} tracked={10} parked={11} raiders={12} bosses={13} epoch={14} rollback={15}"
+  },
+  "CmdStatusBase": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d}",
+    "en": "[ShelterBase] {1} level={2} hp={3}/{4} alive={5} ref={6}",
+    "chi": "[ShelterBase] {1} level={2} hp={3}/{4} alive={5} ref={6}"
+  },
+  "CmdStatusBoss": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d}",
+    "en": "[ShelterBoss] {1} hp={2} awake={3} defeated={4} bound={5} positioned_hp={6}",
+    "chi": "[ShelterBoss] {1} hp={2} awake={3} defeated={4} bound={5} positioned_hp={6}"
+  },
+  "CmdNativeNotStarted": {
+    "en": "[Shelter] Native Han_OnGameStart has not started this session.",
+    "chi": "[昼夜求生] 大灾变主体尚未发出 Han_OnGameStart 开始通知。"
+  },
+  "CmdPhaseUsage": {
+    "en": "Usage: sm_zsh_phase day|night",
+    "chi": "用法: sm_zsh_phase day|night"
+  },
+  "CmdDayUsage": {
+    "en": "Usage: sm_zsh_day <1..100000>",
+    "chi": "用法: sm_zsh_day <1..100000>"
+  },
+  "CmdGrantResult": {
+    "format": "{1:d},{2:s},{3:s}",
+    "en": "[Shelter] Granted {1} {2} to {3}'s backpack.",
+    "chi": "[昼夜求生] 已向{3}的个人背包发放{2} {1}。"
+  },
+  "CmdGrantUsage": {
+    "en": "Usage: sm_zsh_grant wood|iron|copper|silver|gold <1..1000000> [name|#userid]; requires a living recipient.",
+    "chi": "用法: sm_zsh_grant wood|iron|copper|silver|gold <1..1000000> [玩家名|#userid]; 目标必须存活。"
+  },
+  "CmdReloadBlocked": {
+    "en": "[Shelter] Models and positions cannot be reloaded during a campaign. Reload the map after changing configuration.",
+    "chi": "[昼夜求生] 战役中不热换模型/位置; 修改配置后重新加载地图生效。"
+  },
+  "CmdReloadResult": {
+    "format": "{1:d}",
+    "en": "[Shelter] reload enabled={1}",
+    "chi": "[昼夜求生] 重新载入完成 enabled={1}"
+  },
+  "MenuBaseAlive": {
+    "en": "Knife repairs | Upgrades use your backpack",
+    "chi": "刀修复 | 升级消耗个人背包"
+  },
+  "MenuBaseDestroyed": {
+    "en": "Base destroyed; this safe area still offers shelter",
+    "chi": "基地已摧毁, 当前安全区仍可避难"
+  },
+  "MenuBaseTitle": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:s}",
+    "en": "{1}\nLevel {2} | Maximum HP {3}\nCurrent HP {4}/{5}\n{6}",
+    "chi": "{1}\n等级 {2} | 最大血量 {3}\n当前血量 {4}/{5}\n{6}"
+  },
+  "MenuUpgradeView": {
+    "en": "Upgrade base: view materials",
+    "chi": "升级基地: 查看材料需求"
+  },
+  "MenuUpgradeUnavailable": {
+    "en": "Upgrade unavailable / maximum level",
+    "chi": "基地无法升级 / 已达最高等级"
+  },
+  "MenuStorage": {
+    "en": "Shared supplies: deposit / withdraw",
+    "chi": "共享物资: 存入 / 取出"
+  },
+  "MenuBuild": {
+    "en": "Build defenses",
+    "chi": "建造防御设施"
+  },
+  "MenuUpgradeTitle": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d}",
+    "en": "{1} upgrade {2} -> {3}\nMaximum HP {4} -> {5}\nBackpack: owned / required",
+    "chi": "{1} 升级 {2} -> {3}\n最大血量 {4} -> {5}\n个人背包: 已有 / 需要"
+  },
+  "MenuUpgradeCost": {
+    "format": "{1:s},{2:d},{3:d}",
+    "en": "\n{1}: {2} / {3}",
+    "chi": "\n{1}: {2} / {3}"
+  },
+  "MenuUpgradeConfirm": {
+    "en": "Confirm: spend backpack materials",
+    "chi": "确认消耗背包材料并升级"
+  },
+  "MenuUpgradeInsufficient": {
+    "en": "Insufficient backpack materials (withdraw first)",
+    "chi": "背包材料不足 (可先到仓库取出)"
+  },
+  "MenuBackBase": {
+    "en": "Return to base menu",
+    "chi": "返回基地菜单"
+  },
+  "MenuStorageTitle": {
+    "format": "{1:s}",
+    "en": "{1} shared supplies\nAll teammates can deposit or withdraw here.\nWithdraw to your backpack before building/upgrading.",
+    "chi": "{1} 共享物资\n所有队员可在本基地存取\n建造 / 升级需先将材料取入个人背包"
+  },
+  "MenuStorageMaterial": {
+    "format": "{1:s},{2:d},{3:d}",
+    "en": "{1}: backpack {2} / storage {3}",
+    "chi": "{1}: 背包 {2} / 仓库 {3}"
+  },
+  "MenuMaterialTitle": {
+    "format": "{1:s},{2:s},{3:d},{4:d}",
+    "en": "{1} | {2}\nBackpack {3} / Base storage {4}",
+    "chi": "{1} | {2}\n个人背包 {3} / 基地仓库 {4}"
+  },
+  "MenuDepositAll": {
+    "format": "{1:d}",
+    "en": "Deposit all ({1})",
+    "chi": "存入全部 ({1})"
+  },
+  "MenuWithdrawAll": {
+    "format": "{1:d}",
+    "en": "Withdraw all ({1})",
+    "chi": "取出全部 ({1})"
+  },
+  "MenuDepositAmount": {
+    "format": "{1:d}",
+    "en": "Deposit {1}",
+    "chi": "存入 {1}"
+  },
+  "MenuWithdrawAmount": {
+    "format": "{1:d}",
+    "en": "Withdraw {1}",
+    "chi": "取出 {1}"
+  },
+  "MenuBackStorage": {
+    "en": "Return to materials",
+    "chi": "返回物资列表"
+  },
+  "MenuExpired": {
+    "en": "This base menu expired. Press E inside the corresponding safe area to reopen it.",
+    "chi": "基地菜单已失效, 请在对应安全区内按 E 重新打开。"
+  },
+  "MenuTransferFailed": {
+    "en": "The amount, capacity, or safe area changed. No transfer was completed.",
+    "chi": "物资数量、背包容量或所在区域已变化, 存取未完成。"
+  },
+  "MenuUpgradeChanged": {
+    "en": "The base or backpack materials changed. Upgrade was not completed.",
+    "chi": "基地状态或背包材料已变化, 升级未完成。"
+  }
+}

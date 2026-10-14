@@ -1,0 +1,15 @@
+{
+  "BossAwakened": {"en":"The Boss has awakened!","chi":"Boss已经苏醒！"},
+  "StorageDeposited": {"format":"{1:s},{2:d},{3:d},{4:d}","en":"Deposited {1} +{2}\nBackpack {3} | Base storage {4}","chi":"存入{1} +{2}\n个人 {3} | 基地仓库 {4}"},
+  "StorageWithdrawn": {"format":"{1:s},{2:d},{3:d},{4:d}","en":"Withdrew {1} +{2}\nBackpack {3} | Base storage {4}","chi":"取出{1} +{2}\n个人 {3} | 基地仓库 {4}"},
+  "MaterialWood": {"en":"Wood","chi":"木材"},
+  "MaterialIron": {"en":"Iron","chi":"铁材"},
+  "MaterialCopper": {"en":"Copper","chi":"铜材"},
+  "MaterialSilver": {"en":"Silver","chi":"银材"},
+  "MaterialGold": {"en":"Gold","chi":"金材"},
+  "RecipeTurretBasic": {"en":"Basic machine gun turret","chi":"简易机枪塔"},
+  "RecipeTurretHeavy": {"en":"Heavy machine gun turret","chi":"重型机枪塔"},
+  "RecipeFlame": {"en":"Flamethrower turret","chi":"火焰喷射塔"},
+  "RecipeFence": {"en":"Wire fence","chi":"铁丝围栏"},
+  "RecipeMine": {"en":"Mine","chi":"地雷"}
+}

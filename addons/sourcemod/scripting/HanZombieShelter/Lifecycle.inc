@@ -3,6 +3,7 @@ void OverrideCorePool()
     if(!gEnabled)return;
     gCorePoolCvar=FindConVar("hzs_maxzombiespawn");
     if(gCorePoolCvar==null)return;
+    CaptureDayCvars();gNativePoolBootstrap=true;
     if(!gPoolOverridden){gOriginalPool=gCorePoolCvar.IntValue;gPoolOverridden=true;}
     gCorePoolCvar.IntValue=gNativePoolSize;
 }
@@ -30,6 +31,7 @@ void RestoreServerPolicy()
 
 void RestoreCorePool()
 {
+    RestoreDayCvars();
     if(gPoolOverridden && gCorePoolCvar!=null)gCorePoolCvar.IntValue=gOriginalPool;
     gPoolOverridden=false;
 }
@@ -44,7 +46,7 @@ void PrepareRound()
     for(int i=0;i<gBossCount;i++)gBosses[i].boundThisRound=false;
     if(!CreateWorld(gSnapshot))
     {
-        CleanWorld();gEnabled=false;RestoreCorePool();LogError("[Shelter] World creation failed; mode left disabled, no partial session");return;
+        CleanWorld();gEnabled=false;RestoreCorePool();RestoreServerPolicy();LogError("[Shelter] World creation failed; mode left disabled, no partial session");return;
     }
     gSnapshot=true;gRoundPrepared=true;gRollback=false;OverrideCorePool();
 }
@@ -53,17 +55,19 @@ void StartDay(bool advance)
 {
     if(!gEnabled || gTerminal || !gRoundPrepared)return;
     if(advance)gDay++;
-    gPhase=Phase_Day;gDeadline=GetGameTime()+gDaySeconds;gWarningSent=false;
-    for(int n=0;n<MAX_NPCS;n++)if(gNPCs[n].used && gNPCs[n].ready && !gNPCs[n].dead && gNPCs[n].boss<0)ParkNPC(n);
-    char text[192];Format(text,sizeof(text),"第%d天白天：出门采集，修建基地。距离黑夜%.0f秒。",gDay,gDaySeconds);Announce(text);
+    gPhase=Phase_Day;gDeadline=GetGameTime()+gDaySeconds;gWarningSent=false;gNextAdmissions=0.0;
+    ApplyDayCvars();
+    TrimOrdinary(DayTarget());
+    AnnouncePhrase("DayStarted",gDay,RoundToNearest(gDaySeconds));
 }
 
 void StartNight()
 {
     if(!Running() || gTerminal)return;
     gPhase=Phase_Night;gDeadline=GetGameTime()+gNightSeconds;gNextAdmissions=0.0;
+    ApplyDayCvars();TrimOrdinary(NightTarget());
     gNextExposure=GetGameTime()+gExposureInterval;
-    char text[192];Format(text,sizeof(text),"第%d天黑夜：请进入存活基地！屋外每%.1f秒损失%d点生命。",gDay,gExposureInterval,gExposureDamage);Announce(text);
+    AnnouncePhrase("NightStarted",gDay,gExposureInterval,gExposureDamage);
 }
 
 public void Han_OnGameStart()
@@ -73,6 +77,7 @@ public void Han_OnGameStart()
     if(!gRoundPrepared)PrepareRound();
     if(!gRoundPrepared)return;
     OverrideCorePool();StartDay(false);gNextBossAudit=GetGameTime()+3.0;
+    RequestFrame(FinishNativePoolBootstrap,gEpoch);
 }
 
 public void Han_OnGameEnd()
@@ -120,15 +125,16 @@ public void ResolveOutcome(any epoch)
     }
     if(victory || gDirectLoss)
     {
-        gTerminal=true;gDeadline=GetGameTime()+gOutcomeSeconds;Announce(victory ? gVictoryText : gFailureText);
+        gTerminal=true;gDeadline=GetGameTime()+gOutcomeSeconds;AnnouncePhrase(victory ? gVictoryText : gFailureText);
     }
     else
     {
         gDay-=gRollbackDays;if(gDay<gMinimumDay)gDay=gMinimumDay;
+        ApplyDayCvars();
         RecoverBases();
         if(gDestroySummons)
             for(int b=gCoreCount;b<MAX_BUILDINGS;b++){gBuildings[b].alive=false;gBuildings[b].used=false;}
-        gRollback=true;char text[192];Format(text,sizeof(text),"防守失败，回到第%d天。基地成长保留；%s。",gDay,gDestroySummons ? "召唤物清空" : "存活设施将在下一回合重建");Announce(text);
+        gRollback=true;AnnouncePhrase(gDestroySummons ? "CampaignRollbackDestroy" : "CampaignRollbackRetain",gDay);
         if(!gTerminationExpected)CS_TerminateRound(3.0,CSRoundEnd_Draw,true);
     }
 }
@@ -188,7 +194,7 @@ public void RedirectHuman(any value)
     if(!redirect)return;
     float position[3],angles[3];
     if(SafeHumanPoint(client,position,angles)){TeleportEntity(client,position,angles,view_as<float>({0.0,0.0,0.0}));return;}
-    if(attempt>=4){Tell(client,"安全出生点暂被占用，请尽快前往存活基地。");return;}
+    if(attempt>=4){Tell(client,"%t","SafeSpawnOccupied");return;}
     DataPack retry;CreateDataTimer(0.25,RetryHuman,retry,TIMER_FLAG_NO_MAPCHANGE);retry.WriteCell(serial);retry.WriteCell(epoch);retry.WriteCell(attempt+1);
 }
 
@@ -210,22 +216,9 @@ void ExposureTick(float now)
     }
 }
 
-void CampaignHUD(float now)
+void CampaignHUD()
 {
-    if(now<gNextHUD)return;gNextHUD=now+1.0;
-    int bosses;for(int i=0;i<gBossCount;i++)if(gBosses[i].defeated)bosses++;
-    for(int client=1;client<=MaxClients;client++)
-    {
-        if(!IsClientInGame(client) || IsFakeClient(client))continue;
-        if(gTerminal){PrintCenterText(client,"%s",gVictoryCandidate ? gVictoryText : gFailureText);continue;}
-        if(!Running())continue;
-        int b=LiveHuman(client) ? FindBuilding(AimedEntity(client,gUseDistance)) : -1;
-        char target[128];if(b>=0)Format(target,sizeof(target),"\n瞄准设施 Lv%d HP %d/%d · E升级 · 刀修",gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP);
-        float seconds=gDeadline-now;if(seconds<0.0)seconds=0.0;
-        PrintHintText(client,"第%d天 %s %.0f秒 · 基地%d/%d · 夜袭%d/%d\n木%d 铁%d 铜%d 银%d 金%d · Boss%d/%d%s",
-            gDay,gPhase==Phase_Day ? "白天" : "黑夜",seconds,AliveCores(),gCoreCount,ActiveOrdinary(),gPhase==Phase_Night ? NightTarget() : 0,
-            gInventory[0],gInventory[1],gInventory[2],gInventory[3],gInventory[4],bosses,gBossCount,target);
-    }
+    RenderCampaignHUD();
 }
 
 void ChangeCampaignMap()
@@ -242,7 +235,8 @@ void ChangeCampaignMap()
         delete list;
         if(!IsMapValid(next))strcopy(next,sizeof(next),gMap);
     }
-    gDeadline=999999999.0;ForceChangeLevel(next,"昼夜求生战役结束");
+    char reason[192];Format(reason,sizeof(reason),"%T","CampaignMapChange",LANG_SERVER);
+    gDeadline=999999999.0;ForceChangeLevel(next,reason);
 }
 
 public Action WorldTick(Handle timer)
@@ -252,15 +246,16 @@ public Action WorldTick(Handle timer)
     gCoreReady=APIAvailable();
     if(gTerminal)
     {
-        CampaignHUD(now);if(now>=gDeadline)ChangeCampaignMap();return Plugin_Continue;
+        CampaignHUD();if(now>=gDeadline)ChangeCampaignMap();return Plugin_Continue;
     }
     if(!Running())return Plugin_Continue;
     if(now>=gDeadline){if(gPhase==Phase_Day)StartNight();else StartDay(true);}
     else if(gPhase==Phase_Day && !gWarningSent && gDeadline-now<=gWarningSeconds)
     {
-        gWarningSent=true;Announce("黑夜即将到来，请赶回基地！");
+        gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
-    ResourceTick(elapsed);NPCTick(now);DefenseTick(now);ExposureTick(now);CampaignHUD(now);
+    EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
+    ResourceTick(elapsed);NPCTick(now);DefenseTick(now);ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

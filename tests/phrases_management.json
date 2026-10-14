@@ -1,0 +1,232 @@
+{
+  "HUDBuildingAttacked": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:s}",
+    "en": "{1} | Level {2} | UNDER ATTACK\nHP {3}/{4}\nKnife: repair | {5}",
+    "chi": "{1} | 等级 {2} | 正在被攻击\n血量 {3}/{4}\n刀修复 | {5}"
+  },
+  "HUDBaseAttackList": {
+    "format": "{1:s}",
+    "en": "Bases under attack:\n{1}",
+    "chi": "基地正在被攻击:\n{1}"
+  },
+  "MenuStoragePending": {
+    "format": "{1:d}",
+    "en": "\nWaiting for warehouse space: {1}",
+    "chi": "\n待入仓物资: {1}"
+  },
+  "DefenseTitle": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d},{7:.2f},{8:s}",
+    "en": "{1} | Level {2}\nHP {3}/{4}\nRange {5} | Base damage {6} | Interval {7}s\n{8}",
+    "chi": "{1} | 等级 {2}\n血量 {3}/{4}\n射程 {5} | 基础伤害 {6} | 间隔 {7}秒\n{8}"
+  },
+  "DefenseUpgradeUnavailable": {
+    "en": "This defense has reached its highest level",
+    "chi": "此设施已达最高等级"
+  },
+  "DefenseAmplifierTitle": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:d},{7:d},{8:d},{9:d},{10:s}",
+    "en": "{1} | Level {2}\nHP {3}/{4} | Requires base level {5}\nPlayer: normal +{6}%% / boss +{7}%%\nDefense: normal +{8}%% / boss +{9}%%\nTeam-wide additive damage bonuses\n{10}",
+    "chi": "{1} | 等级 {2}\n血量 {3}/{4} | 需基地等级 {5}\n玩家: 普通 +{6}%% / 首领 +{7}%%\n设施: 普通 +{8}%% / 首领 +{9}%%\n全队共享伤害倍率加成\n{10}"
+  },
+  "DefenseBaseRequirement": {
+    "format": "{1:d},{2:d}",
+    "en": "\nTeam base level: {1} / required {2}",
+    "chi": "\n团队基地等级: {1} / 需要 {2}"
+  },
+  "DefenseBaseLevelLocked": {
+    "en": "Base level is too low",
+    "chi": "基地等级不足"
+  },
+  "DefenseManageAllowed": {
+    "en": "You can manage this structure",
+    "chi": "你可以管理此设施"
+  },
+  "DefenseViewOnly": {
+    "en": "View only: another player's structure",
+    "chi": "仅可查看: 其他玩家的设施"
+  },
+  "DefenseUpgradeView": {
+    "en": "View next level and upgrade cost",
+    "chi": "查看下一等级及升级材料"
+  },
+  "DefenseDismantleView": {
+    "en": "Dismantle and view refund",
+    "chi": "拆除并查看返还材料"
+  },
+  "DefenseBack": {
+    "en": "Back to structure",
+    "chi": "返回设施菜单"
+  },
+  "DefenseDismantleTitle": {
+    "format": "{1:s}",
+    "en": "Dismantle {1}?\nConfigured material refund:\n",
+    "chi": "确定拆除 {1}?\n按配置返还材料:\n"
+  },
+  "DefenseRefundLine": {
+    "format": "{1:s},{2:d}",
+    "en": "{1}: {2}\n",
+    "chi": "{1}: {2}\n"
+  },
+  "DefenseDismantleConfirm": {
+    "en": "Confirm dismantle",
+    "chi": "确认拆除"
+  },
+  "DefenseDismantleFailed": {
+    "en": "Cannot dismantle: check ownership, distance and refund capacity.",
+    "chi": "拆除失败: 请检查归属、距离及材料存放容量。"
+  },
+  "DefenseDismantled": {
+    "en": "Structure dismantled; materials returned.",
+    "chi": "设施已拆除，材料已返还。"
+  },
+  "DefenseExpired": {
+    "en": "Structure menu expired. Aim at it and press E again.",
+    "chi": "设施菜单已过期，请重新瞄准并按 E。"
+  },
+  "AdminBuildingControls": {
+    "en": "Administrator controls",
+    "chi": "管理员管理"
+  },
+  "AdminAccessDenied": {
+    "en": "A living shelter administrator is required.",
+    "chi": "需要存活的昼夜求生管理员权限。"
+  },
+  "AdminTitle": {
+    "format": "{1:d}",
+    "en": "Shelter administration | Day {1}",
+    "chi": "昼夜求生管理 | 第 {1} 天"
+  },
+  "AdminResetDay": {
+    "en": "Reset the current day",
+    "chi": "重置当天"
+  },
+  "AdminBaseSupplies": {
+    "en": "Shared base materials",
+    "chi": "基地共享物资"
+  },
+  "AdminPlayerSupplies": {
+    "en": "Online player materials",
+    "chi": "在线玩家物资"
+  },
+  "AdminAllBuildings": {
+    "en": "All structures",
+    "chi": "全部建筑列表"
+  },
+  "AdminResetTitle": {
+    "format": "{1:d}",
+    "en": "Reset day {1} to daytime?\nKeep materials and surviving defenses.\nRestore bases and restart the round.",
+    "chi": "确定重置第 {1} 天为白天?\n保留材料和存活设施。\n恢复基地并重新开始回合。"
+  },
+  "AdminConfirmReset": {
+    "en": "Confirm day reset",
+    "chi": "确认重置当天"
+  },
+  "AdminBack": {
+    "en": "Back",
+    "chi": "返回"
+  },
+  "AdminMaterialsTitle": {
+    "format": "{1:s}",
+    "en": "Materials | {1}",
+    "chi": "物资管理 | {1}"
+  },
+  "AdminMaterialCount": {
+    "format": "{1:s},{2:d}",
+    "en": "{1}: {2}",
+    "chi": "{1}: {2}"
+  },
+  "AdminAmountTitle": {
+    "format": "{1:s},{2:s},{3:d}",
+    "en": "{1}\n{2}: {3}",
+    "chi": "{1}\n{2}: {3}"
+  },
+  "AdminAdd10": {
+    "en": "Add 10",
+    "chi": "增加 10"
+  },
+  "AdminAdd100": {
+    "en": "Add 100",
+    "chi": "增加 100"
+  },
+  "AdminRemove10": {
+    "en": "Remove 10",
+    "chi": "减少 10"
+  },
+  "AdminRemove100": {
+    "en": "Remove 100",
+    "chi": "减少 100"
+  },
+  "AdminSetZero": {
+    "en": "Set to 0",
+    "chi": "设置为 0"
+  },
+  "AdminSetCustom": {
+    "en": "Set an exact amount",
+    "chi": "设置指定数量"
+  },
+  "AdminBuildingEntry": {
+    "format": "{1:s},{2:d},{3:d}",
+    "en": "{1} #{2} | Level {3}",
+    "chi": "{1} #{2} | 等级 {3}"
+  },
+  "AdminNearbyScope": {
+    "en": "Nearby controls: stay within reach",
+    "chi": "近距离管理: 请保持在操作范围内"
+  },
+  "AdminGlobalScope": {
+    "en": "Global administrator controls",
+    "chi": "管理员远程管理"
+  },
+  "AdminBuildingTitle": {
+    "format": "{1:s},{2:d},{3:d},{4:d},{5:d},{6:s}",
+    "en": "{1} #{2} | Level {3}\nHP {4}/{5}\n{6}",
+    "chi": "{1} #{2} | 等级 {3}\n血量 {4}/{5}\n{6}"
+  },
+  "AdminLevelUp": {
+    "en": "Increase level by 1",
+    "chi": "提升 1 级"
+  },
+  "AdminLevelDown": {
+    "en": "Decrease level by 1",
+    "chi": "降低 1 级"
+  },
+  "AdminDestroyBuilding": {
+    "en": "Destroy this structure",
+    "chi": "摧毁此建筑"
+  },
+  "AdminDestroyTitle": {
+    "format": "{1:s},{2:d}",
+    "en": "Destroy {1} #{2}?\nConfigured defense refunds apply.\nDestroying the final base causes defeat.",
+    "chi": "确定摧毁 {1} #{2}?\n设施按配置返还材料。\n摧毁最后一个基地会判定失败。"
+  },
+  "AdminLevelTitle": {
+    "format": "{1:s},{2:d},{3:d}",
+    "en": "Change {1} from level {2} to {3}?\nAdministrator adjustment uses no materials.",
+    "chi": "将 {1} 从等级 {2} 改为 {3}?\n管理员调整不消耗材料。"
+  },
+  "AdminConfirm": {
+    "en": "Confirm",
+    "chi": "确认"
+  },
+  "AdminMutationRejected": {
+    "en": "Change rejected: target, permission, amount or capacity changed.",
+    "chi": "修改失败: 目标、权限、数量或容量已变化。"
+  },
+  "AdminMaterialChanged": {
+    "format": "{1:d}",
+    "en": "Material quantity set to {1}.",
+    "chi": "物资数量已设置为 {1}。"
+  },
+  "AdminCustomInput": {
+    "en": "Within 30 seconds enter in console: sm_zsh_admin_value <0-2000000000>.",
+    "chi": "请在 30 秒内于控制台输入: sm_zsh_admin_value <0-2000000000>。"
+  },
+  "AdminMenuExpired": {
+    "en": "Administrator menu expired. Open it again.",
+    "chi": "管理员菜单已过期，请重新打开。"
+  },
+  "AdminBuildingChanged": {
+    "en": "Structure updated.",
+    "chi": "建筑状态已更新。"
+  }
+}

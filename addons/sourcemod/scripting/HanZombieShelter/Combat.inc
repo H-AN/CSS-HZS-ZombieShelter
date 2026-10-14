@@ -43,14 +43,14 @@ int DamageCredit(int serial)
     return 0;
 }
 
-bool DamageNPC(int n,int damage,int serial=0)
+bool DamageNPC(int n,int damage,int serial=0,bool defense=false)
 {
     if(!Running() || n<0 || n>=MAX_NPCS || !gNPCs[n].used || !gNPCs[n].active || gNPCs[n].dead || damage<1)return false;
     int entity=Resolve(gNPCs[n].ref),client=DamageCredit(serial);if(entity<0 || client==0)return false;
-    int previousRef=gDamageNPCRef,previousValue=gDamageValue;
-    gDamageNPCRef=gNPCs[n].ref;gDamageValue=damage>100000 ? 100000 : damage;
+    int previousRef=gDamageNPCRef,previousValue=gDamageValue;bool previousDefense=gDamageIsDefense;
+    gDamageNPCRef=gNPCs[n].ref;gDamageValue=damage>100000 ? 100000 : damage;gDamageIsDefense=defense;
     bool applied=Han_SafeDamageZombie(client,entity,gDamageValue);
-    gDamageNPCRef=previousRef;gDamageValue=previousValue;
+    gDamageNPCRef=previousRef;gDamageValue=previousValue;gDamageIsDefense=previousDefense;
     return applied;
 }
 
@@ -90,7 +90,7 @@ void TurretFire(int b,float now)
     gBuildings[b].nextFire=now+gBuildings[b].interval;
     if(gBuildings[b].kind==Kind_Turret)
     {
-        Beam(muzzle,position,false);DamageNPC(target,RoundToNearest(gBuildings[b].damage));return;
+        Beam(muzzle,position,false);DamageNPC(target,RoundToNearest(gBuildings[b].damage),gBuildings[b].ownerSerial,true);return;
     }
     NormalizeVector(direction,direction);float cutoff=Cosine(DegToRad(gBuildings[b].halfAngle));
     for(int n=0;n<MAX_NPCS;n++)
@@ -99,15 +99,17 @@ void TurretFire(int b,float now)
         int victim=Resolve(gNPCs[n].ref);float point[3],toward[3];EntityCenter(victim,point);MakeVectorFromPoints(muzzle,point,toward);
         if(GetVectorLength(toward)>gBuildings[b].range)continue;
         NormalizeVector(toward,toward);if(GetVectorDotProduct(direction,toward)<cutoff || !LineClear(muzzle,point,body,victim))continue;
-        Beam(muzzle,point,true);DamageNPC(n,RoundToNearest(gBuildings[b].damage));
+        Beam(muzzle,point,true);DamageNPC(n,RoundToNearest(gBuildings[b].damage),gBuildings[b].ownerSerial,true);
         if(!gNPCs[n].dead && gBuildings[b].burnDuration>0.0)
         {
             bool burning=gNPCs[n].burnUntil>now;
             float until=now+gBuildings[b].burnDuration;if(until>gNPCs[n].burnUntil)gNPCs[n].burnUntil=until;
             if(!burning || gBuildings[b].burnDamage>=gNPCs[n].burnDamage)
-            {gNPCs[n].burnDamage=gBuildings[b].burnDamage;gNPCs[n].burnInterval=gBuildings[b].burnInterval;}
+            {
+                gNPCs[n].burnDamage=gBuildings[b].burnDamage;gNPCs[n].burnInterval=gBuildings[b].burnInterval;
+                int credit=DamageCredit(gBuildings[b].ownerSerial);gNPCs[n].burnClientSerial=credit>0 ? GetClientSerial(credit) : 0;
+            }
             if(!burning)gNPCs[n].nextBurn=now+gBuildings[b].burnInterval;
-            int credit=DamageCredit(0);gNPCs[n].burnClientSerial=credit>0 ? GetClientSerial(credit) : 0;
         }
     }
 }
@@ -132,7 +134,7 @@ void MineTick(int b)
     {
         if(!DefenseTarget(n,true))continue;
         int entity=Resolve(gNPCs[n].ref);float p[3];EntityCenter(entity,p);
-        if(GetVectorDistance(source,p)<=radius && LineClear(source,p,body,entity))DamageNPC(n,damage);
+        if(GetVectorDistance(source,p)<=radius && LineClear(source,p,body,entity))DamageNPC(n,damage,gBuildings[b].ownerSerial,true);
     }
     int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
 }
