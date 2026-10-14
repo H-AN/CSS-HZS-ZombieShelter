@@ -298,6 +298,12 @@
         "en"    "[Shelter] Check your backpack from an in-game client."
         "chi"    "[昼夜求生] 请由游戏内玩家查询个人背包。"
     }
+    "CmdPowerStatus"
+    {
+        "#format"    "{1:s},{2:.2f},{3:.2f},{4:.2f},{5:d}"
+        "en"    "[ShelterPower] {1} output={2} demand={3} allocated={4} offline={5}"
+        "chi"    "[ShelterPower] {1} output={2} demand={3} allocated={4} offline={5}"
+    }
     "CmdReloadBlocked"
     {
         "en"    "[Shelter] Models and positions cannot be reloaded during a campaign. Reload the map after changing configuration."
@@ -332,6 +338,12 @@
         "#format"    "{1:s}"
         "en"    "Configuration rejected: {1}"
         "chi"    "配置拒绝启动: {1}"
+    }
+    "ConsumerPowerInfo"
+    {
+        "#format"    "{1:s},{2:.1f},{3:.1f}"
+        "en"    "\n{1} | Load {2}\nSelected level load {3}"
+        "chi"    "\n{1} | 当前耗电 {2}\n所选等级耗电 {3}"
     }
     "DayResetByAdmin"
     {
@@ -475,6 +487,18 @@
         "en"    "Upgraded to level {1}. Health: {2} / {3}."
         "chi"    "已升级到{1}级. 耐久: {2} / {3}."
     }
+    "GeneratorPowerInfo"
+    {
+        "#format"    "{1:.1f},{2:.1f},{3:.1f}"
+        "en"    "\nActual output {1} / full HP {2}\nSelected level full output {3}"
+        "chi"    "\n实际发电 {1} / 满血产能 {2}\n所选等级满血产能 {3}"
+    }
+    "GrenadeRadiusInfo"
+    {
+        "#format"    "{1:.0f}"
+        "en"    "\nBlast radius {1}"
+        "chi"    "\n爆炸半径 {1}"
+    }
     "HUDAmplifierName"
     {
         "en"    "Damage amplifier"
@@ -547,11 +571,26 @@
         "en"    "{1} +{2} | Gather {3}/{4}\nDepleted. Waiting to regrow."
         "chi"    "{1} +{2} | 可采集 {3}/{4}\n已采尽, 等待恢复"
     }
+    "HUDGeneratorName"
+    {
+        "en"    "Generator"
+        "chi"    "发电机"
+    }
+    "HUDGrenadeName"
+    {
+        "en"    "Grenade turret"
+        "chi"    "榴弹炮塔"
+    }
     "HUDInventory"
     {
         "#format"    "{1:d},{2:d},{3:d},{4:d},{5:d}"
         "en"    "Personal backpack\nWood {1} | Iron {2}\nCopper {3} | Silver {4}\nGold {5}\n!build | E: base/storage"
         "chi"    "个人背包\n木 {1} | 铁 {2}\n铜 {3} | 银 {4}\n金 {5}\n!build 建造 | E 基地/仓库"
+    }
+    "HUDLightName"
+    {
+        "en"    "Lamp"
+        "chi"    "照明灯"
     }
     "HUDMineName"
     {
@@ -606,6 +645,18 @@
         "#format"    "{1:s},{2:d},{3:d},{4:d}"
         "en"    "{1} upgraded to level {2}\nHP {3}/{4}"
         "chi"    "{1} 升至 {2} 级\n血量 {3}/{4}"
+    }
+    "LampRadiusInfo"
+    {
+        "#format"    "{1:.0f}"
+        "en"    "\nLight radius {1}"
+        "chi"    "\n照明半径 {1}"
+    }
+    "LightLimitReached"
+    {
+        "#format"    "{1:d}"
+        "en"    "Lamp limit reached: {1}"
+        "chi"    "已达到灯具数量上限: {1}"
     }
     "MaterialCopper"
     {
@@ -790,6 +841,28 @@
         "en"    "Your backpack is full."
         "chi"    "个人背包已满."
     }
+    "PowerFacilityTitle"
+    {
+        "#format"    "{1:s},{2:d},{3:d},{4:d},{5:s}"
+        "en"    "{1} | Level {2}\nHP {3}/{4}\n{5}"
+        "chi"    "{1} | 等级 {2}\n血量 {3}/{4}\n{5}"
+    }
+    "PowerGridInfo"
+    {
+        "#format"    "{1:s},{2:.1f},{3:.1f},{4:.1f},{5:d}"
+        "en"    "\n{1} grid: output {2} / demand {3}\nAllocated {4} | Offline {5}"
+        "chi"    "\n{1}电网: 发电 {2} / 需求 {3}\n已供电 {4} | 停机 {5}"
+    }
+    "PowerOffline"
+    {
+        "en"    "No power - stopped"
+        "chi"    "供电不足 - 停机"
+    }
+    "PowerOnline"
+    {
+        "en"    "Powered"
+        "chi"    "供电正常"
+    }
     "RecipeDamageAmplifier"
     {
         "en"    "Damage amplifier"
@@ -804,6 +877,21 @@
     {
         "en"    "Flamethrower turret"
         "chi"    "火焰喷射塔"
+    }
+    "RecipeGenerator"
+    {
+        "en"    "Generator"
+        "chi"    "发电机"
+    }
+    "RecipeGrenade"
+    {
+        "en"    "Grenade turret"
+        "chi"    "榴弹炮塔"
+    }
+    "RecipeLamp"
+    {
+        "en"    "Lamp"
+        "chi"    "照明灯"
     }
     "RecipeMine"
     {

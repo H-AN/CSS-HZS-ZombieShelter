@@ -1,0 +1,38 @@
+{
+  "HUDGeneratorName": {"en":"Generator","chi":"发电机"},
+  "HUDLightName": {"en":"Lamp","chi":"照明灯"},
+  "HUDGrenadeName": {"en":"Grenade turret","chi":"榴弹炮塔"},
+  "RecipeGenerator": {"en":"Generator","chi":"发电机"},
+  "RecipeLamp": {"en":"Lamp","chi":"照明灯"},
+  "RecipeGrenade": {"en":"Grenade turret","chi":"榴弹炮塔"},
+  "PowerOnline": {"en":"Powered","chi":"供电正常"},
+  "PowerOffline": {"en":"No power - stopped","chi":"供电不足 - 停机"},
+  "PowerGridInfo": {
+    "format":"{1:s},{2:.1f},{3:.1f},{4:.1f},{5:d}",
+    "en":"\n{1} grid: output {2} / demand {3}\nAllocated {4} | Offline {5}",
+    "chi":"\n{1}电网: 发电 {2} / 需求 {3}\n已供电 {4} | 停机 {5}"
+  },
+  "GeneratorPowerInfo": {
+    "format":"{1:.1f},{2:.1f},{3:.1f}",
+    "en":"\nActual output {1} / full HP {2}\nSelected level full output {3}",
+    "chi":"\n实际发电 {1} / 满血产能 {2}\n所选等级满血产能 {3}"
+  },
+  "ConsumerPowerInfo": {
+    "format":"{1:s},{2:.1f},{3:.1f}",
+    "en":"\n{1} | Load {2}\nSelected level load {3}",
+    "chi":"\n{1} | 当前耗电 {2}\n所选等级耗电 {3}"
+  },
+  "PowerFacilityTitle": {
+    "format":"{1:s},{2:d},{3:d},{4:d},{5:s}",
+    "en":"{1} | Level {2}\nHP {3}/{4}\n{5}",
+    "chi":"{1} | 等级 {2}\n血量 {3}/{4}\n{5}"
+  },
+  "LampRadiusInfo": {"format":"{1:.0f}","en":"\nLight radius {1}","chi":"\n照明半径 {1}"},
+  "GrenadeRadiusInfo": {"format":"{1:.0f}","en":"\nBlast radius {1}","chi":"\n爆炸半径 {1}"},
+  "LightLimitReached": {"format":"{1:d}","en":"Lamp limit reached: {1}","chi":"已达到灯具数量上限: {1}"},
+  "CmdPowerStatus": {
+    "format":"{1:s},{2:.2f},{3:.2f},{4:.2f},{5:d}",
+    "en":"[ShelterPower] {1} output={2} demand={3} allocated={4} offline={5}",
+    "chi":"[ShelterPower] {1} output={2} demand={3} allocated={4} offline={5}"
+  }
+}

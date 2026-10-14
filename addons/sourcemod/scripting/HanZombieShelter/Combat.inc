@@ -82,7 +82,7 @@ void Beam(const float from[3],const float to[3],bool fire)
 
 void TurretFire(int b,float now)
 {
-    int body=Resolve(gBuildings[b].ref);if(body<0 || now<gBuildings[b].nextFire)return;
+    int body=Resolve(gBuildings[b].ref);if(body<0 || !BuildingPowered(b) || now<gBuildings[b].nextFire)return;
     float muzzle[3];muzzle=gBuildings[b].origin;muzzle[2]+=48.0;
     int target=TurretTarget(b,muzzle);if(target<0)return;
     int entity=Resolve(gNPCs[target].ref);float position[3],direction[3],angles[3];EntityCenter(entity,position);MakeVectorFromPoints(muzzle,position,direction);GetVectorAngles(direction,angles);
@@ -145,6 +145,7 @@ void DefenseTick(float now)
     {
         if(!gBuildings[b].used || !gBuildings[b].alive)continue;
         if(gBuildings[b].kind==Kind_Turret || gBuildings[b].kind==Kind_Flame)TurretFire(b,now);
+        else if(gBuildings[b].kind==Kind_Grenade)GrenadeFire(b,now);
         else if(gBuildings[b].kind==Kind_Mine)MineTick(b);
     }
 }

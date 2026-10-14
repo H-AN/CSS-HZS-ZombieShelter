@@ -105,9 +105,16 @@ bool ApplyBuildingLevel(int index,bool initializing)
         || !ReadLevelFloat(file,profile,level,"cone_half_angle_degrees",30.0,next.halfAngle)
         || !ReadLevelInt(file,profile,level,"burn_damage",0,next.burnDamage)
         || !ReadLevelFloat(file,profile,level,"burn_interval",0.5,next.burnInterval)
-        || !ReadLevelFloat(file,profile,level,"burn_duration",0.0,next.burnDuration))return false;
+        || !ReadLevelFloat(file,profile,level,"burn_duration",0.0,next.burnDuration)
+        || !ReadLevelFloat(file,profile,level,"power_output",0.0,next.powerOutput)
+        || !ReadLevelFloat(file,profile,level,"power_required",0.0,next.powerDemand)
+        || !ReadLevelInt(file,profile,level,"power_priority",10,next.powerPriority)
+        || !ReadLevelFloat(file,profile,level,"light_radius",500.0,next.lightRadius)
+        || !ReadLevelInt(file,profile,level,"light_brightness",2,next.lightBrightness)
+        || !ReadLevelFloat(file,profile,level,"projectile_speed",900.0,next.projectileSpeed)
+        || !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.blastRadius))return false;
     if(next.kind==Kind_Mine && !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.range))return false;
-    gBuildings[index]=next;return true;
+    gBuildings[index]=next;RecalculatePower();return true;
 }
 
 bool SpawnBuildingBody(int index)
@@ -121,13 +128,20 @@ bool SpawnBuildingBody(int index)
     gBuildings[index].boundsKnown=true;
     if(entity<sizeof(gWorldBinding)){gWorldBinding[entity]=index+1;gWorldBindingRef[entity]=gBuildings[index].ref;}
     SDKHook(entity,SDKHook_OnTakeDamage,BuildingDamageHook);SDKHook(entity,SDKHook_Touch,BuildingTouch);
+    if(gBuildings[index].kind==Kind_Light && !CreateBuildingLight(index))
+    {
+        int failedRef=gBuildings[index].ref;gBuildings[index].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(failedRef);return false;
+    }
+    RecalculatePower();
     return true;
 }
 
 void CleanWorld()
 {
+    ClearGrenades();StopPowerEffects();
     for(int i=0;i<MAX_BUILDINGS;i++)
     {
+        RemoveBuildingEffect(i);
         int ref=gBuildings[i].ref;gBuildings[i].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
     }
     for(int i=0;i<gNodeCount;i++)
@@ -332,11 +346,14 @@ public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &
     float now=GetGameTime();if(now<gNextRepair[attacker])return Plugin_Handled;
     gNextRepair[attacker]=now+gRepairCooldown;
     int repair=Number(C_Bases,"Profiles/shelter_basic","repair_hp_per_hit",10);
+    if(gBuildings[b].kind==Kind_Generator)
+    {char profile[128];BuildingProfilePath(b,profile,sizeof(profile));repair=Number(C_Generators,profile,"repair_hp_per_hit",50);}
     if(gBuildings[b].hp<gBuildings[b].maxHP)
     {
         int missing=gBuildings[b].maxHP-gBuildings[b].hp;if(repair>missing)repair=missing;
         if(repair<1)return Plugin_Handled;
         int before=gBuildings[b].hp;gBuildings[b].hp+=repair;
+        if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
         HudRepairFeedback(attacker,b,gBuildings[b].hp-before);
         PlayInteractionSound("repair",entity,gBuildings[b].origin);
     }
@@ -359,9 +376,9 @@ void DamageBuilding(int b,int damage,bool attacked=false)
 {
     if(!Running() || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive || damage<1)return;
     if(attacked)gBuildings[b].lastAttackAt=GetGameTime();
-    gBuildings[b].hp-=damage;if(gBuildings[b].hp>0)return;
+    gBuildings[b].hp-=damage;if(gBuildings[b].hp>0){if(gBuildings[b].kind==Kind_Generator)RecalculatePower();return;}
     PlayInteractionSound("destroyed",Resolve(gBuildings[b].ref),gBuildings[b].origin);
-    gBuildings[b].hp=0;gBuildings[b].alive=false;int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
+    gBuildings[b].hp=0;gBuildings[b].alive=false;RemoveBuildingEffect(b);int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);RecalculatePower();
     if(gBuildings[b].kind==Kind_Base)
     {
         char label[2];label[0]='A'+gBuildings[b].core;label[1]='\0';AnnouncePhrase("BaseDestroyed",label);
@@ -433,6 +450,7 @@ bool BuildRecipe(int client,int recipe)
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
     if(!CheckConstructionBudget(client))return false;
     if(SummonCount()>=gSummonLimit){Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
+    if(gRecipes[recipe].kind==Kind_Light && LightCount()>=gLightLimit){Tell(client,"%t","LightLimitReached",gLightLimit);return false;}
     int required;
     if(gRecipes[recipe].kind==Kind_Amplifier && !CanBuildAmplifier(gRecipes[recipe].type,1,required))
     {Tell(client,"%t","AmplifierBaseLevelRequired",required);return false;}
@@ -443,7 +461,8 @@ bool BuildRecipe(int client,int recipe)
     if(!CheckConstructionBudget(client))return false;
     if(!Spend(gRecipes[recipe].cost,client)){Tell(client,"%t","BuildPersonalMaterialsMissing");return false;}
     Building value;value.used=true;value.alive=true;value.kind=gRecipes[recipe].kind;value.uid=++gUID;value.core=-1;
-    value.file=gRecipes[recipe].file;value.level=1;value.ref=INVALID_ENT_REFERENCE;value.origin=origin;value.angles=angles;
+    value.file=gRecipes[recipe].file;value.level=1;value.ref=INVALID_ENT_REFERENCE;value.effectRef=INVALID_ENT_REFERENCE;value.origin=origin;value.angles=angles;
+    value.powerCore=GridAt(origin);value.gridAssigned=true;
     strcopy(value.type,sizeof(value.type),gRecipes[recipe].type);strcopy(value.model,sizeof(value.model),model);gBuildings[slot]=value;
     AssignBuildingOwner(slot,client);
     for(int m=0;m<MATERIALS;m++)gBuildings[slot].invested[m]=gRecipes[recipe].cost[m];

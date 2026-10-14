@@ -26,6 +26,9 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Fence: TranslateLabel(client,"HUDFenceName",name,length);
         case Kind_Mine: TranslateLabel(client,"HUDMineName",name,length);
         case Kind_Amplifier: TranslateLabel(client,"HUDAmplifierName",name,length);
+        case Kind_Generator: TranslateLabel(client,"HUDGeneratorName",name,length);
+        case Kind_Light: TranslateLabel(client,"HUDLightName",name,length);
+        case Kind_Grenade: TranslateLabel(client,"HUDGrenadeName",name,length);
     }
 }
 
@@ -48,8 +51,12 @@ void HudBuildingTarget(int client,int building)
     char name[64],action[128];BuildingDisplayName(building,name,sizeof(name),client);
     TranslateLabel(client,gBuildings[building].kind==Kind_Base ? "HUDBaseUseHint" : "HUDDefenseUseHint",action,sizeof(action));
     SetHudTextParams(-1.0,0.69,0.4,225,245,255,255,0,0.0,0.0,0.1);
-    ShowHudText(client,HUD_TARGET,"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
+    char text[512];
+    Format(text,sizeof(text),"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
         gBuildings[building].level,gBuildings[building].hp,gBuildings[building].maxHP,action);
+    if(gBuildings[building].kind==Kind_Base)AppendGridInfo(client,gBuildings[building].core,text,sizeof(text));
+    else AppendBuildingPowerInfo(client,building,gBuildings[building].level,text,sizeof(text));
+    ShowHudText(client,HUD_TARGET,"%s",text);
 }
 
 bool BuildingUnderAttack(int building,float now)

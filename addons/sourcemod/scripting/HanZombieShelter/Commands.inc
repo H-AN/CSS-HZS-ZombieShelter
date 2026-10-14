@@ -40,6 +40,7 @@ public Action StatusCommand(int client,int args)
         SHELTER_VERSION,gEnabled,gCoreReady,gPhase,gDay,AliveCores(),gCoreCount,gNodeCount,SummonCount(),tracked,parked,ActiveOrdinary(),activeBoss,gEpoch,gRollback);
     for(int i=0;i<gCoreCount;i++){int b=gCores[i].building;if(b>=0)ReplyToCommand(client,"%T","CmdStatusBase",client,gCores[i].id,gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP,gBuildings[b].alive,gBuildings[b].ref);}
     for(int i=0;i<gBossCount;i++)ReplyToCommand(client,"%T","CmdStatusBoss",client,gBosses[i].id,gBosses[i].savedHP,gBosses[i].awakened,gBosses[i].defeated,gBosses[i].boundThisRound,gBosses[i].positionedHP);
+    for(int c=0;c<gCoreCount;c++)ReplyToCommand(client,"%T","CmdPowerStatus",client,gCores[c].id,gGridProduction[c],gGridDemand[c],gGridAllocated[c],gGridOffline[c]);
     return Plugin_Handled;
 }
 
@@ -161,6 +162,13 @@ void ShowDefenseMenu(int client,int building)
                 RoundToNearest(bonuses[0]*100.0),RoundToNearest(bonuses[1]*100.0),
                 RoundToNearest(bonuses[2]*100.0),RoundToNearest(bonuses[3]*100.0),access);
     }
+    if(gBuildings[building].kind==Kind_Generator || gBuildings[building].kind==Kind_Light)
+        Format(title,sizeof(title),"%T","PowerFacilityTitle",client,name,gBuildings[building].level,gBuildings[building].hp,gBuildings[building].maxHP,access);
+    if(gBuildings[building].kind==Kind_Light)
+    {char line[96];Format(line,sizeof(line),"%T","LampRadiusInfo",client,gBuildings[building].lightRadius);StrCat(title,sizeof(title),line);}
+    if(gBuildings[building].kind==Kind_Grenade)
+    {char line[96];Format(line,sizeof(line),"%T","GrenadeRadiusInfo",client,gBuildings[building].blastRadius);StrCat(title,sizeof(title),line);}
+    AppendBuildingPowerInfo(client,building,gBuildings[building].level,title,sizeof(title));
     Menu menu=new Menu(DefenseMenuHandler);menu.SetTitle("%s",title);
     int cost[MATERIALS],nextHP;bool upgrade=ReadBaseUpgrade(building,cost,nextHP);
     AddDefenseMenuItem(menu,client,building,1,upgrade ? "DefenseUpgradeView" : "DefenseUpgradeUnavailable",upgrade);
@@ -177,6 +185,7 @@ void ShowDefenseUpgradeMenu(int client,int building)
     char name[64],title[768],line[192];BuildingDisplayName(building,name,sizeof(name),client);
     Format(title,sizeof(title),"%T","MenuUpgradeTitle",client,name,gBuildings[building].level,
         gBuildings[building].level+1,gBuildings[building].maxHP,nextHP);
+    AppendBuildingPowerInfo(client,building,gBuildings[building].level+1,title,sizeof(title));
     for(int m=0;m<MATERIALS;m++)
     {
         char material[64];TranslateLabel(client,gMaterials[m].label,material,sizeof(material));
@@ -302,6 +311,7 @@ void ShowBaseMenu(int client,int core)
     TranslateLabel(client,gBuildings[building].alive ? "MenuBaseAlive" : "MenuBaseDestroyed",state,sizeof(state));
     Format(title,sizeof(title),"%T","MenuBaseTitle",client,name,gBuildings[building].level,
         gBuildings[building].maxHP,gBuildings[building].hp,gBuildings[building].maxHP,state);
+    AppendGridInfo(client,core,title,sizeof(title));
     Menu menu=new Menu(BaseMenuHandler);menu.SetTitle("%s",title);
     int cost[MATERIALS],nextMaxHP;bool upgrade=gBuildings[building].alive && ReadBaseUpgrade(building,cost,nextMaxHP);
     BaseMenuToken(client,core,0,token,sizeof(token));

@@ -84,6 +84,7 @@ bool DismantleBuilding(int client,int b,bool adminAction=false)
         if(refund[m]>maximum-gPlayerInventory[recipient][m]){Tell(client,"%t","DismantleNoRoom");return false;}
     // Commit consumption before removing the entity or publishing a refund.
     gBuildings[b].alive=false;gBuildings[b].hp=0;
+    RemoveBuildingEffect(b);
     for(int m=0;m<MATERIALS;m++)gBuildings[b].invested[m]=0;
     int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
     if(recipient>0)Refund(refund,recipient);
@@ -92,7 +93,7 @@ bool DismantleBuilding(int client,int b,bool adminAction=false)
         int core=NearestStorageCore(gBuildings[b].origin);
         for(int m=0;m<MATERIALS;m++)DepositSharedAutomatic(core,m,refund[m]);
     }
-    Tell(client,"%t","BuildingDismantled");return true;
+    RecalculatePower();Tell(client,"%t","BuildingDismantled");return true;
 }
 
 bool AdminSetBuildingLevel(int client,int b,int level)
@@ -128,7 +129,9 @@ bool AdminSetPlayerMaterial(int client,int targetSerial,int material,int value)
 void RequestDayReset()
 {
     if(!Running() || gTerminal || gOutcomeQueued)return;
+    Phase previous=gPhase;
     gPhase=Phase_Ending;gSnapshot=true;gRollback=true;gWarningSent=false;gTerminationExpected=true;
+    ClearGrenades();StopPowerEffects();NotifyPhaseChanged(previous,0.0);
     for(int n=0;n<MAX_NPCS;n++)if(gNPCs[n].used && gNPCs[n].ready && !gNPCs[n].dead)
     {
         int entity=Resolve(gNPCs[n].ref);if(entity<0)continue;

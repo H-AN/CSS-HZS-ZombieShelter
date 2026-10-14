@@ -39,35 +39,42 @@ void RestoreCorePool()
 void PrepareRound()
 {
     if(!gEnabled || gTerminal)return;
-    gEpoch++;gRoundPrepared=false;gPhase=Phase_Waiting;gWarningSent=false;
+    Phase previous=gPhase;
+    gEpoch++;gRoundPrepared=false;gPhase=Phase_Waiting;gEnvironmentPhase=HZSHEnvironment_Day;gWarningSent=false;
     gFailureCandidate=false;gVictoryCandidate=false;gOutcomeQueued=false;gTerminationExpected=false;
     CleanWorld();
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<gBossCount;i++)gBosses[i].boundThisRound=false;
+    gRoundRestored=gSnapshot;
     if(!CreateWorld(gSnapshot))
     {
-        CleanWorld();gEnabled=false;RestoreCorePool();RestoreServerPolicy();LogError("[Shelter] World creation failed; mode left disabled, no partial session");return;
+        CleanWorld();gEnabled=false;RestoreCorePool();RestoreServerPolicy();PublishShelterState(true);LogError("[Shelter] World creation failed; mode left disabled, no partial session");return;
     }
     gSnapshot=true;gRoundPrepared=true;gRollback=false;OverrideCorePool();
+    PublishShelterState(true);NotifyPhaseChanged(previous,0.0);
 }
 
 void StartDay(bool advance)
 {
     if(!gEnabled || gTerminal || !gRoundPrepared)return;
+    Phase previous=gPhase;
     if(advance)gDay++;
-    gPhase=Phase_Day;gDeadline=GetGameTime()+gDaySeconds;gWarningSent=false;gNextAdmissions=0.0;
+    gPhase=Phase_Day;gEnvironmentPhase=HZSHEnvironment_Day;gDeadline=GetGameTime()+gDaySeconds;gWarningSent=false;gNextAdmissions=0.0;
     ApplyDayCvars();
     TrimOrdinary(DayTarget());
     AnnouncePhrase("DayStarted",gDay,RoundToNearest(gDaySeconds));
+    PowerTick();NotifyPhaseChanged(previous,gDaySeconds);
 }
 
 void StartNight()
 {
     if(!Running() || gTerminal)return;
-    gPhase=Phase_Night;gDeadline=GetGameTime()+gNightSeconds;gNextAdmissions=0.0;
+    Phase previous=gPhase;
+    gPhase=Phase_Night;gEnvironmentPhase=HZSHEnvironment_Night;gDeadline=GetGameTime()+gNightSeconds;gNextAdmissions=0.0;
     ApplyDayCvars();TrimOrdinary(NightTarget());
     gNextExposure=GetGameTime()+gExposureInterval;
     AnnouncePhrase("NightStarted",gDay,gExposureInterval,gExposureDamage);
+    PowerTick();NotifyPhaseChanged(previous,gNightSeconds);
 }
 
 public void Han_OnGameStart()
@@ -76,7 +83,9 @@ public void Han_OnGameStart()
     gCoreReady=APIAvailable();if(!gCoreReady)return;
     if(!gRoundPrepared)PrepareRound();
     if(!gRoundPrepared)return;
+    bool restored=gRoundRestored;
     OverrideCorePool();StartDay(false);gNextBossAudit=GetGameTime()+3.0;
+    Call_StartForward(gRoundForward);Call_PushCell(gDay);Call_PushCell(restored);Call_Finish();
     RequestFrame(FinishNativePoolBootstrap,gEpoch);
 }
 
@@ -84,7 +93,7 @@ public void Han_OnGameEnd()
 {
     if(!gEnabled || gTerminal || gFailureCandidate || gVictoryCandidate || gPhase==Phase_Ending)return;
     // A lifecycle notification without a result is not a loss.
-    gPhase=Phase_Waiting;
+    Phase previous=gPhase;gPhase=Phase_Waiting;ClearGrenades();StopPowerEffects();NotifyPhaseChanged(previous,0.0);
 }
 
 public void Han_OnZombieWin()
@@ -111,7 +120,8 @@ public void ResolveOutcome(any epoch)
 {
     if(epoch!=gEpoch || !gEnabled || gTerminal || (!gVictoryCandidate && !gFailureCandidate))return;
     gOutcomeQueued=false;bool victory=gVictoryCandidate;
-    gPhase=Phase_Ending;gSnapshot=true;
+    Phase previous=gPhase;int previousDay=gDay;
+    gPhase=Phase_Ending;gSnapshot=true;ClearGrenades();StopPowerEffects();
     for(int n=0;n<MAX_NPCS;n++)
     {
         if(!gNPCs[n].used || !gNPCs[n].ready || gNPCs[n].dead)continue;
@@ -137,6 +147,8 @@ public void ResolveOutcome(any epoch)
         gRollback=true;AnnouncePhrase(gDestroySummons ? "CampaignRollbackDestroy" : "CampaignRollbackRetain",gDay);
         if(!gTerminationExpected)CS_TerminateRound(3.0,CSRoundEnd_Draw,true);
     }
+    NotifyPhaseChanged(previous,0.0);
+    Call_StartForward(gOutcomeForward);Call_PushCell(victory);Call_PushCell(previousDay);Call_PushCell(gDay);Call_PushCell(gTerminal);Call_Finish();
 }
 
 void RecoverBases()
@@ -168,7 +180,8 @@ public void RoundEnd(Event event,const char[] name,bool dontBroadcast)
 {
     if(!gEnabled)return;
     CleanWorld();gRoundPrepared=false;
-    if(!gTerminal && gPhase!=Phase_Ending)gPhase=Phase_Waiting;
+    if(!gTerminal && gPhase!=Phase_Ending){Phase previous=gPhase;gPhase=Phase_Waiting;NotifyPhaseChanged(previous,0.0);}
+    else PublishShelterState();
 }
 
 public Action CS_OnTerminateRound(float &delay,CSRoundEndReason &reason)
@@ -243,7 +256,8 @@ public Action WorldTick(Handle timer)
 {
     float now=GetGameTime(),elapsed=now-gPreviousTick;gPreviousTick=now;
     if(!gEnabled)return Plugin_Continue;
-    gCoreReady=APIAvailable();
+    bool previousReady=gCoreReady;gCoreReady=APIAvailable();
+    if(previousReady!=gCoreReady){if(!gCoreReady){StopPowerEffects();ClearGrenades();}PublishShelterState();}
     if(gTerminal)
     {
         CampaignHUD();if(now>=gDeadline)ChangeCampaignMap();return Plugin_Continue;
@@ -255,7 +269,7 @@ public Action WorldTick(Handle timer)
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
-    ResourceTick(elapsed);NPCTick(now);DefenseTick(now);ExposureTick(now);CampaignHUD();
+    ResourceTick(elapsed);NPCTick(now);PowerTick();DefenseTick(now);ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

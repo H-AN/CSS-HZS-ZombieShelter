@@ -6,6 +6,8 @@
 #include <cstrike>
 #include <nextmap>
 #include <HanZombieScenarioAPI>
+#define HZSH_API_PROVIDER
+#include <HanZombieShelterAPI>
 #include "HanZombieShelter/Types.inc"
 #include "HanZombieShelter/Levels.inc"
 #include "HanZombieShelter/Progression.inc"
@@ -16,9 +18,12 @@
 #include "HanZombieShelter/Management.inc"
 #include "HanZombieShelter/EntityBudget.inc"
 #include "HanZombieShelter/Audio.inc"
+#include "HanZombieShelter/Power.inc"
+#include "HanZombieShelter/API.inc"
 #include "HanZombieShelter/World.inc"
 #include "HanZombieShelter/NPC.inc"
 #include "HanZombieShelter/Combat.inc"
+#include "HanZombieShelter/Grenades.inc"
 #include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
@@ -30,13 +35,14 @@ public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 {
     MarkNativeAsOptional("Han_IsZombie");MarkNativeAsOptional("Han_GetZombieName");MarkNativeAsOptional("Han_GetZombieCount");MarkNativeAsOptional("Han_GetZombieByIndex");
     MarkNativeAsOptional("Han_SetZombieTarget");MarkNativeAsOptional("Han_UnlockZombie");MarkNativeAsOptional("Han_SetCustomAnimationEx");MarkNativeAsOptional("Han_SafeDamageZombie");
-    RegPluginLibrary("HanZombieShelter");return APLRes_Success;
+    RegisterShelterNatives();RegPluginLibrary("HanZombieShelter");return APLRes_Success;
 }
 
 public void OnPluginStart()
 {
     LoadTranslations("HanZombieShelter.phrases");
     LoadTranslations("common.phrases");
+    InitializeShelterForwards();
     ResetInventories();
     HookEvent("round_start",RoundStart);HookEvent("round_end",RoundEnd);HookEvent("player_spawn",PlayerSpawn);
     RegConsoleCmd("sm_build",BuildMenuCommand);RegConsoleCmd("sm_materials",MaterialsCommand);
@@ -47,6 +53,7 @@ public void OnPluginStart()
     RegisterShelterAdminCommands();
     for(int i=1;i<=MaxClients;i++)if(IsClientInGame(i))OnClientPutInServer(i);
     gTick=CreateTimer(0.25,WorldTick,_,TIMER_REPEAT);
+    gProjectileTimer=CreateTimer(0.05,GrenadeTimer,_,TIMER_REPEAT);
 }
 
 public void OnMapStart()
@@ -59,12 +66,15 @@ public void OnMapStart()
     for(int i=0;i<sizeof(gNPCBinding);i++){gNPCBinding[i]=0;gWorldBinding[i]=0;}
     gLeaderOffset=FindSendPropInfo("CHostage","m_leader");
     gBeamSprite=PrecacheModel("materials/sprites/laserbeam.vmt",true);gFireSprite=PrecacheModel("materials/sprites/fire1.vmt",true);
+    gExplosionSprite=PrecacheModel("sprites/zerogxplode.spr",true);
     gPreviousTick=GetGameTime();gNextHUD=0.0;gNextAdmissions=0.0;
+    ResetPowerState();gAPIStateReady=true;PublishShelterState(true);
 }
 
 public void OnConfigsExecuted()
 {
     BootMode();
+    PublishShelterState();
 }
 
 void BootMode()
@@ -145,12 +155,17 @@ public void CleanOrphan(any ref)
 
 public void OnMapEnd()
 {
-    gEnabled=false;gEpoch++;CleanWorld();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;
+    gEnabled=false;gEpoch++;CleanWorld();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;PublishShelterState();
 }
 
 public void OnPluginEnd()
 {
     gEpoch++;
     if(gCoreReady && APIAvailable())for(int i=0;i<MAX_NPCS;i++)if(gNPCs[i].used)RestoreNPCOnUnload(i);
-    gEnabled=false;CleanWorld();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gSharedOverflow;
+    gEnabled=false;CleanWorld();PublishShelterState();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gProjectileTimer;delete gSharedOverflow;
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+    if(!APIAvailable()){gCoreReady=false;StopPowerEffects();ClearGrenades();PublishShelterState();}
 }

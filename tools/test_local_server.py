@@ -68,9 +68,13 @@ parser.add_argument('--server-root',default=r'D:\css\CS2\steamcmd\steamapps\comm
 parser.add_argument('--report-dir',default=str(Path(__file__).resolve().parents[1]/'tests'/'reports'))
 parser.add_argument('--integration',action='store_true',help='Requires the test-only probe compiled as HanZombieShelter.smx')
 parser.add_argument('--focused',action='store_true')
+parser.add_argument('--port',type=int,default=27129,help='Use an isolated port when another shelter server is running')
+parser.add_argument('--power',action='store_true',help='Include 0.4 power, light, projectile and public API checks')
+parser.add_argument('--power-only',action='store_true',help='Run only new 0.4 engine scenarios (requires --integration --power)')
 parser.add_argument('--classify-existing',action='store_true',help='Classify the existing error-log report offline; do not launch a server')
 options=parser.parse_args()
-CSS=Path(options.server_root);STAGE=CSS/'cstrike';PORT=27129;SERVER_CONFIG='zsh_codex_test.cfg'
+CSS=Path(options.server_root);STAGE=CSS/'cstrike';PORT=options.port;SERVER_CONFIG='zsh_codex_test.cfg'
+if not 1024 <= PORT <= 65535:raise SystemExit('Invalid test port')
 REPORT=Path(options.report_dir);REPORT.mkdir(parents=True,exist_ok=True)
 sys_encoding='utf-8'
 sys.stdout.reconfigure(encoding='utf-8',errors='backslashreplace')
@@ -166,6 +170,22 @@ def run():
                 assert 'Failed=0' in summary,'Focused assertion failed'
                 return
             command('zsh_test world')
+            if options.power:
+                api=command('hzsh_api_test snapshot')
+                assert 'Failed=0' in api,'Initial API consumer assertion failed'
+                command('zsh_test power')
+                command('zsh_test power_upgrade_prepare');time.sleep(.3);command('zsh_test power_upgrade_verify')
+                if options.power_only:
+                    command('zsh_test power_retention')
+                    api=command('hzsh_api_test night_ending')
+                    assert 'Failed=0' in api
+                    wait_status(lambda state: status_number(state,'phase')==1 and status_number(state,'day')==1,
+                        'power facilities restore after failure')
+                    command('zsh_test power_restored');time.sleep(.3)
+                    summary=command('zsh_test summary')
+                    command('sm_zsh_fail');time.sleep(4.5);command('sm plugins unload UnmodifiedHZS');command('quit');proc.wait(timeout=15)
+                    assert 'Failed=0' in summary,'Power scenario failed'
+                    return
             command('zsh_test progression')
             command('zsh_test growth')
             command('zsh_test resource_reroll')
@@ -190,6 +210,13 @@ def run():
             wait_status(lambda state: status_number(state,'phase')==1 and status_number(state,'raiders')==DAY_TARGET,
                 'dawn retains a small population',timeout=20)
             command('zsh_test dawn_population')
+            if options.power:
+                command('zsh_test power_retention')
+                api=command('hzsh_api_test night_ending')
+                assert 'Failed=0' in api,'Night settlement API consumer assertion failed'
+                wait_status(lambda state: status_number(state,'phase')==1 and status_number(state,'day')==1,
+                    'powered facilities restore after a real failure')
+                command('zsh_test power_restored')
             for case in ['gather','inventory','safety_economy','menus','admin_menus','upgrade','placement','defenses','wall','boss','death']:
                 command('zsh_test '+case)
             # Wait for both the native death-animation/reborn lifecycle and external admission.
@@ -206,6 +233,9 @@ def run():
             wait_status(lambda state: status_number(state,'phase')==1 and status_number(state,'day')==3
                 and status_number(state,'bosses')==1,'actual core all-dead campaign restart')
             command('zsh_test purged');command('zsh_test victory');time.sleep(0.6)
+            if options.power:
+                api=command('hzsh_api_test ending')
+                assert 'Failed=0' in api,'Ending API consumer assertion failed'
             summary=command('zsh_test summary')
             assert 'Failed=0' in summary,'Integration assertion failed'
             time.sleep(4.0);reloaded=command('sm_zsh_status')
@@ -213,15 +243,31 @@ def run():
             command('sm plugins unload UnmodifiedHZS');command('quit');proc.wait(timeout=15)
             return
         command('sm_zsh_phase night')
+        if options.power:command('hzsh_api_test night')
         wait_status(lambda state: status_number(state,'phase')==2 and status_number(state,'raiders')==NIGHT_TARGET,
             'production nighttime ordinary population',timeout=40)
+        if options.power:
+            command('sm plugins unload 000_ShelterAPIConsumer');command('sm plugins load 000_ShelterAPIConsumer')
+            api=command('hzsh_api_test night')
+            assert 'Failed=0' in api,'Late-loaded API consumer failed to read night state'
         command('sm_zsh_phase day')
         day_again=wait_status(lambda state: status_number(state,'phase')==1 and status_number(state,'raiders')==DAY_TARGET,
             'production daytime ordinary population',timeout=20)
         assert 'bosses=1' in day_again
+        if options.power:
+            api=command('hzsh_api_test day')
+            assert 'Failed=0' in api,'Public API consumer assertion failed'
+            assert 'Unknown command' in command('zsh_test summary'),'Production contains test fixture command'
         # HZS OnPluginEnd terminates a live round even during engine shutdown.
         # Stop the live round while GameRules still exists, without altering HZS source.
         command('sm_zsh_fail');time.sleep(4.5)
+        if options.power:
+            command('sm plugins unload HanZombieShelter')
+            absent=command('hzsh_api_test absent')
+            assert '[ShelterAPI] PASS optional consumer survives provider absence' in absent,absent
+            command('sm plugins load HanZombieShelter')
+            reloaded=command('hzsh_api_test snapshot')
+            assert 'Failed=0' in reloaded,'Consumer failed after provider reload'
         command('sm plugins unload UnmodifiedHZS');command('quit');proc.wait(timeout=15)
     finally:
         if sock:sock.close()

@@ -209,7 +209,7 @@ int ProgressionBaseLevel()
     {
         int building=gCores[core].building;
         if(building<0 || building>=MAX_BUILDINGS || !gBuildings[building].used || !gBuildings[building].alive
-            || gBuildings[building].hp<=0 || Resolve(gBuildings[building].ref)<0)continue;
+            || gBuildings[building].hp<=0 || !BuildingPowered(building))continue;
         if(gBuildings[building].level>highest)highest=gBuildings[building].level;
     }
     return highest;

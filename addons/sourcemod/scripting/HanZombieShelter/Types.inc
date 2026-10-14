@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.3.0"
+#define SHELTER_VERSION "0.4.0"
 #define MAX_BUILDINGS 128
 #define MAX_NODES 80
 #define MAX_NPCS 256
@@ -10,8 +10,8 @@
 #define MATERIALS 5
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
-enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier }
-enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Count }
+enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade }
+enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Count }
 
 enum struct MaterialDef
 {
@@ -93,6 +93,17 @@ enum struct Building
     float restoreMins[3];
     float restoreMaxs[3];
     bool boundsKnown;
+    int powerCore;
+    bool gridAssigned;
+    bool powered;
+    float powerOutput;
+    float powerDemand;
+    int powerPriority;
+    int effectRef;
+    float lightRadius;
+    int lightBrightness;
+    float projectileSpeed;
+    float blastRadius;
 }
 
 enum struct ResourceNode
@@ -174,7 +185,7 @@ int gEpoch, gUID;
 int gDay=1, gNativeKills;
 Phase gPhase=Phase_Waiting;
 bool gEnabled, gCoreReady, gSnapshot, gRollback, gTerminal, gFailureCandidate, gVictoryCandidate;
-bool gRoundPrepared, gWarningSent, gRebuilding;
+bool gRoundPrepared, gRoundRestored, gWarningSent, gRebuilding;
 bool gOutcomeQueued, gTerminationExpected;
 float gDeadline, gNextHUD, gNextExposure, gNextAdmissions, gPreviousTick;
 float gDaySeconds, gNightSeconds, gWarningSeconds, gExposureInterval, gRecoveryFraction, gOutcomeSeconds;
@@ -190,8 +201,8 @@ int gDamageNPCRef=INVALID_ENT_REFERENCE, gDamageValue;
 int gNPCBinding[2049], gNPCBindingRef[2049];
 int gWorldBinding[2049], gWorldBindingRef[2049];
 float gNextBossAudit;
-int gLeaderOffset=-1, gBeamSprite, gFireSprite;
-Handle gTick;
+int gLeaderOffset=-1, gBeamSprite, gFireSprite, gExplosionSprite;
+Handle gTick,gProjectileTimer;
 ConVar gCorePoolCvar;
 int gOriginalPool;
 bool gPoolOverridden;

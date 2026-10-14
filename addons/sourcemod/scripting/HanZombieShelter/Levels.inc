@@ -2,10 +2,11 @@
 // and no gameplay cap such as 16 or 100; limits below protect SourcePawn cells.
 #define LEVEL_CELL_LIMIT 2000000000
 
-static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level"};
+static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness"};
 static const char sLevelFloatFields[][]={"damage","range","fire_interval","cone_half_angle_degrees","burn_interval",
-    "burn_duration","blast_radius","player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus"};
-static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0};
+    "burn_duration","blast_radius","player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus",
+    "power_output","power_required","light_radius","projectile_speed"};
+static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,900.0};
 
 bool ParseLevelInteger(const char[] input,int &value,bool signedValue=false)
 {
@@ -80,6 +81,8 @@ bool IntegerLevelBounds(const char[] key,int &minimum,int &maximum)
     minimum=0;maximum=LEVEL_CELL_LIMIT;
     if(StrEqual(key,"max_hp") || StrEqual(key,"initial_hp") || StrEqual(key,"minimum_base_level")){minimum=1;return true;}
     if(StrEqual(key,"burn_damage")){maximum=1000000;return true;}
+    if(StrEqual(key,"power_priority")){maximum=1000;return true;}
+    if(StrEqual(key,"light_brightness")){maximum=8;return true;}
     return false;
 }
 
@@ -91,7 +94,10 @@ bool FloatLevelBounds(const char[] key,float &minimum,float &maximum)
     if(StrEqual(key,"fire_interval") || StrEqual(key,"burn_interval")){minimum=0.1;maximum=3600.0;return true;}
     if(StrEqual(key,"cone_half_angle_degrees")){maximum=180.0;return true;}
     if(StrEqual(key,"burn_duration")){maximum=3600.0;return true;}
-    for(int i=7;i<sizeof(sLevelFloatFields);i++)if(StrEqual(key,sLevelFloatFields[i])){maximum=100.0;return true;}
+    for(int i=7;i<11;i++)if(StrEqual(key,sLevelFloatFields[i])){maximum=100.0;return true;}
+    if(StrEqual(key,"power_output") || StrEqual(key,"power_required")){maximum=100000.0;return true;}
+    if(StrEqual(key,"light_radius")){minimum=32.0;maximum=2048.0;return true;}
+    if(StrEqual(key,"projectile_speed")){minimum=100.0;maximum=3000.0;return true;}
     return false;
 }
 
@@ -209,7 +215,9 @@ bool ValidateResolvedLevel(ConfigFile file,const char[] profile,int level)
     if(!ReadLevelInt(file,profile,level,"max_hp",0,maximum)
         || !ReadLevelInt(file,profile,level,"initial_hp",maximum,value) || value>maximum)return false;
     if(!ReadLevelInt(file,profile,level,"burn_damage",0,value)
-        || !ReadLevelInt(file,profile,level,"minimum_base_level",1,value))return false;
+        || !ReadLevelInt(file,profile,level,"minimum_base_level",1,value)
+        || !ReadLevelInt(file,profile,level,"power_priority",10,value)
+        || !ReadLevelInt(file,profile,level,"light_brightness",2,value))return false;
     for(int f=0;f<sizeof(sLevelFloatFields);f++)
         if(!ReadLevelFloat(file,profile,level,sLevelFloatFields[f],sLevelFloatDefaults[f],decimal))return false;
     return ReadLevelUpgradeCost(file,profile,level,cost);
@@ -313,7 +321,7 @@ bool ValidateLevelProfile(ConfigFile file,const char[] profile)
 
 bool ValidateLevelProfiles()
 {
-    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers};
+    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades};
     for(int f=0;f<sizeof(files);f++)
     {
         char section[16];strcopy(section,sizeof(section),f==0 ? "Profiles" : "Types");

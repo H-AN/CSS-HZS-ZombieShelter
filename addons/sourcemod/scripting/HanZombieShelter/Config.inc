@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -94,7 +94,7 @@ bool LoadConfigs()
     return ReadMaterials() && ReadMapData()
         && (ValidateResourcePools() || ConfigFailure("resource pool weights, regrow option or map pool reference"))
         && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
-        && LoadManagementSettings() && LoadEntitySettings() && ValidateDayRanges() && ValidateNativeBridge();
+        && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && ValidateDayRanges() && ValidateNativeBridge();
 }
 
 bool ValidResourceGrowth(float hold,float grow,float scale)
@@ -239,8 +239,8 @@ bool TokenPresent(const char[] tokens,const char[] word)
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers};
-    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier};
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades};
+    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade};
     for(int file=0;file<sizeof(files);file++)
     {
         KeyValues kv=gCfg[files[file]];kv.Rewind();

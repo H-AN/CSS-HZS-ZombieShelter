@@ -10,6 +10,7 @@
 #include "DayPopulationProbe.inc"
 #include "GrowthProbe.inc"
 #include "ResourceRerollProbe.inc"
+#include "PowerProbe.inc"
 
 int tPassed,tFailed;
 int tSavedBossHP;
@@ -92,7 +93,12 @@ void AtBase(int client)
 public Action TestCommand(int args)
 {
     char which[32];GetCmdArg(1,which,sizeof(which));
+    if(StrEqual(which,"summary")){PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d",tPassed,tFailed);return Plugin_Handled;}
     int client=TestHuman();if(client==0){PrintToServer("[ShelterTest] FAIL no living fixture client");return Plugin_Handled;}
+    bool savedPower=gPowerEnabled;
+    // Existing independent economy/combat cases also verify the supported
+    // power-disabled compatibility setting. The power cases use real supply.
+    if(StrContains(which,"power")!=0)gPowerEnabled=false;
     if(StrEqual(which,"world"))TestWorld(client);
     else if(StrEqual(which,"progression"))TestProgression(client);
     else if(StrEqual(which,"safety_economy"))TestSafetyEconomy(client);
@@ -110,6 +116,11 @@ public Action TestCommand(int args)
     else if(StrEqual(which,"day_population"))TestDayPopulation(client);
     else if(StrEqual(which,"growth"))TestGrowth(client);
     else if(StrEqual(which,"resource_reroll"))TestResourceReroll(client);
+    else if(StrEqual(which,"power"))TestPower(client);
+    else if(StrEqual(which,"power_retention"))TestPowerRetention(client);
+    else if(StrEqual(which,"power_restored"))TestPowerRestored(client);
+    else if(StrEqual(which,"power_upgrade_prepare"))TestPowerUpgradePrepare(client);
+    else if(StrEqual(which,"power_upgrade_verify"))TestPowerUpgradeVerify(client);
     else if(StrEqual(which,"resource_ui"))TestPrepareResourceRerollUI(client);
     else if(StrEqual(which,"resource_verify_ui"))
     {
@@ -138,6 +149,7 @@ public Action TestCommand(int args)
     else if(StrEqual(which,"victory"))TestVictory(client);
     else if(StrEqual(which,"summary"))PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d",tPassed,tFailed);
     else PrintToServer("[ShelterTest] Unknown case");
+    gPowerEnabled=savedPower;RecalculatePower();
     return Plugin_Handled;
 }
 
