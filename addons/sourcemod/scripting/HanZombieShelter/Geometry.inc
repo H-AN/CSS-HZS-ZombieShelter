@@ -192,11 +192,7 @@ bool ReservedBounds(const float mins[3],const float maxs[3])
         float low[3],high[3];gCfg[C_Map].GetVector("mins",low);gCfg[C_Map].GetVector("maxs",high);
         if(BoxesOverlap(mins,maxs,low,high))return true;
     }
-    // Keep all initial safe-room spawn hulls and entrances usable.
-    for(int c=0;c<gCoreCount;c++)for(int p=0;p<gCores[c].pointCount;p++)
-    {
-        float low[3],high[3];for(int a=0;a<3;a++){low[a]=gCorePoints[c][p][a]-20.0;high[a]=gCorePoints[c][p][a]+20.0;}high[2]+=72.0;
-        if(BoxesOverlap(mins,maxs,low,high))return true;
-    }
+    // Human respawns select an available hull in SafeHumanPoint. Their candidate
+    // points are not permanent build exclusions inside the shelter.
     return false;
 }

@@ -1,6 +1,8 @@
 // Test-only compilation of the production source with extra server assertions.
 // Never ship this SMX as the production plugin.
+#define HZSH_TEST_REALFIRE
 #include "../addons/sourcemod/scripting/HanZombieShelter.sp"
+int tPassed,tFailed,tSkipped;
 #include "LiveManagementProbe.inc"
 #include "LiveClientProbe.inc"
 #include "MenuProbe.inc"
@@ -11,8 +13,19 @@
 #include "GrowthProbe.inc"
 #include "ResourceRerollProbe.inc"
 #include "PowerProbe.inc"
+#include "SchedulerProbe.inc"
+#include "V05ClientSessionProbe.inc"
+#include "V05BuildProbe.inc"
+#include "MaterialDropProbe.inc"
+#include "V05RealMaterialProbe.inc"
+#include "VariantProbe.inc"
+#include "V05RealClientProbe.inc"
+#include "V05RealFireProbe.inc"
+#include "FenceRotationProbe.inc"
+#include "FenceRetaliationProbe.inc"
+#include "NPCFollowupProbe.inc"
+#include "TravelProbe.inc"
 
-int tPassed,tFailed;
 int tSavedBossHP;
 int tNativeAttacks;
 int tKilledOrdinaryRef=INVALID_ENT_REFERENCE;
@@ -31,24 +44,14 @@ public void OnAllPluginsLoaded()
     RegServerCmd("zsh_test",TestCommand);
     RegServerCmd("zsh_test_bounds",BoundsCommand);
     RegServerCmd("zsh_test_client",TestFixtureCommand);
+    RegServerCmd("zsh_v05_client",V05ClientSessionCommand);
 }
 
 public Action TestFixtureCommand(int args)
 {
-    if(Han_GetZombieCount()>0){PrintToServer("[ShelterTest] FAIL fixture must join before native NPCs");return Plugin_Handled;}
     int client=TestHuman();
-    if(client==0)
-    {
-        client=CreateFakeClient("ShelterFixture");
-        if(client>0){ChangeClientTeam(client,CS_TEAM_CT);CS_RespawnPlayer(client);}
-    }
-    int fixtures;for(int i=1;i<=MaxClients;i++)if(LiveHuman(i))fixtures++;
-    if(fixtures<2)
-    {
-        int second=CreateFakeClient("ShelterFixtureTwo");
-        if(second>0){ChangeClientTeam(second,CS_TEAM_CT);CS_RespawnPlayer(second);}
-    }
-    PrintToServer("[ShelterFixture] client=%d alive=%d",client,LiveHuman(client));
+    if(client>0)PrintToServer("[ShelterFixture] real_client=%d alive=1",client);
+    else PrintToServer("[ShelterFixture] SKIP no living real client; no client created or respawned");
     return Plugin_Handled;
 }
 
@@ -76,7 +79,7 @@ void Check(bool condition,const char[] name)
 int TestHuman()
 {
     for(int i=1;i<=MaxClients;i++)if(LiveHuman(i) && !IsFakeClient(i))return i;
-    for(int i=1;i<=MaxClients;i++)if(LiveHuman(i))return i;return 0;
+    return 0;
 }
 
 void Aim(int client,const float origin[3],const float point[3])
@@ -90,11 +93,40 @@ void AtBase(int client)
     TeleportEntity(client,gCorePoints[0][0],gCorePointAngles[0][0],view_as<float>({0.0,0.0,0.0}));SetEntityHealth(client,1000);
 }
 
+bool KnownClientTest(const char[] which)
+{
+    char cases[][]={"world","progression","safety_economy","admin_menus","reset_day","reset_restored",
+        "day_population","growth","resource_reroll","power","power_retention","power_restored",
+        "power_upgrade_prepare","power_upgrade_verify","resource_ui","resource_verify_ui","resource_restore_ui",
+        "growth_base_ui","growth_turret_ui","growth_verify_ui","menus","gather","inventory","upgrade",
+        "placement","defenses","wall","boss","death","reborn","night_population","dawn_population",
+        "retention","restored","wipe","purged","victory"};
+    for(int i=0;i<sizeof(cases);i++)if(StrEqual(which,cases[i]))return true;
+    return false;
+}
+
 public Action TestCommand(int args)
 {
     char which[32];GetCmdArg(1,which,sizeof(which));
-    if(StrEqual(which,"summary")){PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d",tPassed,tFailed);return Plugin_Handled;}
-    int client=TestHuman();if(client==0){PrintToServer("[ShelterTest] FAIL no living fixture client");return Plugin_Handled;}
+    if(StrEqual(which,"summary")){PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d Skipped=%d",tPassed,tFailed,tSkipped);return Plugin_Handled;}
+    if(StrEqual(which,"logic")){TestSchedulerLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05build")){TestV05BuildLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_materials")){RunMaterialDropTests();return Plugin_Handled;}
+    if(StrEqual(which,"v05_real_materials")){RunV05RealMaterialTests(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_variants")){TestV05VariantLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_rotation_math")){TestFenceRotationMath();return Plugin_Handled;}
+    if(StrEqual(which,"v05_rotation_aim")){TestFenceRotationCurrentAim(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_rotation_ui_setup")){SetupFenceRotationUI(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_rotation_ui_verify")){VerifyFenceRotationUI(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_admin_travel")){TestAdminTravelReal(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_fence_logic")){TestFenceRetaliationLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_fence_real")){TestFenceRetaliationReal(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_npc_followup_logic")){TestNPCFollowupLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_npc_followup_real")){TestNPCFollowupReal(TestHuman());return Plugin_Handled;}
+    if(V05RealClientCommand(which))return Plugin_Handled;
+    if(V05RealFireCommand(which))return Plugin_Handled;
+    if(!KnownClientTest(which)){Check(false,"unknown test case");PrintToServer("[ShelterTest] unknown case: %s",which);return Plugin_Handled;}
+    int client=TestHuman();if(client==0){tSkipped++;PrintToServer("[ShelterTest] SKIP %s requires a living real client",which);return Plugin_Handled;}
     bool savedPower=gPowerEnabled;
     // Existing independent economy/combat cases also verify the supported
     // power-disabled compatibility setting. The power cases use real supply.
@@ -148,7 +180,7 @@ public Action TestCommand(int args)
     else if(StrEqual(which,"purged"))TestPurged(client);
     else if(StrEqual(which,"victory"))TestVictory(client);
     else if(StrEqual(which,"summary"))PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d",tPassed,tFailed);
-    else PrintToServer("[ShelterTest] Unknown case");
+    else Check(false,"known fixture case has no dispatcher implementation");
     gPowerEnabled=savedPower;RecalculatePower();
     return Plugin_Handled;
 }
@@ -311,11 +343,21 @@ void TestUpgrade(int client)
 
 int TestBuild(int recipe,const float origin[3])
 {
+    if(recipe<0 || recipe>=gRecipeCount)return -1;
     int slot=-1;for(int i=gCoreCount;i<MAX_BUILDINGS;i++)if(!gBuildings[i].used || !gBuildings[i].alive){slot=i;break;}
     if(slot<0)return -1;
     Building value;value.used=true;value.alive=true;value.kind=gRecipes[recipe].kind;value.uid=++gUID;value.core=-1;value.file=gRecipes[recipe].file;value.level=1;value.ref=INVALID_ENT_REFERENCE;value.origin=origin;
+    value.effectRef=INVALID_ENT_REFERENCE;value.meta=gRecipes[recipe].meta;value.buildCore=0;value.powerCore=0;
+    value.gridAssigned=true;value.configRevision=gConfigRevision;value.placementAnchor=origin;
     strcopy(value.type,sizeof(value.type),gRecipes[recipe].type);char path[128];Format(path,sizeof(path),"Types/%s",value.type);Text(value.file,path,"model",value.model,sizeof(value.model));
-    gBuildings[slot]=value;if(!ApplyBuildingLevel(slot,true) || !SpawnBuildingBody(slot))return -1;return slot;
+    gBuildings[slot]=value;
+    if(!ApplyBuildingLevel(slot,true) || !SpawnBuildingBody(slot))
+    {
+        RemoveBuildingEffect(slot);int failedRef=gBuildings[slot].ref;
+        gBuildings[slot].ref=INVALID_ENT_REFERENCE;gBuildings[slot].used=false;gBuildings[slot].alive=false;
+        RemoveOwnedRef(failedRef);MarkBuildAreasDirty();RecalculatePower();return -1;
+    }
+    return slot;
 }
 
 void TestDefenses(int client)
@@ -394,7 +436,7 @@ void TestPlacement(int client)
 {
     StartDay(false);for(int m=0;m<MATERIALS;m++)gPlayerInventory[client][m]=1000;
     char model[PLATFORM_MAX_PATH],path[128];Format(path,sizeof(path),"Types/%s",gRecipes[0].type);Text(gRecipes[0].file,path,"model",model,sizeof(model));
-    bool found=false;float placement[3],angles[3];
+    bool found=false;float placement[3],angles[3],anchor[3];
     for(int r=0;r<3 && !found;r++)for(int step=0;step<16 && !found;step++)
     {
         float heading=DegToRad(float(step)*22.5),position[3],ground[3];position=gCores[0].origin;
@@ -405,18 +447,23 @@ void TestPlacement(int client)
         position=ground;position[2]+=2.0;float mins[3]={-16.0,-16.0,0.0},maxs[3]={16.0,16.0,72.0};
         if(!ClearHull(position,mins,maxs,client,MASK_PLAYERSOLID))continue;
         float aim[3];aim=ground;aim[0]+=Cosine(heading)*120.0;aim[1]+=Sine(heading)*120.0;
-        Aim(client,position,aim);found=Placement(client,model,placement,angles);
+        Aim(client,position,aim);found=PlacementForRecipe(client,0,anchor,placement,angles,false) && BuildCoreAt(anchor)>=0;
     }
-    Check(found,"player ground aim finds a complete collision checked turret placement");
+    Check(found,"player ray aim finds a recipe placement inside the current build area");
     if(found)
     {
         int before=SummonCount(),materials[MATERIALS];materials=gPlayerInventory[client];
         Check(BuildRecipe(client,0) && SummonCount()==before+1,"actual construction transaction creates one owned defense");
         bool exact=true;for(int m=0;m<MATERIALS;m++)if(materials[m]-gPlayerInventory[client][m]!=gRecipes[0].cost[m])exact=false;
         Check(exact,"construction spends each recipe material exactly once");
-        materials=gPlayerInventory[client];Check(!BuildRecipe(client,0),"overlapping repeated construction is rejected");
+        materials=gPlayerInventory[client];
+        Check(gRecipes[0].meta.allowOverlap && BuildRecipe(client,0) && SummonCount()==before+2,
+            "default construction accepts an overlapping supported surface");
+        exact=true;for(int m=0;m<gMaterialCount;m++)if(materials[m]-gPlayerInventory[client][m]!=gRecipes[0].cost[m])exact=false;
+        Check(exact,"allowed overlapping construction spends its own recipe exactly once");
+        materials=gPlayerInventory[client];Check(!BuildRecipe(client,-1),"invalid construction input is rejected");
         exact=true;for(int m=0;m<MATERIALS;m++)if(materials[m]!=gPlayerInventory[client][m])exact=false;
-        Check(exact,"rejected placement never spends team materials");
+        Check(exact,"rejected construction never spends personal materials");
         for(int b=gCoreCount;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].alive)DamageBuilding(b,gBuildings[b].hp);
     }
     AtBase(client);

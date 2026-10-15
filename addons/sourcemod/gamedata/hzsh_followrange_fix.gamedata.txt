@@ -1,0 +1,67 @@
+// Audited Windows x64 server.dll SHA256:
+// b42edb61cfa13aef6397eb0278fb38656f1eb71e7ac306f00343c671ab2a6cae
+// Stable math/call contexts retain signature identity when the six branch
+// bytes are already NOPed. Exact branch bytes are validated by the plugin.
+"Games"
+{
+    "cstrike"
+    {
+        "Signatures"
+        {
+            "RangeContext"
+            {
+                "library" "server"
+                "windows64" "\xF3\x0F\x59\xC9\xF3\x0F\x59\xC0\xF3\x0F\x58\xF1\xF3\x0F\x58\xF0\x0F\x2F\x35\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x83\xBF\x60\x2A\x00\x00\x00\x7E"
+            }
+            "PathContext"
+            {
+                "library" "server"
+                "windows64" "\x48\x8D\x8F\x60\x0A\x00\x00\xE8\x2A\x2A\x2A\x2A\x0F\x2F\x05\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x2A\x0F\xB6\x87\x58\x0A\x00\x00"
+            }
+            "CHostage_Idle"
+            {
+                "library" "server"
+                "windows64" "\x40\x53\x48\x83\xEC\x20\x48\x8D\x99\x0C\x0A\x00\x00\x4C\x8B\xC9\x8B\x13\x85\xD2\x74\x43\xB8\xFF\x1F\x00\x00\x83\xFA\xFF\x74\x03"
+            }
+        }
+        "Addresses"
+        {
+            "RangeContext"
+            {
+                "windows64"
+                {
+                    "signature" "RangeContext"
+                }
+            }
+            "PathContext"
+            {
+                "windows64"
+                {
+                    "signature" "PathContext"
+                }
+            }
+            "CHostage_Idle"
+            {
+                "windows64"
+                {
+                    "signature" "CHostage_Idle"
+                }
+            }
+        }
+        "Offsets"
+        {
+            "PlatformPointerBytes"
+            {
+                "windows64" "8"
+            }
+            "RangePatchOffset"
+            {
+                "windows64" "23"
+            }
+            "PathPatchOffset"
+            {
+                "windows64" "19"
+            }
+        }
+    }
+}

@@ -10,6 +10,6 @@
   "RecipeTurretBasic": {"en":"Basic machine gun turret","chi":"简易机枪塔"},
   "RecipeTurretHeavy": {"en":"Heavy machine gun turret","chi":"重型机枪塔"},
   "RecipeFlame": {"en":"Flamethrower turret","chi":"火焰喷射塔"},
-  "RecipeFence": {"en":"Wire fence","chi":"铁丝围栏"},
+  "RecipeFence": {"en":"Defensive structure","chi":"防御工事"},
   "RecipeMine": {"en":"Mine","chi":"地雷"}
 }

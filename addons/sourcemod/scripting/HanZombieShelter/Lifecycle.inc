@@ -40,9 +40,10 @@ void PrepareRound()
 {
     if(!gEnabled || gTerminal)return;
     Phase previous=gPhase;
+    CancelAllBaseTeleportSelections();
     gEpoch++;gRoundPrepared=false;gPhase=Phase_Waiting;gEnvironmentPhase=HZSHEnvironment_Day;gWarningSent=false;
     gFailureCandidate=false;gVictoryCandidate=false;gOutcomeQueued=false;gTerminationExpected=false;
-    CleanWorld();
+    CleanWorld();ApplyMapAdjustments();
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<gBossCount;i++)gBosses[i].boundThisRound=false;
     gRoundRestored=gSnapshot;
@@ -269,7 +270,7 @@ public Action WorldTick(Handle timer)
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
-    ResourceTick(elapsed);NPCTick(now);PowerTick();DefenseTick(now);ExposureTick(now);CampaignHUD();
+    ResourceTick(elapsed);NPCTick(now);PowerTick();MineWorldTick();ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

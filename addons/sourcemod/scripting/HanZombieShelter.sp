@@ -14,7 +14,10 @@
 #include "HanZombieShelter/Config.inc"
 #include "HanZombieShelter/DayCvars.inc"
 #include "HanZombieShelter/Geometry.inc"
+#include "HanZombieShelter/MapAdjustments.inc"
+#include "HanZombieShelter/BuildAreas.inc"
 #include "HanZombieShelter/Inventory.inc"
+#include "HanZombieShelter/Drops.inc"
 #include "HanZombieShelter/Management.inc"
 #include "HanZombieShelter/EntityBudget.inc"
 #include "HanZombieShelter/Audio.inc"
@@ -50,14 +53,17 @@ public void OnPluginStart()
     RegAdminCmd("sm_zsh_phase",PhaseCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_day",DayCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_grant",GrantCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_fail",FailCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_reload",ReloadCommand,ADMFLAG_ROOT);
+    RegAdminCmd("sm_zsh_defense_trace",DefenseTraceCommand,ADMFLAG_ROOT);
     RegisterShelterAdminCommands();
     for(int i=1;i<=MaxClients;i++)if(IsClientInGame(i))OnClientPutInServer(i);
     gTick=CreateTimer(0.25,WorldTick,_,TIMER_REPEAT);
+    gDefenseTimer=CreateTimer(0.1,DefenseTimer,_,TIMER_REPEAT);
     gProjectileTimer=CreateTimer(0.05,GrenadeTimer,_,TIMER_REPEAT);
 }
 
 public void OnMapStart()
 {
+    ClearNPCDropCaches();ClearDefenseState();MarkBuildAreasDirty();
     gEpoch++;gEnabled=false;gCoreReady=false;gRoundPrepared=false;gSnapshot=false;gRollback=false;gTerminal=false;
     gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;
     ResetInventories();
@@ -79,6 +85,7 @@ public void OnConfigsExecuted()
 
 void BootMode()
 {
+    if(gSnapshot)return; // One immutable configuration revision per campaign.
     gEnabled=LoadConfigs();gCoreReady=APIAvailable();
     if(!gEnabled)return;
     if(!gCoreReady){LogError("[Shelter] HZS natives unavailable; load HZS and reload this map before play");gEnabled=false;return;}
@@ -96,14 +103,14 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    CancelBaseTeleportSelection(client);
     SaveClientInventory(client);
     if(!gEnabled || !APIAvailable())return;
     int serial=GetClientSerial(client);
     for(int n=0;n<MAX_NPCS;n++)
     {
         if(!gNPCs[n].used || !gNPCs[n].ready || gNPCs[n].dead || !gNPCs[n].active)continue;
-        int entity=Resolve(gNPCs[n].ref);if(entity<0)continue;
-        if(gNPCs[n].targetClientSerial==serial){gNPCs[n].targetClientSerial=0;StopBuildingAttack(n);}
+        ClearDisconnectedNPCTarget(n,client,serial);
     }
 }
 
@@ -118,6 +125,7 @@ public void OnEntityDestroyed(int entity)
     int npc=gNPCBinding[entity]-1;
     if(npc>=0 && gNPCs[npc].used && gNPCs[npc].ref==gNPCBindingRef[entity])
     {
+        ReleaseNPCDropCache(npc);ClearNPCRewardContext(npc);
         gNPCs[npc].used=false;gNPCs[npc].ref=INVALID_ENT_REFERENCE;
         // Body lifetime owns its associated ornament. Defer cleanup until HZS returns.
         if(gNPCs[npc].visualRef!=INVALID_ENT_REFERENCE)RequestFrame(CleanOrphan,gNPCs[npc].visualRef);
@@ -155,14 +163,18 @@ public void CleanOrphan(any ref)
 
 public void OnMapEnd()
 {
+    CancelAllBaseTeleportSelections();
+    ClearNPCDropCaches();
     gEnabled=false;gEpoch++;CleanWorld();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;PublishShelterState();
 }
 
 public void OnPluginEnd()
 {
+    CancelAllBaseTeleportSelections();
+    ClearNPCDropCaches();
     gEpoch++;
     if(gCoreReady && APIAvailable())for(int i=0;i<MAX_NPCS;i++)if(gNPCs[i].used)RestoreNPCOnUnload(i);
-    gEnabled=false;CleanWorld();PublishShelterState();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gProjectileTimer;delete gSharedOverflow;
+    gEnabled=false;CleanWorld();PublishShelterState();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gProjectileTimer;delete gDefenseTimer;delete gSharedOverflow;
 }
 
 public void OnLibraryRemoved(const char[] name)

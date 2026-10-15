@@ -1,12 +1,20 @@
 ﻿param(
     [string]$Compiler = 'D:\css\sp\大灾变1.12\addons\sourcemod\scripting\spcomp64.exe',
     [string]$SourceModInclude = 'D:\css\sp\大灾变1.12\addons\sourcemod\scripting\include',
-    [switch]$IntegrationProbe
+    [switch]$IntegrationProbe,
+    [switch]$APIConsumer
 )
 $ErrorActionPreference = 'Stop'
 $sourcePath = Join-Path $PSScriptRoot 'addons\sourcemod\scripting\HanZombieShelter.sp'
 $includePath = Join-Path $PSScriptRoot 'addons\sourcemod\scripting\include'
 $outputPath = Join-Path $PSScriptRoot 'addons\sourcemod\plugins\HanZombieShelter.smx'
+if ($IntegrationProbe -and $APIConsumer) { throw 'Select one test compilation target' }
+if ($APIConsumer) {
+    $sourcePath = Join-Path $PSScriptRoot 'tests\ShelterAPIConsumer.sp'
+    $testOutput = Join-Path $PSScriptRoot 'tests\compiled'
+    New-Item -ItemType Directory -Path $testOutput -Force | Out-Null
+    $outputPath = Join-Path $testOutput 'ShelterAPIConsumer.smx'
+}
 if ($IntegrationProbe) {
     $sourcePath = Join-Path $PSScriptRoot 'tests\ShelterIntegrationProbe.sp'
     $testOutput = Join-Path $PSScriptRoot 'tests\compiled'

@@ -3,3 +3,4 @@ tests/compiled/
 *.log
 tests/reports/
 tests/runtime/
+dist/

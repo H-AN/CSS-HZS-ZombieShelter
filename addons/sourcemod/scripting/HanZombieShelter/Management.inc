@@ -6,7 +6,13 @@ bool LoadManagementSettings()
     gDismantleRefund=Number(C_Management,"Dismantle","refund_enabled",1)!=0;
     gDismantleFraction=Decimal(C_Management,"Dismantle","refund_fraction",0.5);
     gAdminRefundToOwner=Number(C_Management,"Dismantle","admin_refund_to_owner",1)!=0;
-    gSummonLimit=Number(C_Management,"Limits","max_managed_defenses",96);
+    bool found;
+    if(!StoredLevelInt(C_Management,"Limits","max_total_buildings",768,gSummonLimit,found))return ConfigFailure("max_total_buildings must be an integer");
+    if(!found && Node(C_Management,"Limits") && gCfg[C_Management].GetDataType("max_managed_defenses")!=KvData_None)
+    {
+        gSummonLimit=Number(C_Management,"Limits","max_managed_defenses",96);
+        LogMessage("[Shelter] migrate Limits/max_managed_defenses=%d to max_total_buildings (global logical defenses; bases excluded)",gSummonLimit);
+    }
     return (gDismantleFraction>=0.0 && gDismantleFraction<=1.0 && gSummonLimit>=1
         && gSummonLimit<=MAX_BUILDINGS-MAX_CORES) || ConfigFailure("management refund ratio/defense count");
 }
@@ -40,6 +46,23 @@ void AssignBuildingOwner(int b,int client)
     strcopy(gBuildings[b].ownerKey,sizeof(gBuildings[].ownerKey),gInventoryOwner[client]);
 }
 
+int BuildingOwnerOnline(int b)
+{
+    if(b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used)return 0;
+    int client=GetClientFromSerial(gBuildings[b].ownerSerial);
+    return client>0 && IsClientInGame(client) && !IsFakeClient(client)
+        && !IsClientSourceTV(client) && !IsClientReplay(client)
+        && gBuildings[b].ownerKey[0] && StrEqual(gBuildings[b].ownerKey,gInventoryOwner[client]) ? client : 0;
+}
+
+bool TakeBuildingOwnership(int client,int b)
+{
+    if(!Running() || !LiveHuman(client) || IsFakeClient(client) || b<0 || b>=MAX_BUILDINGS
+        || !gBuildings[b].used || !gBuildings[b].alive || gBuildings[b].kind!=Kind_Fence
+        || BuildingOwnerOnline(b)>0 || !BuildingInUseRange(client,b))return false;
+    AssignBuildingOwner(b,client);return true;
+}
+
 void AbandonClientBuildings(int client)
 {
     int serial=GetClientSerial(client);
@@ -49,9 +72,9 @@ void AbandonClientBuildings(int client)
 
 void BuildingRefund(int b,int refund[MATERIALS])
 {
-    for(int m=0;m<MATERIALS;m++)refund[m]=0;
+    for(int m=0;m<gMaterialCount;m++)refund[m]=0;
     if(b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive || gBuildings[b].kind==Kind_Base || !gDismantleRefund)return;
-    for(int m=0;m<MATERIALS;m++)
+    for(int m=0;m<gMaterialCount;m++)
     {
         refund[m]=RoundToFloor(float(gBuildings[b].invested[m])*gDismantleFraction);
         if(refund[m]>gBuildings[b].invested[m])refund[m]=gBuildings[b].invested[m];
@@ -80,18 +103,18 @@ bool DismantleBuilding(int client,int b,bool adminAction=false)
         if(recipient<1 || !IsClientInGame(recipient))recipient=0;
     }
     int maximum=gInventoryCap>0 ? gInventoryCap : 2000000000;
-    if(recipient>0)for(int m=0;m<MATERIALS;m++)
+    if(recipient>0)for(int m=0;m<gMaterialCount;m++)
         if(refund[m]>maximum-gPlayerInventory[recipient][m]){Tell(client,"%t","DismantleNoRoom");return false;}
     // Commit consumption before removing the entity or publishing a refund.
-    gBuildings[b].alive=false;gBuildings[b].hp=0;
+    InvalidateDefenseCache(b);MarkBuildAreasDirty();gBuildings[b].alive=false;gBuildings[b].hp=0;
     RemoveBuildingEffect(b);
-    for(int m=0;m<MATERIALS;m++)gBuildings[b].invested[m]=0;
+    for(int m=0;m<gMaterialCount;m++)gBuildings[b].invested[m]=0;
     int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
     if(recipient>0)Refund(refund,recipient);
     else
     {
-        int core=NearestStorageCore(gBuildings[b].origin);
-        for(int m=0;m<MATERIALS;m++)DepositSharedAutomatic(core,m,refund[m]);
+        int core=gBuildings[b].buildCore;
+        for(int m=0;m<gMaterialCount;m++)DepositSharedAutomatic(core,m,refund[m]);
     }
     RecalculatePower();Tell(client,"%t","BuildingDismantled");return true;
 }
@@ -110,7 +133,7 @@ bool AdminSetBuildingLevel(int client,int b,int level)
 
 bool AdminSetBaseMaterial(int client,int core,int material,int value)
 {
-    if(!IsShelterAdmin(client) || !Running() || core<0 || core>=gCoreCount || material<0 || material>=MATERIALS || value<0)return false;
+    if(!IsShelterAdmin(client) || !Running() || core<0 || core>=gCoreCount || material<0 || material>=gMaterialCount || value<0)return false;
     int maximum=StorageCapacity();if(value>maximum)return false;
     int before=gBaseInventory[core][material];gBaseInventory[core][material]=value;
     FlushSharedOverflow();LogAction(client,-1,"[Shelter] base %d material %d: %d -> %d",core,material,before,value);return true;
@@ -120,7 +143,7 @@ bool AdminSetPlayerMaterial(int client,int targetSerial,int material,int value)
 {
     int target=GetClientFromSerial(targetSerial);
     if(!IsShelterAdmin(client) || !Running() || target<1 || !IsClientInGame(target) || IsFakeClient(target)
-        || material<0 || material>=MATERIALS || value<0)return false;
+        || material<0 || material>=gMaterialCount || value<0)return false;
     int maximum=gInventoryCap>0 ? gInventoryCap : 2000000000;if(value>maximum)return false;
     int before=gPlayerInventory[target][material];gPlayerInventory[target][material]=value;
     LogAction(client,target,"[Shelter] player material %d: %d -> %d",material,before,value);return true;

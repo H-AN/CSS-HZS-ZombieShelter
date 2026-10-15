@@ -42,7 +42,7 @@ void SaveClientInventory(int client)
     {
         float position[3];if(IsClientInGame(client))GetClientAbsOrigin(client,position);
         int core=NearestStorageCore(position);
-        for(int m=0;m<MATERIALS;m++)
+        for(int m=0;m<gMaterialCount;m++)
         {
             int amount=gPlayerInventory[client][m];gPlayerInventory[client][m]=0;
             if(amount>0){DepositSharedAutomatic(core,m,amount);hadMaterials=true;}
@@ -80,7 +80,7 @@ int NearestStorageCore(const float position[3])
 
 int PlaceSharedMaterial(int preferred,int material,int amount)
 {
-    if(gCoreCount<1 || material<0 || material>=MATERIALS || amount<=0)return amount;
+    if(gCoreCount<1 || material<0 || material>=gMaterialCount || amount<=0)return amount;
     if(preferred<0 || preferred>=gCoreCount)preferred=0;
     int capacity=StorageCapacity();
     for(int step=0;step<gCoreCount && amount>0;step++)
@@ -94,7 +94,7 @@ int PlaceSharedMaterial(int preferred,int material,int amount)
 
 void DepositSharedAutomatic(int preferred,int material,int amount)
 {
-    if(amount<=0 || material<0 || material>=MATERIALS)return;
+    if(amount<=0 || material<0 || material>=gMaterialCount)return;
     int remaining=PlaceSharedMaterial(preferred,material,amount);if(remaining<=0)return;
     if(gSharedOverflow==null)gSharedOverflow=new ArrayList(3);
     for(int i=0;i<gSharedOverflow.Length && remaining>0;i++)
@@ -133,18 +133,18 @@ int SharedPendingAmount(int core,int material)
 bool Spend(const int cost[MATERIALS],int client)
 {
     if(client<1 || client>MaxClients || !IsClientInGame(client))return false;
-    for(int m=0;m<MATERIALS;m++)if(cost[m]<0 || cost[m]>gPlayerInventory[client][m])return false;
-    for(int m=0;m<MATERIALS;m++)gPlayerInventory[client][m]-=cost[m];return true;
+    for(int m=0;m<gMaterialCount;m++)if(cost[m]<0 || cost[m]>gPlayerInventory[client][m])return false;
+    for(int m=0;m<gMaterialCount;m++)gPlayerInventory[client][m]-=cost[m];return true;
 }
 
 void Refund(const int cost[MATERIALS],int client)
 {
-    for(int m=0;m<MATERIALS;m++)Grant(m,cost[m],client);
+    for(int m=0;m<gMaterialCount;m++)Grant(m,cost[m],client);
 }
 
 int Grant(int material,int amount,int client)
 {
-    if(client<1 || client>MaxClients || !IsClientInGame(client) || material<0 || material>=MATERIALS || amount<=0)return 0;
+    if(client<1 || client>MaxClients || !IsClientInGame(client) || material<0 || material>=gMaterialCount || amount<=0)return 0;
     int maximum=gInventoryCap>0 ? gInventoryCap : 2000000000;
     int room=maximum-gPlayerInventory[client][material];if(room<=0)return 0;
     int actual=amount>room ? room : amount;gPlayerInventory[client][material]+=actual;return actual;
@@ -152,7 +152,7 @@ int Grant(int material,int amount,int client)
 
 bool TransferBaseMaterial(int client,int core,int material,int amount,bool deposit)
 {
-    if(!Running() || !LiveHuman(client) || core<0 || core>=gCoreCount || material<0 || material>=MATERIALS || amount<1)return false;
+    if(!Running() || !LiveHuman(client) || core<0 || core>=gCoreCount || material<0 || material>=gMaterialCount || amount<1)return false;
     float position[3];GetClientAbsOrigin(client,position);if(SafeCoreAt(position)!=core)return false;
     int capacity=deposit ? Number(C_Resources,"BaseStorage","capacity",0) : gInventoryCap;
     if(capacity<=0)capacity=2000000000;

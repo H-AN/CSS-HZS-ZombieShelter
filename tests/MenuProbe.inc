@@ -24,33 +24,33 @@ void TestBaseMenus(int client)
         for(int m=0;m<MATERIALS;m++)savedWarehouses[core][m]=gBaseInventory[core][m];
     }
 
-    int building=gCores[0].building,decodedCore,operation;
+    int building=gCores[0].building,decodedCore,operation,material,quantity;
     char token[128];float noVelocity[3]={0.0,0.0,0.0};
     TeleportEntity(client,gCorePoints[0][0],NULL_VECTOR,noVelocity);
     BaseMenuToken(client,0,1,token,sizeof(token));
-    Check(ValidateBaseMenuToken(client,token,decodedCore,operation) && decodedCore==0 && operation==1,
+    Check(ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity) && decodedCore==0 && operation==1,
         "current base A menu token allows one intended confirmation");
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"replaying the identical base confirmation is rejected");
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"replaying the identical base confirmation is rejected");
 
     BaseMenuToken(client,0,1,token,sizeof(token));gEpoch++;
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"previous-round base menu epoch is rejected");gEpoch=savedEpoch;
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"previous-round base menu epoch is rejected");gEpoch=savedEpoch;
 
     BaseMenuToken(client,0,1,token,sizeof(token));gBuildings[building].level++;
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"another upgrade invalidates the previous level quote");gBuildings[building].level--;
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"another upgrade invalidates the previous level quote");gBuildings[building].level--;
 
     BaseMenuToken(client,0,1,token,sizeof(token));gBuildings[building].uid++;
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"replacement base UID invalidates its old menu");gBuildings[building].uid--;
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"replacement base UID invalidates its old menu");gBuildings[building].uid--;
 
-    Format(token,sizeof(token),"%d:%d:0:%d:%d:%d:1",gEpoch,GetClientSerial(client)+1,
-        gBuildings[building].uid,gBuildings[building].level,gBaseMenuNonce[client]);
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"a different client serial cannot use the menu token");
+    Format(token,sizeof(token),"%d:%d:0:%d:%d:%d:1:%d:-:0",gEpoch,GetClientSerial(client)+1,
+        gBuildings[building].uid,gBuildings[building].level,gBaseMenuNonce[client],gConfigRevision);
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"a different client serial cannot use the menu token");
 
     BaseMenuToken(client,0,1,token,sizeof(token));
     float localOutside[3],outside[3];localOutside[0]=gCoreMaxs[0][0][0]+256.0;
     localOutside[1]=gCoreMaxs[0][0][1]+256.0;localOutside[2]=2.0;
     WorldPoint(localOutside,gCores[0].origin,gCores[0].angles,outside);
     TeleportEntity(client,outside,NULL_VECTOR,noVelocity);
-    Check(SafeCoreAt(outside)<0 && !ValidateBaseMenuToken(client,token,decodedCore,operation),
+    Check(SafeCoreAt(outside)<0 && !ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),
         "leaving all safety zones prevents spending from a still-open base menu");
 
     for(int core=0;core<3;core++)
@@ -63,7 +63,7 @@ void TestBaseMenus(int client)
     TeleportEntity(client,gCorePoints[0][0],NULL_VECTOR,noVelocity);
     BaseMenuToken(client,0,1,token,sizeof(token));
     TeleportEntity(client,gCorePoints[1][0],NULL_VECTOR,noVelocity);
-    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation),"moving from A to B rejects an open A upgrade confirmation");
+    Check(!ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity),"moving from A to B rejects an open A upgrade confirmation");
 
     TeleportEntity(client,gCorePoints[0][0],NULL_VECTOR,noVelocity);
     gBuildings[building].alive=false;
@@ -102,7 +102,7 @@ void TestBaseMenus(int client)
             for(int m=0;m<MATERIALS;m++)gPlayerInventory[client][m]=cost[m];
             Check(HasBaseUpgradeMaterials(cost,client),"exactly the quoted personal materials enable confirmation");
             BaseMenuToken(client,quoteCore,1,token,sizeof(token));gPlayerInventory[client][missing]--;
-            Check(ValidateBaseMenuToken(client,token,decodedCore,operation) && !HasBaseUpgradeMaterials(cost,client)
+            Check(ValidateBaseMenuToken(client,token,decodedCore,operation,material,quantity) && !HasBaseUpgradeMaterials(cost,client)
                 && !TryUpgrade(client,building),"personal materials spent after opening a menu are rechecked at confirmation");
             gBaseInventory[quoteCore][missing]=cost[missing]+100;
             Check(!HasBaseUpgradeMaterials(cost,client) && !TryUpgrade(client,building)
@@ -135,15 +135,28 @@ void TestBaseStorageTransactions(int client)
     Check(!TransferBaseMaterial(client,1,0,1,true) && gPlayerInventory[client][0]==50 && gBaseInventory[1][0]==7,
         "base B warehouse cannot be accessed while standing in A");
 
-    char token[128];int core,operation;
-    BaseMenuToken(client,0,20,token,sizeof(token));
-    Check(ValidateBaseMenuToken(client,token,core,operation) && TransferBaseMaterial(client,core,0,1,true),
+    char token[192];int core,operation,material,quantity;
+    BaseMenuToken(client,0,6,token,sizeof(token),gMaterials[0].id,1);
+    Check(ValidateBaseMenuToken(client,token,core,operation,material,quantity) && operation==6 && material==0 && quantity==1 && TransferBaseMaterial(client,core,material,quantity,true),
         "one valid storage menu selection transfers exactly once");
-    Check(!ValidateBaseMenuToken(client,token,core,operation) && gPlayerInventory[client][0]==49 && gBaseInventory[0][0]==21,
+    Check(!ValidateBaseMenuToken(client,token,core,operation,material,quantity) && gPlayerInventory[client][0]==49 && gBaseInventory[0][0]==21,
         "replaying a storage button cannot duplicate its transfer");
 
-    BaseMenuToken(client,0,24,token,sizeof(token));gBaseInventory[0][0]=9;
-    Check(ValidateBaseMenuToken(client,token,core,operation) && !TransferBaseMaterial(client,0,0,10,false)
+    // Material index 11 used to collide with arithmetic operation ranges.
+    int savedMaterialCount=gMaterialCount;MaterialDef savedMenuMaterial;savedMenuMaterial=gMaterials[11];
+    if(gMaterialCount<12)gMaterialCount=12;
+    strcopy(gMaterials[11].id,sizeof(gMaterials[].id),"menu_probe_material_11");
+    BaseMenuToken(client,0,6,token,sizeof(token),gMaterials[11].id,10);
+    Check(ValidateBaseMenuToken(client,token,core,operation,material,quantity) && operation==6 && material==11 && quantity==10,
+        "storage action and material ID remain independent above ten materials");
+    Check(!ValidateBaseMenuToken(client,token,core,operation,material,quantity),"extended material token is single use");
+    BaseMenuToken(client,0,7,token,sizeof(token),gMaterials[11].id,-1);
+    int savedRevision=gConfigRevision;gConfigRevision++;
+    Check(!ValidateBaseMenuToken(client,token,core,operation,material,quantity),"storage token rejects a changed material catalogue revision");
+    gConfigRevision=savedRevision;gMaterialCount=savedMaterialCount;gMaterials[11]=savedMenuMaterial;
+
+    BaseMenuToken(client,0,7,token,sizeof(token),gMaterials[0].id,10);gBaseInventory[0][0]=9;
+    Check(ValidateBaseMenuToken(client,token,core,operation,material,quantity) && operation==7 && material==0 && quantity==10 && !TransferBaseMaterial(client,core,material,quantity,false)
         && gPlayerInventory[client][0]==49 && gBaseInventory[0][0]==9,
         "withdrawal rechecks shared stock after another action changes it");
     gPlayerInventory[client][0]=99;gBaseInventory[0][0]=3;

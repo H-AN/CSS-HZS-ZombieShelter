@@ -4,7 +4,8 @@ enum AdminMenuAction
     Admin_BaseMaterials=10, Admin_BaseAmounts, Admin_SetBase, Admin_ChangeBase,
     Admin_PlayerMaterials=20, Admin_PlayerAmounts, Admin_SetPlayer, Admin_ChangePlayer,
     Admin_Building=30, Admin_BuildingConfirm, Admin_BuildingApply,
-    Admin_CustomBase=40, Admin_CustomPlayer
+    Admin_CustomBase=40, Admin_CustomPlayer,
+    Admin_TravelList=50, Admin_Travel
 }
 
 enum AdminTokenField { AT_Epoch, AT_Client, AT_Nonce, AT_Action, AT_Subject, AT_Identity, AT_Revision, AT_Material, AT_Value, AT_Nearby, AT_Count }
@@ -21,7 +22,68 @@ void RegisterShelterAdminCommands()
 
 bool AdminActor(int client)
 {
-    return LiveHuman(client) && Running() && IsShelterAdmin(client);
+    return LiveHuman(client) && !IsFakeClient(client) && Running() && IsShelterAdmin(client);
+}
+
+bool TravelBaseAlive(int core)
+{
+    if(!Running() || core<0 || core>=gCoreCount)return false;
+    int b=gCores[core].building;
+    return b>=0 && b<MAX_BUILDINGS && gBuildings[b].used && gBuildings[b].alive && gBuildings[b].hp>0
+        && gBuildings[b].kind==Kind_Base && Resolve(gBuildings[b].ref)>0;
+}
+
+bool TravelPointInsideBase(int core,const float point[3])
+{
+    float local[3];LocalPoint(point,gCores[core].origin,gCores[core].angles,local);
+    for(int box=0;box<gCores[core].boxCount;box++)if(InBox(local,gCoreMins[core][box],gCoreMaxs[core][box]))return true;
+    return false;
+}
+
+bool SafeHumanPointForBase(int client,int core,float position[3],float angles[3])
+{
+    if(!TravelBaseAlive(core) || gCores[core].pointCount<1)return false;
+    float mins[3]={-16.0,-16.0,0.0},maxs[3]={16.0,16.0,72.0};int first=GetRandomInt(0,gCores[core].pointCount-1);
+    for(int offset=0;offset<gCores[core].pointCount;offset++)
+    {
+        int point=(first+offset)%gCores[core].pointCount;position=gCorePoints[core][point];angles=gCorePointAngles[core][point];
+        bool valid=true;
+        for(int axis=0;axis<3;axis++)if(!(position[axis]>=-15000.0 && position[axis]<=15000.0)
+            || !(angles[axis]>=-3600.0 && angles[axis]<=3600.0))valid=false;
+        if(!valid || TR_PointOutsideWorld(position) || !TravelPointInsideBase(core,position)
+            || !ClearHull(position,mins,maxs,client,MASK_PLAYERSOLID))continue;
+        // Confirm an actual nearby support surface; never drop into a shaft.
+        float down[3],landing[3],normal[3];down=position;down[2]-=96.0;
+        Handle trace=TR_TraceHullFilterEx(position,down,mins,maxs,MASK_PLAYERSOLID,FilterExcept,client);
+        bool supported=TR_DidHit(trace) && !TR_StartSolid(trace) && !TR_AllSolid(trace);
+        if(supported){TR_GetEndPosition(landing,trace);TR_GetPlaneNormal(trace,normal);}delete trace;
+        if(!supported || normal[2]<0.7 || position[2]-landing[2]>48.0)continue;
+        landing[2]+=1.0;
+        if(TR_PointOutsideWorld(landing) || !TravelPointInsideBase(core,landing)
+            || !ClearHull(landing,mins,maxs,client,MASK_PLAYERSOLID))continue;
+        bool occupied;
+        for(int player=1;player<=MaxClients;player++)if(player!=client && LiveHuman(player) && !IsFakeClient(player))
+        {float other[3];GetClientAbsOrigin(player,other);if(GetVectorDistance(landing,other)<40.0){occupied=true;break;}}
+        if(occupied)continue;position=landing;return true;
+    }
+    return false;
+}
+
+// Shared by the admin menu and public native. Calling plugins own any fees.
+bool TeleportPlayerToBase(int client,int core)
+{
+    if(gBaseTeleportClosing || !LiveHuman(client) || IsFakeClient(client) || IsClientSourceTV(client) || IsClientReplay(client) || !TravelBaseAlive(core))return false;
+    int serial=GetClientSerial(client),epoch=gEpoch,revision=gConfigRevision,uid=gBuildings[gCores[core].building].uid;
+    float position[3],angles[3];if(!SafeHumanPointForBase(client,core,position,angles))return false;
+    if(!LiveHuman(client) || GetClientSerial(client)!=serial || epoch!=gEpoch || revision!=gConfigRevision
+        || !TravelBaseAlive(core) || gBuildings[gCores[core].building].uid!=uid)return false;
+    float before[3],beforeAngles[3],beforeVelocity[3],zero[3];GetClientAbsOrigin(client,before);GetClientEyeAngles(client,beforeAngles);
+    GetEntPropVector(client,Prop_Data,"m_vecAbsVelocity",beforeVelocity);TeleportEntity(client,position,angles,zero);
+    float actual[3];GetClientAbsOrigin(client,actual);
+    if(LiveHuman(client) && GetClientSerial(client)==serial && epoch==gEpoch && revision==gConfigRevision && TravelBaseAlive(core)
+        && gBuildings[gCores[core].building].uid==uid && GetVectorDistance(actual,position)<4.0 && TravelPointInsideBase(core,actual))return true;
+    if(IsClientInGame(client) && GetClientSerial(client)==serial && IsPlayerAlive(client))TeleportEntity(client,before,beforeAngles,beforeVelocity);
+    return false;
 }
 
 bool AdminOnlinePlayer(int serial)
@@ -40,13 +102,19 @@ void AdminToken(int client,AdminMenuAction operation,char[] token,int length,int
 bool ValidateAdminToken(int client,const char[] token,int fields[AT_Count])
 {
     if(!AdminActor(client))return false;
-    char parts[AT_Count][24];if(ExplodeString(token,":",parts,view_as<int>(AT_Count),24)!=view_as<int>(AT_Count))return false;
-    for(int i=0;i<view_as<int>(AT_Count);i++)fields[i]=StringToInt(parts[i]);
+    char parts[view_as<int>(AT_Count)+1][24];if(ExplodeString(token,":",parts,view_as<int>(AT_Count)+1,24)!=view_as<int>(AT_Count))return false;
+    for(int i=0;i<view_as<int>(AT_Count);i++)if(!ParseLevelInteger(parts[i],fields[i],true))return false;
     if(fields[AT_Epoch]!=gEpoch || fields[AT_Client]!=GetClientSerial(client) || fields[AT_Nonce]!=gAdminMenuNonce[client])return false;
     int action=fields[AT_Action],subject=fields[AT_Subject];bool base,player,building,material;
     switch(view_as<AdminMenuAction>(action))
     {
         case Admin_Home,Admin_ResetConfirm,Admin_Reset,Admin_BaseList,Admin_PlayerList,Admin_BuildingList: {}
+        case Admin_TravelList: {if(fields[AT_Revision]!=gConfigRevision)return false;}
+        case Admin_Travel:
+        {
+            if(fields[AT_Revision]!=gConfigRevision || !TravelBaseAlive(subject)
+                || gBuildings[gCores[subject].building].uid!=fields[AT_Identity])return false;
+        }
         case Admin_BaseMaterials: base=true;
         case Admin_BaseAmounts,Admin_SetBase,Admin_ChangeBase,Admin_CustomBase: {base=true;material=true;}
         case Admin_PlayerMaterials: player=true;
@@ -62,7 +130,7 @@ bool ValidateAdminToken(int client,const char[] token,int fields[AT_Count])
             || gBuildings[b].level!=fields[AT_Revision])return false;
     }
     if(player && !AdminOnlinePlayer(subject))return false;
-    if(material && (fields[AT_Material]<0 || fields[AT_Material]>=MATERIALS))return false;
+    if(material && (fields[AT_Material]<0 || fields[AT_Material]>=gMaterialCount))return false;
     if(building)
     {
         if(subject<0 || subject>=MAX_BUILDINGS || !gBuildings[subject].used || !gBuildings[subject].alive
@@ -100,7 +168,23 @@ void ShowShelterAdminMenu(int client)
     AdminAdd(menu,client,Admin_ResetConfirm,"AdminResetDay",-1,0,gDay);
     AdminAdd(menu,client,Admin_BaseList,"AdminBaseSupplies");
     AdminAdd(menu,client,Admin_PlayerList,"AdminPlayerSupplies");
-    AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");
+    AdminAdd(menu,client,Admin_TravelList,"AdminTravelMenu",-1,0,gConfigRevision);menu.Display(client,30);
+}
+
+void ShowAdminTravelMenu(int client)
+{
+    if(!AdminActor(client))return;gAdminMenuNonce[client]++;
+    char title[192];TranslateLabel(client,"AdminTravelTitle",title,sizeof(title));Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
+    int count;
+    for(int core=0;core<gCoreCount;core++)if(TravelBaseAlive(core))
+    {
+        char token[256],name[64],label[128];CoreDisplayName(core,name,sizeof(name),client);
+        Format(label,sizeof(label),"%T","AdminTravelDestination",client,name);
+        AdminToken(client,Admin_Travel,token,sizeof(token),core,gBuildings[gCores[core].building].uid,gConfigRevision);menu.AddItem(token,label);count++;
+    }
+    if(count==0){char text[128];TranslateLabel(client,"AdminTravelNoBases",text,sizeof(text));menu.AddItem("",text,ITEMDRAW_DISABLED);}
+    AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
 }
 
 void ShowAdminResetMenu(int client)
@@ -153,7 +237,7 @@ void ShowAdminMaterialList(int client,int subject,bool base)
     gAdminMenuNonce[client]++;
     char title[192];Format(title,sizeof(title),"%T","AdminMaterialsTitle",client,name);
     Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
-    for(int m=0;m<MATERIALS;m++)
+    for(int m=0;m<gMaterialCount;m++)
     {
         char token[256],label[64],line[128];TranslateLabel(client,gMaterials[m].label,label,sizeof(label));
         int count=base ? gBaseInventory[subject][m] : gPlayerInventory[target][m];
@@ -165,7 +249,7 @@ void ShowAdminMaterialList(int client,int subject,bool base)
 
 void ShowAdminAmounts(int client,int subject,int material,bool base)
 {
-    if(!AdminActor(client) || material<0 || material>=MATERIALS
+    if(!AdminActor(client) || material<0 || material>=gMaterialCount
         || (base ? (subject<0 || subject>=gCoreCount) : !AdminOnlinePlayer(subject)))return;
     int identity,revision,target,count;char name[64],label[64],title[256];
     if(base)
@@ -296,6 +380,14 @@ public int ShelterAdminMenuHandler(Menu menu,MenuAction action,int client,int it
             case Admin_BaseList: ShowAdminBaseList(client);
             case Admin_PlayerList: ShowAdminPlayerList(client);
             case Admin_BuildingList: ShowAdminBuildingList(client);
+            case Admin_TravelList: ShowAdminTravelMenu(client);
+            case Admin_Travel:
+            {
+                if(TeleportPlayerToBase(client,subject))
+                {char name[64];CoreDisplayName(subject,name,sizeof(name),client);Tell(client,"%T","AdminTravelSuccess",client,name);}
+                else Tell(client,"%T","AdminTravelFailed",client);
+                ShowAdminTravelMenu(client);
+            }
             case Admin_BaseMaterials: ShowAdminMaterialList(client,subject,true);
             case Admin_PlayerMaterials: ShowAdminMaterialList(client,subject,false);
             case Admin_BaseAmounts: ShowAdminAmounts(client,subject,material,true);

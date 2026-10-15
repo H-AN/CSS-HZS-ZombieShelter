@@ -246,7 +246,7 @@ float AmplifierBonus(int channel,int &count)
     for(int building=0;building<MAX_BUILDINGS;building++)
     {
         if(!gBuildings[building].used || !gBuildings[building].alive || gBuildings[building].kind!=Kind_Amplifier
-            || gBuildings[building].hp<=0 || Resolve(gBuildings[building].ref)<0)continue;
+            || gBuildings[building].hp<=0 || !BuildingPowered(building))continue;
         int required;float bonuses[PROGRESSION_CHANNELS];
         if(!AmplifierLevelInfo(gBuildings[building].type,gBuildings[building].level,required,bonuses))continue;
         count++;total+=bonuses[channel];

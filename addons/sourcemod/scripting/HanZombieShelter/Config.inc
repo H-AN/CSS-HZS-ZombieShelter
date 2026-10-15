@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -48,12 +48,26 @@ bool LoadConfigs()
     ReleaseConfigs();
     for(int i=0;i<view_as<int>(C_Count);i++)
     {
+        if(i==view_as<int>(C_Drops))continue; // Retired migration reference; never load or fall back.
         strcopy(relative,sizeof(relative),sFiles[i]);ReplaceString(relative,sizeof(relative),"{map}",gMap);
         BuildPath(Path_SM,path,sizeof(path),"configs/HanZombieShelter/%s",relative);
         gCfg[i]=new KeyValues(sRoots[i]);
-        if(!gCfg[i].ImportFromFile(path))return ConfigFailure(path);
+        if(!gCfg[i].ImportFromFile(path))
+        {
+            if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops.cfg missing/invalid: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
+            return ConfigFailure(path);
+        }
         char root[64];gCfg[i].GetSectionName(root,sizeof(root));
-        if(!StrEqual(root,sRoots[i]) || gCfg[i].GetNum("schema_version")!=1)return ConfigFailure("root/schema_version mismatch");
+        int schema=(i==view_as<int>(C_Materials) || i==view_as<int>(C_Resources) || i==view_as<int>(C_ZombieDrops)) ? 2 : 1;
+        int actualSchema=gCfg[i].GetNum("schema_version");
+        bool buildingSchema=i==view_as<int>(C_Bases) || i==view_as<int>(C_Turrets) || i==view_as<int>(C_Flames)
+            || i==view_as<int>(C_Fences) || i==view_as<int>(C_Mines) || i==view_as<int>(C_Amplifiers)
+            || i==view_as<int>(C_Generators) || i==view_as<int>(C_Lights) || i==view_as<int>(C_Grenades) || i==view_as<int>(C_Expanders);
+        if(!StrEqual(root,sRoots[i]) || (actualSchema!=schema && !(buildingSchema && actualSchema==2)))
+        {
+            if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops root/schema mismatch: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
+            return ConfigFailure("root/schema_version mismatch");
+        }
     }
     if(!Number(C_Mode,"","enabled_for_configured_maps",1))return false;
     gDaySeconds=Decimal(C_Mode,"Rules","day_seconds",180.0);
@@ -91,10 +105,14 @@ bool LoadConfigs()
     Text(C_Lifecycle,"Outcome","loss_phrase",gFailureText,sizeof(gFailureText),"CampaignLoss");
     Text(C_Mode,"HumanTeamPolicy","t_client_spawn_policy",gSpawnPolicy,sizeof(gSpawnPolicy),"native_position");
     if(!StrEqual(gSpawnPolicy,"native_position") && !StrEqual(gSpawnPolicy,"alive_base") && !StrEqual(gSpawnPolicy,"random_ct_spawn"))return ConfigFailure("t_client_spawn_policy");
-    return ReadMaterials() && ReadMapData()
+    bool valid=ReadMaterials() && ReadMapData() && LoadBuildAreaSettings()
         && (ValidateResourcePools() || ConfigFailure("resource pool weights, regrow option or map pool reference"))
         && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
         && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && ValidateDayRanges() && ValidateNativeBridge();
+    if(!valid)return false;
+    ReadZombieDrops();
+    gConfigRevision=gConfigRevision==2147483647 ? 1 : gConfigRevision+1;
+    return true;
 }
 
 bool ValidResourceGrowth(float hold,float grow,float scale)
@@ -112,13 +130,29 @@ bool ValidResourceGrowth(float hold,float grow,float scale)
 bool ReadMaterials()
 {
     static const char ids[][]={"wood","iron","copper","silver","gold"};
-    static const char labels[][]={"MaterialWood","MaterialIron","MaterialCopper","MaterialSilver","MaterialGold"};
-    for(int i=0;i<MATERIALS;i++)
+    gMaterialCount=0;
+    // Stable legacy positions are independent of administrator section ordering.
+    for(int i=0;i<LEGACY_MATERIALS;i++)
     {
         char path[96];Format(path,sizeof(path),"Materials/%s",ids[i]);
-        if(!Node(C_Resources,path))return ConfigFailure(path);
-        strcopy(gMaterials[i].id,sizeof(gMaterials[].id),ids[i]);
-        gCfg[C_Resources].GetString("display_name",gMaterials[i].label,sizeof(gMaterials[].label),labels[i]);
+        if(!Node(C_Materials,path) || !RegisterMaterial(ids[i]))return ConfigFailure(path);
+    }
+    if(!Node(C_Materials,"Materials") || !gCfg[C_Materials].GotoFirstSubKey())return ConfigFailure("Materials empty");
+    do
+    {
+        char id[64];gCfg[C_Materials].GetSectionName(id,sizeof(id));
+        if(FindMaterial(id)>=0)continue;
+        if(!RegisterMaterial(id))return ConfigFailure("material ID/kind/capacity (maximum 64)");
+    }while(gCfg[C_Materials].GotoNextKey());
+    if(!Node(C_Resources,"Gatherables") || !gCfg[C_Resources].GotoFirstSubKey())return ConfigFailure("Gatherables required");
+    // Enumerate only explicit gatherable definitions: a core/currency needs no model.
+    ArrayList gatherables=new ArrayList(ByteCountToCells(64));
+    do{char id[64];gCfg[C_Resources].GetSectionName(id,sizeof(id));gatherables.PushString(id);}while(gCfg[C_Resources].GotoNextKey());
+    for(int entry=0;entry<gatherables.Length;entry++)
+    {
+        char id[64],path[128];gatherables.GetString(entry,id,sizeof(id));int i=FindMaterial(id);
+        if(i<0){delete gatherables;return ConfigFailure("unregistered Gatherables ID");}
+        Format(path,sizeof(path),"Gatherables/%s",id);Node(C_Resources,path);
         gCfg[C_Resources].GetString("model",gMaterials[i].model,sizeof(gMaterials[].model));
         gMaterials[i].quota=gCfg[C_Resources].GetNum("hits_per_cycle");
         gMaterials[i].yield=gCfg[C_Resources].GetNum("yield_per_successful_hit");
@@ -126,15 +160,31 @@ bool ReadMaterials()
         gMaterials[i].hold=gCfg[C_Resources].GetFloat("hold_seconds");
         gMaterials[i].scale=gCfg[C_Resources].GetFloat("model_scale",1.0);
         char rgb[64],parts[3][16];gCfg[C_Resources].GetString("render_rgb",rgb,sizeof(rgb),"255 255 255");
-        if(ExplodeString(rgb," ",parts,3,16)!=3)return ConfigFailure("material render_rgb");
+        if(ExplodeString(rgb," ",parts,3,16)!=3){delete gatherables;return ConfigFailure("material render_rgb");}
         for(int axis=0;axis<3;axis++)gMaterials[i].rgb[axis]=StringToInt(parts[axis]);
         char curve[32];gCfg[C_Resources].GetString("render_alpha_curve",curve,sizeof(curve),"linear");
         gMaterials[i].ease=StrEqual(curve,"ease_in");
         if(gMaterials[i].quota<1 || gMaterials[i].yield<1
            || !ValidResourceGrowth(gMaterials[i].hold,gMaterials[i].grow,gMaterials[i].scale)
-           || PrecacheModel(gMaterials[i].model,true)<=0)return ConfigFailure("material model/quota/growth");
+           || !gMaterials[i].model[0] || PrecacheModel(gMaterials[i].model,true)<=0)
+        {delete gatherables;return ConfigFailure("material model/quota/growth");}
+        gMaterials[i].gatherable=true;
     }
+    delete gatherables;
     return true;
+}
+
+bool RegisterMaterial(const char[] id)
+{
+    if(!id[0] || strlen(id)>=sizeof(gMaterials[].id) || gMaterialCount>=MATERIALS)return false;
+    for(int c=0;id[c];c++)if(!((id[c]>='a' && id[c]<='z') || (id[c]>='0' && id[c]<='9') || id[c]=='_'))return false;
+    MaterialDef material;strcopy(material.id,sizeof(material.id),id);
+    gCfg[C_Materials].GetString("display_name",material.label,sizeof(material.label),id);
+    if(!material.label[0])strcopy(material.label,sizeof(material.label),id);
+    gCfg[C_Materials].GetString("description",material.description,sizeof(material.description));
+    char kind[32];gCfg[C_Materials].GetString("kind",kind,sizeof(kind),"material");
+    if(!StrEqual(kind,"material") && !StrEqual(kind,"currency"))return false;
+    material.currency=StrEqual(kind,"currency");gMaterials[gMaterialCount++]=material;return true;
 }
 
 bool ReadMapData()
@@ -236,39 +286,141 @@ bool TokenPresent(const char[] tokens,const char[] word)
     return false;
 }
 
+bool ReadMetadataVector(ConfigFile file,const char[] path,const char[] key,float vector[3])
+{
+    if(!Node(file,path) || gCfg[file].GetDataType(key)==KvData_None)return true;
+    char text[160],values[4][40];gCfg[file].GetString(key,text,sizeof(text));TrimString(text);
+    ReplaceString(text,sizeof(text),"\t"," ");
+    while(StrContains(text,"  ")>=0)ReplaceString(text,sizeof(text),"  "," ");
+    if(ExplodeString(text," ",values,4,40)!=3)return false;
+    for(int axis=0;axis<3;axis++)
+        if(!values[axis][0] || StringToFloatEx(values[axis],vector[axis])!=strlen(values[axis])
+            || !(vector[axis]>=-8192.0 && vector[axis]<=8192.0))return false;
+    return true;
+}
+
+void RegisterBuildingSound(char[] sample,int length)
+{
+    if(!sample[0])return;
+    if(StrContains(sample,"sound/")==0)strcopy(sample,length,sample[6]);
+    char path[PLATFORM_MAX_PATH];Format(path,sizeof(path),"sound/%s",sample);
+    if(StrContains(sample,"..")>=0 || !FileExists(path,true) || !PrecacheSound(sample,true))
+    {LogError("[Shelter] Missing building sound %s; using category default",path);sample[0]=0;return;}
+    AddFileToDownloadsTable(path);
+}
+
+int BuildingModelSkinCount(const char[] model)
+{
+    // Read only a validated Source studio header through the mounted GAME FS,
+    // including VPK/BSP resources. Unknown header formats retain the safe cap.
+    File asset=OpenFile(model,"rb",true,"GAME");if(asset==null)return 0;
+    int signature,version,count;
+    bool valid=asset.ReadInt32(signature) && asset.ReadInt32(version) && signature==0x54534449
+        && version>=44 && version<=49 && asset.Seek(224,SEEK_SET) && asset.ReadInt32(count);
+    delete asset;return valid && count>0 && count<=256 ? count : 0;
+}
+
+bool ReadBuildingMetadata(ConfigFile file,const char[] profile,BuildingKind kind,BuildingMetadata meta)
+{
+    if(!Node(file,profile) || !gCfg[file].GetNum("enabled",1))return false;
+    Text(file,profile,"display_name",meta.label,sizeof(meta.label));
+    Text(file,profile,"description",meta.description,sizeof(meta.description));
+    char text[128],values[4][24];Text(file,profile,"render_rgb",text,sizeof(text),"255 255 255");
+    if(ExplodeString(text," ",values,4,24)!=3)return false;
+    for(int axis=0;axis<3;axis++)
+    {
+        int color;if(!ParseLevelInteger(values[axis],color,true))return false;
+        meta.render[axis]=color<0 ? 0 : (color>255 ? 255 : color);
+    }
+    int alpha=Number(file,profile,"render_alpha",255);meta.render[3]=alpha<0 ? 0 : (alpha>255 ? 255 : alpha);
+    meta.skin=Number(file,profile,"skin",0);
+    if(meta.skin<0 || meta.skin>255)
+    {LogMessage("[Shelter] %s skin %d clamped to safe range 0..255; verify the model's actual skin count",profile,meta.skin);meta.skin=meta.skin<0 ? 0 : 255;}
+    char model[PLATFORM_MAX_PATH];Text(file,profile,"model",model,sizeof(model));int skins=BuildingModelSkinCount(model);
+    if(skins>0 && meta.skin>=skins)
+    {LogMessage("[Shelter] %s skin %d exceeds model skin range 0..%d; clamped",profile,meta.skin,skins-1);meta.skin=skins-1;}
+    char path[192];Format(path,sizeof(path),"%s/Placement",profile);
+    Text(file,path,"mode",meta.placementMode,sizeof(meta.placementMode),"upright");
+    if(!StrEqual(meta.placementMode,"upright") && !StrEqual(meta.placementMode,"surface") && !StrEqual(meta.placementMode,"wall"))return false;
+    meta.allowOverlap=Number(file,path,"allow_overlap",1)!=0;
+    meta.maxDistance=Decimal(file,path,"max_distance",512.0);
+    if(!(meta.maxDistance>=16.0 && meta.maxDistance<=4096.0)
+        || !ReadMetadataVector(file,path,"origin_offset",meta.originOffset)
+        || !ReadMetadataVector(file,path,"angle_offset",meta.angleOffset))return false;
+    if(kind==Kind_Turret || kind==Kind_Flame)meta.muzzleOffset[2]=48.0;
+    if(kind==Kind_Grenade)meta.muzzleOffset[2]=64.0;
+    meta.lightOffset[2]=64.0;
+    Format(path,sizeof(path),"%s/Attachments",profile);
+    if(!ReadMetadataVector(file,path,"muzzle_offset",meta.muzzleOffset)
+        || !ReadMetadataVector(file,path,"light_offset",meta.lightOffset))return false;
+    Format(path,sizeof(path),"%s/Sounds",profile);
+    Text(file,path,"build",meta.buildSound,sizeof(meta.buildSound));RegisterBuildingSound(meta.buildSound,sizeof(meta.buildSound));
+    Text(file,path,"attack",meta.attackSound,sizeof(meta.attackSound));RegisterBuildingSound(meta.attackSound,sizeof(meta.attackSound));
+    Text(file,path,"upgrade",meta.upgradeSound,sizeof(meta.upgradeSound));RegisterBuildingSound(meta.upgradeSound,sizeof(meta.upgradeSound));
+    Text(file,path,"destroy",meta.destroySound,sizeof(meta.destroySound));RegisterBuildingSound(meta.destroySound,sizeof(meta.destroySound));
+    Format(path,sizeof(path),"%s/Downloads",profile);
+    if(Node(file,path) && gCfg[file].GotoFirstSubKey(false))
+    {
+        do
+        {
+            char asset[PLATFORM_MAX_PATH];gCfg[file].GetString(NULL_STRING,asset,sizeof(asset));
+            if(!asset[0] || StrContains(asset,"..")>=0 || !FileExists(asset,true))
+            {LogError("[Shelter] Missing/invalid building download %s (%s)",asset,profile);continue;}
+            AddFileToDownloadsTable(asset);
+        }while(gCfg[file].GotoNextKey(false));
+    }
+    return true;
+}
+
+bool ReadTypeMetadata(ConfigFile file,const char[] type,BuildingMetadata meta)
+{
+    BuildingKind kind=Kind_Fence;
+    if(file==C_Turrets)kind=Kind_Turret;else if(file==C_Flames)kind=Kind_Flame;else if(file==C_Grenades)kind=Kind_Grenade;
+    char path[128];Format(path,sizeof(path),"Types/%s",type);return ReadBuildingMetadata(file,path,kind,meta);
+}
+
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades};
-    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade};
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders};
+    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade,Kind_Expander};
     for(int file=0;file<sizeof(files);file++)
     {
-        KeyValues kv=gCfg[files[file]];kv.Rewind();
-        if(!kv.JumpToKey("BuildRecipes") || !kv.GotoFirstSubKey())return ConfigFailure("BuildRecipes");
-        do
+        ConfigFile source=files[file];ArrayList ids=new ArrayList(ByteCountToCells(64));
+        if(Node(source,"BuildRecipes") && gCfg[source].GotoFirstSubKey())
         {
-            if(gRecipeCount>=MAX_RECIPES)return ConfigFailure("too many recipes");
-            Recipe recipe;recipe.file=files[file];recipe.kind=kinds[file];
-            kv.GetSectionName(recipe.id,sizeof(recipe.id));kv.GetString("output_type",recipe.type,sizeof(recipe.type));
-            kv.GetString("display_name",recipe.label,sizeof(recipe.label),recipe.type);
-            if(!kv.JumpToKey("cost"))return ConfigFailure("recipe cost");
-            for(int m=0;m<MATERIALS;m++)
+            do{char id[64];gCfg[source].GetSectionName(id,sizeof(id));ids.PushString(id);}while(gCfg[source].GotoNextKey());
+        }
+        for(int entry=0;entry<ids.Length;entry++)
+        {
+            Recipe recipe;recipe.file=source;recipe.kind=kinds[file];ids.GetString(entry,recipe.id,sizeof(recipe.id));
+            char path[192],profile[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"BuildRecipes/%s",recipe.id);
+            if(!Number(source,path,"enabled",1))continue;
+            Text(source,path,"output_type",recipe.type,sizeof(recipe.type));Text(source,path,"display_name",recipe.label,sizeof(recipe.label));
+            Format(profile,sizeof(profile),"Types/%s",recipe.type);
+            bool valid=recipe.id[0] && recipe.type[0] && StrContains(recipe.id,"/")<0 && StrContains(recipe.type,"/")<0
+                && StrContains(recipe.id,":")<0 && StrContains(recipe.type,":")<0
+                && ValidateLevelProfile(source,profile) && ReadTypeMetadata(source,recipe.type,recipe.meta);
+            Text(source,profile,"model",model,sizeof(model));
+            valid=valid && model[0] && PrecacheModel(model,true)>0;
+            if(!recipe.label[0])strcopy(recipe.label,sizeof(recipe.label),recipe.meta.label[0] ? recipe.meta.label : recipe.type);
+            strcopy(recipe.meta.label,sizeof(recipe.meta.label),recipe.label);
+            Format(path,sizeof(path),"BuildRecipes/%s/cost",recipe.id);
+            valid=valid && Node(source,path) && ValidateMaterialCostKeys(source,path);
+            for(int m=0;m<gMaterialCount && valid;m++)
             {
-                recipe.cost[m]=kv.GetNum(gMaterials[m].id,0);
-                if(recipe.cost[m]<0 || recipe.cost[m]>1000000)return ConfigFailure("recipe cost range");
+                bool found;
+                valid=StoredLevelInt(source,path,gMaterials[m].id,0,recipe.cost[m],found)
+                    && recipe.cost[m]>=0 && recipe.cost[m]<=1000000;
             }
-            kv.GoBack();gRecipes[gRecipeCount++]=recipe;
-        }while(kv.GotoNextKey());
+            for(int r=0;r<gRecipeCount && valid;r++)if(gRecipes[r].file==source && StrEqual(gRecipes[r].id,recipe.id))valid=false;
+            if(!valid){LogError("[Shelter] Disabled recipe %s in %s: invalid type/model/metadata/material cost",recipe.id,sFiles[source]);continue;}
+            if(gRecipeCount>=MAX_RECIPES){LogError("[Shelter] Recipe catalogue capacity %d exceeded; skipped %s",MAX_RECIPES,recipe.id);continue;}
+            gRecipes[gRecipeCount++]=recipe;
+        }
+        delete ids;
     }
-    for(int i=0;i<gRecipeCount;i++)
-    {
-        char section[128],model[PLATFORM_MAX_PATH];Format(section,sizeof(section),"Types/%s",gRecipes[i].type);
-        Text(gRecipes[i].file,section,"model",model,sizeof(model));
-        if(!model[0] || PrecacheModel(model,true)<=0)return ConfigFailure("recipe output model");
-        Format(section,sizeof(section),"Types/%s/Levels/1",gRecipes[i].type);
-        if(Number(gRecipes[i].file,section,"max_hp",0)<1)return ConfigFailure("recipe level/HP");
-    }
-    return true;
+    return gRecipeCount>0 || ConfigFailure("no valid building recipes");
 }
 
 bool ValidateDayRanges()

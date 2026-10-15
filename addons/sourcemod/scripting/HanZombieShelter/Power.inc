@@ -57,6 +57,7 @@ void RecalculatePower()
     {
         beforeOutput[c]=gGridProduction[c];beforeDemand[c]=gGridDemand[c];beforeAllocated[c]=gGridAllocated[c];beforeOffline[c]=gGridOffline[c];
     }
+    bool wasPowered[MAX_BUILDINGS];for(int b=0;b<MAX_BUILDINGS;b++)wasPowered[b]=gBuildings[b].powered;
     ResetPowerState();int loads[MAX_BUILDINGS],loadCount;
     for(int b=0;b<MAX_BUILDINGS;b++)
     {
@@ -93,7 +94,16 @@ void RecalculatePower()
         {gBuildings[next].powered=true;gGridAllocated[core]+=gBuildings[next].powerDemand;}
         else gGridOffline[core]++;
     }
-    for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].kind==Kind_Light)UpdateBuildingLight(b);
+    for(int b=0;b<MAX_BUILDINGS;b++)
+    {
+        if(wasPowered[b]!=gBuildings[b].powered)
+        {
+            InvalidateDefenseCache(b);
+            if(gBuildings[b].kind==Kind_Expander)MarkBuildAreasDirty();
+        }
+        if(gBuildings[b].used && gBuildings[b].kind==Kind_Light)UpdateBuildingLight(b);
+    }
+    RefreshBuildAreas();
     for(int c=0;c<gCoreCount;c++)
         if(beforeOutput[c]!=gGridProduction[c] || beforeDemand[c]!=gGridDemand[c] || beforeAllocated[c]!=gGridAllocated[c] || beforeOffline[c]!=gGridOffline[c])NotifyPowerChanged(c);
 }
@@ -117,7 +127,7 @@ bool CreateBuildingLight(int b)
     DispatchKeyValue(light,"style","0");DispatchKeyValue(light,"inner_cone","0");DispatchKeyValue(light,"cone","0");
     DispatchKeyValueFloat(light,"distance",gBuildings[b].lightRadius);
     if(!DispatchSpawn(light) || !CanAllocateEntities(1,true)){RemoveEntity(light);return false;}
-    float source[3];source=gBuildings[b].origin;source[2]+=64.0;TeleportEntity(light,source,NULL_VECTOR,NULL_VECTOR);
+    float source[3];BuildingAttachmentPosition(b,gBuildings[b].meta.lightOffset,source);TeleportEntity(light,source,NULL_VECTOR,NULL_VECTOR);
     SetVariantString("!activator");AcceptEntityInput(light,"SetParent",body);
     gBuildings[b].effectRef=EntIndexToEntRef(light);UpdateBuildingLight(b);return true;
 }
@@ -139,7 +149,7 @@ void StopPowerEffects()
     }
     bool changed[MAX_CORES];
     for(int c=0;c<gCoreCount;c++)changed[c]=gGridProduction[c]!=0.0 || gGridDemand[c]!=0.0 || gGridAllocated[c]!=0.0 || gGridOffline[c]!=0;
-    ResetPowerState();
+    ClearDefenseState();MarkBuildAreasDirty();ResetPowerState();RefreshBuildAreas();
     for(int c=0;c<gCoreCount;c++)if(changed[c])NotifyPowerChanged(c);
 }
 

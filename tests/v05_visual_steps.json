@@ -1,0 +1,30 @@
+{
+  "steps": [
+    {"rcon": "zsh_test v05_ui_setup"},
+    {"wait": 0.8},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.8},
+    {"rcon": "zsh_test v05_ui_verify"},
+    {"client": "menuselect 0"},
+    {"wait": 0.6},
+    {"screenshot": "compact_target_hud"},
+    {"rcon": "zsh_test v05_visual_overview"},
+    {"wait": 1.5},
+    {"screenshot": "base_red_green_overview"},
+    {"rcon": "zsh_test v05_red_inside"},
+    {"wait": 1.3},
+    {"rcon": "zsh_test v05_red_verify_inside"},
+    {"rcon": "zsh_test v05_red_outside"},
+    {"wait": 1.5},
+    {"rcon": "zsh_test v05_red_verify_outside"},
+    {"screenshot": "outside_height_no_red"},
+    {"rcon": "zsh_test v05_real_cleanup"},
+    {"rcon": "zsh_test summary", "contains": "Failed=0"}
+  ]
+}

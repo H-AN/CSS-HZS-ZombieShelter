@@ -1,14 +1,14 @@
 bool ReadResourceWeights(ConfigFile file,const char[] path,float weights[MATERIALS],float &total)
 {
-    total=0.0;for(int m=0;m<MATERIALS;m++)weights[m]=0.0;
+    total=0.0;for(int m=0;m<gMaterialCount;m++)weights[m]=0.0;
     if(!Node(file,path) || !gCfg[file].GotoFirstSubKey(false))return false;
-    int seen;float largest;
+    bool seen[MATERIALS];float largest;
     do
     {
         char key[64],raw[128];gCfg[file].GetSectionName(key,sizeof(key));
-        int material=-1;for(int m=0;m<MATERIALS;m++)if(StrEqual(key,gMaterials[m].id)){material=m;break;}
-        if(material<0 || (seen&(1<<material)) || gCfg[file].GetDataType(NULL_STRING)==KvData_None)return false;
-        seen|=1<<material;gCfg[file].GetString(NULL_STRING,raw,sizeof(raw));TrimString(raw);
+        int material=-1;for(int m=0;m<gMaterialCount;m++)if(StrEqual(key,gMaterials[m].id)){material=m;break;}
+        if(material<0 || !gMaterials[material].gatherable || seen[material] || gCfg[file].GetDataType(NULL_STRING)==KvData_None)return false;
+        seen[material]=true;gCfg[file].GetString(NULL_STRING,raw,sizeof(raw));TrimString(raw);
         float value;
         if(!raw[0] || StringToFloatEx(raw,value)!=strlen(raw) || value<0.0
             || (view_as<int>(value)&0x7f800000)==0x7f800000)return false;
@@ -17,7 +17,7 @@ bool ReadResourceWeights(ConfigFile file,const char[] path,float weights[MATERIA
     if(largest<=0.0)return false;
     // Scale before summation: even very large finite relative weights cannot
     // overflow the total into infinity. Zero weight is never eligible.
-    for(int m=0;m<MATERIALS;m++)
+    for(int m=0;m<gMaterialCount;m++)
     {
         weights[m]/=largest;total+=weights[m];
     }
@@ -57,8 +57,8 @@ int WeightedMaterial(ConfigFile file,const char[] path)
 {
     float weights[MATERIALS],total;if(!ReadResourceWeights(file,path,weights,total))return -1;
     float roll=GetRandomFloat(0.0,total);
-    for(int m=0;m<MATERIALS;m++){roll-=weights[m];if(roll<=0.0 && weights[m]>0.0)return m;}
-    for(int m=MATERIALS-1;m>=0;m--)if(weights[m]>0.0)return m;
+    for(int m=0;m<gMaterialCount;m++){roll-=weights[m];if(roll<=0.0 && weights[m]>0.0)return m;}
+    for(int m=gMaterialCount-1;m>=0;m--)if(weights[m]>0.0)return m;
     return -1;
 }
 
@@ -112,9 +112,16 @@ bool ApplyBuildingLevel(int index,bool initializing)
         || !ReadLevelFloat(file,profile,level,"light_radius",500.0,next.lightRadius)
         || !ReadLevelInt(file,profile,level,"light_brightness",2,next.lightBrightness)
         || !ReadLevelFloat(file,profile,level,"projectile_speed",900.0,next.projectileSpeed)
-        || !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.blastRadius))return false;
+        || !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.blastRadius)
+        || !ReadLevelFloat(file,profile,level,"build_range_bonus",0.0,next.buildRangeBonus)
+        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,next.buildLimitBonus))return false;
+    if(next.kind==Kind_Base)
+    {
+        if(!ReadLevelInt(file,profile,level,"build_limit",24,next.baseBuildLimit)
+            || !ReadBuildHalfExtents(file,profile,level,next.buildHalfExtents))return false;
+    }
     if(next.kind==Kind_Mine && !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.range))return false;
-    gBuildings[index]=next;RecalculatePower();return true;
+    gBuildings[index]=next;InvalidateDefenseCache(index);MarkBuildAreasDirty();RecalculatePower();return true;
 }
 
 bool SpawnBuildingBody(int index)
@@ -122,6 +129,12 @@ bool SpawnBuildingBody(int index)
     char target[64];Format(target,sizeof(target),"hzsh_build_%d_%d",gBuildings[index].uid,++gBuildings[index].generation);
     int entity=CreateBody(gBuildings[index].model,gBuildings[index].origin,gBuildings[index].angles,target,false,gBuildings[index].kind!=Kind_Base);
     if(entity<0)return false;
+    if(gBuildings[index].kind!=Kind_Base)
+    {
+        SetEntityRenderMode(entity,RENDER_TRANSCOLOR);
+        SetEntityRenderColor(entity,gBuildings[index].meta.render[0],gBuildings[index].meta.render[1],gBuildings[index].meta.render[2],gBuildings[index].meta.render[3]);
+        if(HasEntProp(entity,Prop_Send,"m_nSkin"))SetEntProp(entity,Prop_Send,"m_nSkin",gBuildings[index].meta.skin);
+    }
     gBuildings[index].ref=EntIndexToEntRef(entity);gBuildings[index].nextFire=GetGameTime()+0.5;gBuildings[index].lastAttackAt=0.0;
     float worldMin[3],worldMax[3];ModelWorldBounds(entity,gBuildings[index].origin,gBuildings[index].angles,worldMin,worldMax);
     for(int a=0;a<3;a++){gBuildings[index].restoreMins[a]=worldMin[a]-gBuildings[index].origin[a];gBuildings[index].restoreMaxs[a]=worldMax[a]-gBuildings[index].origin[a];}
@@ -132,13 +145,13 @@ bool SpawnBuildingBody(int index)
     {
         int failedRef=gBuildings[index].ref;gBuildings[index].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(failedRef);return false;
     }
-    RecalculatePower();
+    InvalidateDefenseCache(index);MarkBuildAreasDirty();RecalculatePower();
     return true;
 }
 
 void CleanWorld()
 {
-    ClearGrenades();StopPowerEffects();
+    ClearDefenseState();ClearGrenades();StopPowerEffects();MarkBuildAreasDirty();
     for(int i=0;i<MAX_BUILDINGS;i++)
     {
         RemoveBuildingEffect(i);
@@ -160,6 +173,7 @@ bool CreateWorld(bool restore)
         {
             Building value;value.used=true;value.alive=true;value.kind=Kind_Base;value.uid=++gUID;
             value.core=c;value.file=C_Bases;value.level=1;value.ref=INVALID_ENT_REFERENCE;
+            value.buildCore=c;value.configRevision=gConfigRevision;value.placementAnchor=gCores[c].origin;
             value.origin=gCores[c].origin;value.angles=gCores[c].angles;strcopy(value.model,sizeof(value.model),gCores[c].model);
             gBuildings[b]=value;if(!ApplyBuildingLevel(b,true)){gRebuilding=false;return false;}
         }
@@ -169,8 +183,7 @@ bool CreateWorld(bool restore)
     for(int i=gCoreCount;i<MAX_BUILDINGS;i++)
         if(gBuildings[i].used && gBuildings[i].alive)
         {
-            if(!gBuildings[i].boundsKnown || !ClearHull(gBuildings[i].origin,gBuildings[i].restoreMins,gBuildings[i].restoreMaxs,-1,MASK_NPCSOLID|MASK_PLAYERSOLID)
-                || !SpawnBuildingBody(i))LogMessage("[Shelter] defense UID %d awaiting safe entity capacity or clear placement",gBuildings[i].uid);
+            RestoreSavedBuilding(i);
         }
     for(int n=0;n<gNodeCount;n++)
     {
@@ -183,7 +196,7 @@ bool CreateWorld(bool restore)
         }
         if(!SpawnResourceBody(n)){gRebuilding=false;return false;}
     }
-    gRebuilding=false;return true;
+    gRebuilding=false;MarkBuildAreasDirty();RecalculatePower();return true;
 }
 
 bool SpawnResourceBody(int node)
@@ -305,9 +318,24 @@ void RestoreDeferredBuildings()
     for(int b=gCoreCount;b<MAX_BUILDINGS;b++)
     {
         if(!gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)>0)continue;
-        if(!gBuildings[b].boundsKnown || !ClearHull(gBuildings[b].origin,gBuildings[b].restoreMins,gBuildings[b].restoreMaxs,-1,MASK_NPCSOLID|MASK_PLAYERSOLID))continue;
-        if(!SpawnBuildingBody(b))return;
+        if(GetGameTime()<gBuildings[b].restoreRetryAt)continue;
+        RestoreSavedBuilding(b);
+        if(!CanAllocateEntities(2,true))return;
     }
+}
+
+bool RestoreSavedBuilding(int b)
+{
+    // Saved transforms are final. Do not reapply offsets, charge materials, or
+    // reject legal overlap / buildings left outside a shrunken build area.
+    if(gBuildings[b].configRevision!=gConfigRevision)
+    {
+        gBuildings[b].restoreRetryAt=GetGameTime()+60.0;
+        LogMessage("[Shelter] defense UID %d deferred: saved config revision %d differs from campaign %d",gBuildings[b].uid,gBuildings[b].configRevision,gConfigRevision);return false;
+    }
+    if(SpawnBuildingBody(b)){gBuildings[b].restoreRetryAt=0.0;return true;}
+    gBuildings[b].restoreRetryAt=GetGameTime()+5.0;
+    LogMessage("[Shelter] defense UID %d deferred: entity/model capacity unavailable",gBuildings[b].uid);return false;
 }
 
 bool KnifeDamage(int attacker,int damageType)
@@ -372,18 +400,35 @@ public Action BuildingTouch(int entity,int other)
     return Plugin_Continue;
 }
 
-void DamageBuilding(int b,int damage,bool attacked=false)
+void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
 {
     if(!Running() || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive || damage<1)return;
+    FenceRetaliationEvent reply;
+    if(attacked)CaptureFenceRetaliation(b,attackerNPC,reply);
     if(attacked)gBuildings[b].lastAttackAt=GetGameTime();
-    gBuildings[b].hp-=damage;if(gBuildings[b].hp>0){if(gBuildings[b].kind==Kind_Generator)RecalculatePower();return;}
-    PlayInteractionSound("destroyed",Resolve(gBuildings[b].ref),gBuildings[b].origin);
-    gBuildings[b].hp=0;gBuildings[b].alive=false;RemoveBuildingEffect(b);int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);RecalculatePower();
-    if(gBuildings[b].kind==Kind_Base)
+    gBuildings[b].hp-=damage;
+    if(gBuildings[b].hp>0)
     {
-        char label[2];label[0]='A'+gBuildings[b].core;label[1]='\0';AnnouncePhrase("BaseDestroyed",label);
-        if(AliveCores()==0)QueueOutcome(false);
+        if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
     }
+    else
+    {
+        BuildingKind kind=gBuildings[b].kind;int core=gBuildings[b].core;
+        int ref=gBuildings[b].ref,effectRef=gBuildings[b].effectRef;
+        // Consume the old entity before sounds/removal/native callbacks can re-enter.
+        gBuildings[b].hp=0;gBuildings[b].alive=false;gBuildings[b].ref=INVALID_ENT_REFERENCE;gBuildings[b].effectRef=INVALID_ENT_REFERENCE;
+        InvalidateDefenseCache(b);MarkBuildAreasDirty();PlayBuildingSound(b,"destroy");
+        if(effectRef!=0)RemoveOwnedRef(effectRef);
+        RemoveOwnedRef(ref);RecalculatePower();
+        if(kind==Kind_Base)
+        {
+            char label[2];label[0]='A'+core;label[1]='\0';AnnouncePhrase("BaseDestroyed",label);
+            if(AliveCores()==0)QueueOutcome(false);
+        }
+    }
+    // All data, including fixed base and owner, came from the attacking event.
+    // No read of b occurs here: a destroyed fence's slot may already be reused.
+    ApplyFenceRetaliation(reply);
 }
 
 int AliveCores()
@@ -410,7 +455,7 @@ bool TryUpgrade(int client,int b)
     {Tell(client,"%t","AmplifierBaseLevelRequired",required);return false;}
     int cost[MATERIALS],maximum;
     if(!ReadBuildingLevelQuote(b,oldLevel+1,cost,maximum)){Tell(client,"%t","FacilityUpgradeRecipeMissing");return false;}
-    for(int m=0;m<MATERIALS;m++)
+    for(int m=0;m<gMaterialCount;m++)
     {
         if(cost[m]<0 || gBuildings[b].invested[m]<0 || gBuildings[b].invested[m]>LEVEL_CELL_LIMIT
             || cost[m]>LEVEL_CELL_LIMIT-gBuildings[b].invested[m])return false;
@@ -419,33 +464,111 @@ bool TryUpgrade(int client,int b)
     Building previous;previous=gBuildings[b];
     gBuildings[b].level++;
     if(!ApplyBuildingLevel(b,false)){gBuildings[b]=previous;Refund(cost,client);return false;}
-    for(int m=0;m<MATERIALS;m++)gBuildings[b].invested[m]+=cost[m];
-    gBuildings[b].upgraded=true;PlayInteractionSound("build_complete",Resolve(gBuildings[b].ref),gBuildings[b].origin);
+    for(int m=0;m<gMaterialCount;m++)gBuildings[b].invested[m]+=cost[m];
+    gBuildings[b].upgraded=true;PlayBuildingSound(b,"upgrade");
     Tell(client,"%t","FacilityUpgraded",gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP);return true;
 }
 
-bool Placement(int client,const char[] model,float origin[3],float angles[3])
+bool PlacementError(int client,const char[] phrase,bool report)
+{if(report)Tell(client,"%t",phrase);return false;}
+
+void AnglesFromForwardUp(const float forwardVector[3],const float up[3],float angles[3])
 {
-    float eye[3],direction[3],view[3],end[3];GetClientEyePosition(client,eye);GetClientEyeAngles(client,view);GetAngleVectors(view,direction,NULL_VECTOR,NULL_VECTOR);
-    for(int a=0;a<3;a++)end[a]=eye[a]+direction[a]*256.0;
-    Handle trace=TR_TraceRayFilterEx(eye,end,MASK_SOLID,RayType_EndPoint,FilterExcept,client);
-    if(!TR_DidHit(trace) || TR_StartSolid(trace)){delete trace;return false;}
-    float normal[3];TR_GetPlaneNormal(trace,normal);TR_GetEndPosition(origin,trace);delete trace;
-    if(normal[2]<0.93)return false;
-    angles[0]=0.0;angles[1]=view[1];angles[2]=0.0;
-    origin[2]+=2.0;
-    int probe=CreateBody(model,origin,angles,"hzsh_placement_probe",true,true);if(probe<0)return false;
-    AcceptEntityInput(probe,"DisableCollision");
-    SetEntityRenderMode(probe,RENDER_TRANSCOLOR);SetEntityRenderColor(probe,255,255,255,0);
-    float worldMin[3],worldMax[3];ModelWorldBounds(probe,origin,angles,worldMin,worldMax);
-    float mins[3],maxs[3];for(int a=0;a<3;a++){mins[a]=worldMin[a]-origin[a];maxs[a]=worldMax[a]-origin[a];}
-    float lift=-mins[2]+0.5;origin[2]+=lift;worldMin[2]+=lift;worldMax[2]+=lift;
-    bool clear=ClearHull(origin,mins,maxs,probe,MASK_PLAYERSOLID) && !ReservedBounds(worldMin,worldMax);
-    float human[3];GetClientAbsOrigin(client,human);if(GetVectorDistance(human,origin)<48.0)clear=false;
-    RemoveEntity(probe);return clear;
+    float left[3];GetVectorCrossProduct(up,forwardVector,left);NormalizeVector(left,left);
+    GetVectorAngles(forwardVector,angles);
+    angles[2]=RadToDeg(ArcTangent2(left[2],up[2]));
 }
 
-bool BuildRecipe(int client,int recipe)
+void ComposeModelAngles(const float frame[3],const float offset[3],float result[3])
+{
+    float localForward[3],localUp[3],forwardVector[3],up[3],zero[3];
+    GetAngleVectors(offset,localForward,NULL_VECTOR,localUp);
+    WorldPoint(localForward,zero,frame,forwardVector);WorldPoint(localUp,zero,frame,up);
+    AnglesFromForwardUp(forwardVector,up,result);
+}
+
+void SurfacePlacementAngles(float yaw,const float normal[3],float frame[3])
+{
+    float up[3],forwardVector[3];up=normal;
+    if(NormalizeVector(up,up)<0.001){frame[0]=0.0;frame[1]=yaw;frame[2]=0.0;return;}
+    forwardVector[0]=Cosine(DegToRad(yaw));forwardVector[1]=Sine(DegToRad(yaw));
+    float projection=GetVectorDotProduct(forwardVector,up);
+    for(int a=0;a<3;a++)forwardVector[a]-=projection*up[a];
+    if(GetVectorLength(forwardVector)<0.01)
+    {
+        float alternate[3];if(FloatAbs(up[2])<0.9)alternate[2]=1.0;else alternate[1]=1.0;
+        GetVectorCrossProduct(alternate,up,forwardVector);
+    }
+    NormalizeVector(forwardVector,forwardVector);AnglesFromForwardUp(forwardVector,up,frame);
+}
+
+bool ComputePlacement(int client,const char[] model,BuildingMetadata meta,float anchor[3],float origin[3],float angles[3],bool report)
+{
+    if(!LiveHuman(client))return false;
+    float eye[3],direction[3],view[3],end[3];GetClientEyePosition(client,eye);GetClientEyeAngles(client,view);GetAngleVectors(view,direction,NULL_VECTOR,NULL_VECTOR);
+    for(int a=0;a<3;a++)end[a]=eye[a]+direction[a]*meta.maxDistance;
+    Handle trace=TR_TraceRayFilterEx(eye,end,MASK_SOLID,RayType_EndPoint,FilterExcept,client);
+    if(!TR_DidHit(trace) || TR_StartSolid(trace) || TR_AllSolid(trace)){delete trace;return PlacementError(client,"BuildNoSurface",report);}
+    int hit=TR_GetEntityIndex(trace);int surface=TR_GetSurfaceFlags(trace);float normal[3];TR_GetPlaneNormal(trace,normal);TR_GetEndPosition(anchor,trace);delete trace;
+    if(surface&(SURF_SKY|SURF_SKY2D))return PlacementError(client,"BuildSkySurface",report);
+    if(hit>0 && (hit<=MaxClients || FindNPC(hit)>=0 || (APIAvailable() && Han_IsZombie(hit))))return PlacementError(client,"BuildActorSurface",report);
+    if(hit>MaxClients)
+    {
+        char classname[64];GetEntityClassname(hit,classname,sizeof(classname));
+        if(StrEqual(classname,"hostage_entity"))return PlacementError(client,"BuildActorSurface",report);
+        if(StrEqual(classname,"func_movelinear") || StrEqual(classname,"func_tracktrain"))return PlacementError(client,"BuildMovingSurface",report);
+        char targetname[64];GetEntPropString(hit,Prop_Data,"m_iName",targetname,sizeof(targetname));
+        if(StrContains(targetname,"hzsh_grenade_")==0)return PlacementError(client,"BuildMovingSurface",report);
+        MoveType movement=GetEntityMoveType(hit);
+        if(FindBuilding(hit)<0 && (movement==MOVETYPE_PUSH || movement==MOVETYPE_VPHYSICS
+            || movement==MOVETYPE_FLY || movement==MOVETYPE_FLYGRAVITY || movement==MOVETYPE_STEP))return PlacementError(client,"BuildMovingSurface",report);
+    }
+    for(int a=0;a<3;a++)if(!(anchor[a]>=-15000.0 && anchor[a]<=15000.0))return PlacementError(client,"BuildInvalidWorld",report);
+    if(GetVectorLength(normal)<0.5 || TR_PointOutsideWorld(anchor))return PlacementError(client,"BuildInvalidWorld",report);
+    // Only the explicit NPC/Boss creation columns protect space. Model size and
+    // human spawn candidates do not expand this anchor restriction.
+    if(ReservedBounds(anchor,anchor))return PlacementError(client,"BuildSpawnProtected",report);
+    float frame[3];frame[1]=view[1];
+    if(StrEqual(meta.placementMode,"wall"))
+    {
+        if(FloatAbs(normal[2])>0.7)return PlacementError(client,"BuildInvalidSurface",report);
+        GetVectorAngles(normal,frame);frame[2]=0.0;
+    }
+    else if(StrEqual(meta.placementMode,"surface"))
+        SurfacePlacementAngles(view[1],normal,frame);
+    ComposeModelAngles(frame,meta.angleOffset,angles);
+    WorldPoint(meta.originOffset,anchor,angles,origin);
+    for(int a=0;a<3;a++)if(!(origin[a]>=-15000.0 && origin[a]<=15000.0))return PlacementError(client,"BuildInvalidWorld",report);
+    if(TR_PointOutsideWorld(origin))return PlacementError(client,"BuildInvalidWorld",report);
+    if(!meta.allowOverlap)
+    {
+        int probe=CreateBody(model,origin,angles,"hzsh_placement_probe",true,true);
+        if(probe<0)return PlacementError(client,"BuildEntityCreationFailed",report);
+        AcceptEntityInput(probe,"DisableCollision");SetEntityRenderMode(probe,RENDER_TRANSCOLOR);SetEntityRenderColor(probe,255,255,255,0);
+        float low[3],high[3],mins[3],maxs[3];ModelWorldBounds(probe,origin,angles,low,high);
+        for(int a=0;a<3;a++){mins[a]=low[a]-origin[a];maxs[a]=high[a]-origin[a];}
+        bool clear=ClearHull(origin,mins,maxs,probe,MASK_PLAYERSOLID);RemoveEntity(probe);
+        if(!clear)return PlacementError(client,"BuildOverlapDenied",report);
+    }
+    return true;
+}
+
+bool PlacementForRecipe(int client,int recipe,float anchor[3],float origin[3],float angles[3],bool report=true)
+{
+    if(recipe<0 || recipe>=gRecipeCount)return false;
+    char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);
+    Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
+    return ComputePlacement(client,model,gRecipes[recipe].meta,anchor,origin,angles,report);
+}
+
+// Kept for existing test helpers. Production uses the recipe-bound metadata.
+stock bool Placement(int client,const char[] model,float origin[3],float angles[3])
+{
+    BuildingMetadata meta;strcopy(meta.placementMode,sizeof(meta.placementMode),"upright");meta.maxDistance=512.0;meta.allowOverlap=true;
+    float anchor[3];return ComputePlacement(client,model,meta,anchor,origin,angles,false);
+}
+
+bool BuildRecipe(int client,int recipe,int expectedCore=-1)
 {
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
     if(!CheckConstructionBudget(client))return false;
@@ -457,17 +580,31 @@ bool BuildRecipe(int client,int recipe)
     int slot=-1;for(int i=gCoreCount;i<MAX_BUILDINGS;i++)if(!gBuildings[i].used || !gBuildings[i].alive){slot=i;break;}
     if(slot<0)return false;
     char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
-    float origin[3],angles[3];if(!Placement(client,model,origin,angles)){Tell(client,"%t","BuildPlacementUnavailable");return false;}
+    float anchor[3],origin[3],angles[3];if(!PlacementForRecipe(client,recipe,anchor,origin,angles))return false;
+    int buildCore=BuildCoreAt(anchor);
+    if(expectedCore>=0 && buildCore!=expectedCore){Tell(client,"%t","BuildMenuTargetChanged");return false;}
+    if(buildCore<0)
+    {
+        bool horizontal;for(int c=0;c<gCoreCount;c++)if(BuildAreaContains(c,anchor,false)){horizontal=true;break;}
+        Tell(client,"%t",horizontal ? "BuildHeightOutside" : "BuildOutsideArea");return false;
+    }
+    if(!CheckBuildCapacity(client,buildCore))return false;
     if(!CheckConstructionBudget(client))return false;
     if(!Spend(gRecipes[recipe].cost,client)){Tell(client,"%t","BuildPersonalMaterialsMissing");return false;}
     Building value;value.used=true;value.alive=true;value.kind=gRecipes[recipe].kind;value.uid=++gUID;value.core=-1;
     value.file=gRecipes[recipe].file;value.level=1;value.ref=INVALID_ENT_REFERENCE;value.effectRef=INVALID_ENT_REFERENCE;value.origin=origin;value.angles=angles;
-    value.powerCore=GridAt(origin);value.gridAssigned=true;
+    value.buildCore=buildCore;value.configRevision=gConfigRevision;value.placementAnchor=anchor;value.meta=gRecipes[recipe].meta;
+    value.powerCore=buildCore;value.gridAssigned=true;
     strcopy(value.type,sizeof(value.type),gRecipes[recipe].type);strcopy(value.model,sizeof(value.model),model);gBuildings[slot]=value;
     AssignBuildingOwner(slot,client);
-    for(int m=0;m<MATERIALS;m++)gBuildings[slot].invested[m]=gRecipes[recipe].cost[m];
-    if(!ApplyBuildingLevel(slot,true) || !SpawnBuildingBody(slot)){gBuildings[slot].used=false;Refund(gRecipes[recipe].cost,client);return false;}
-    PlayInteractionSound("build_place",Resolve(gBuildings[slot].ref),gBuildings[slot].origin);
+    for(int m=0;m<gMaterialCount;m++)gBuildings[slot].invested[m]=gRecipes[recipe].cost[m];
+    if(!ApplyBuildingLevel(slot,true) || !SpawnBuildingBody(slot))
+    {
+        RemoveBuildingEffect(slot);int failedRef=gBuildings[slot].ref;gBuildings[slot].ref=INVALID_ENT_REFERENCE;
+        gBuildings[slot].used=false;gBuildings[slot].alive=false;RemoveOwnedRef(failedRef);
+        Refund(gRecipes[recipe].cost,client);MarkBuildAreasDirty();RecalculatePower();Tell(client,"%t","BuildEntityCreationFailed");return false;
+    }
+    MarkBuildAreasDirty();RecalculatePower();PlayBuildingSound(slot,"build");
     char label[128];TranslateLabel(client,gRecipes[recipe].label,label,sizeof(label));
     Tell(client,"%t","DefenseBuilt",label);return true;
 }

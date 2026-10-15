@@ -2,11 +2,11 @@
 // and no gameplay cap such as 16 or 100; limits below protect SourcePawn cells.
 #define LEVEL_CELL_LIMIT 2000000000
 
-static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness"};
+static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness","build_limit","build_limit_bonus"};
 static const char sLevelFloatFields[][]={"damage","range","fire_interval","cone_half_angle_degrees","burn_interval",
     "burn_duration","blast_radius","player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus",
-    "power_output","power_required","light_radius","projectile_speed"};
-static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,900.0};
+    "power_output","power_required","light_radius","projectile_speed","build_range_bonus","build_half_extents_x","build_half_extents_y"};
+static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,900.0,0.0,512.0,512.0};
 
 bool ParseLevelInteger(const char[] input,int &value,bool signedValue=false)
 {
@@ -39,7 +39,9 @@ bool StoredLevelFloat(ConfigFile file,const char[] path,const char[] key,float f
     if(!Node(file,path) || gCfg[file].GetDataType(key)==KvData_None)return true;
     char text[64];gCfg[file].GetString(key,text,sizeof(text));TrimString(text);found=true;
     // All supported scalar coefficients fit this bound; it also rejects NaN/Inf.
-    return text[0] && StringToFloatEx(text,value)==strlen(text) && value>=-1000000.0 && value<=1000000.0;
+    if(!text[0] || StringToFloatEx(text,value)!=strlen(text) || !(value>=-1000000.0 && value<=1000000.0))return false;
+    if((StrEqual(key,"fire_interval_min") || StrEqual(key,"fire_interval_max")) && value>0.0 && value<0.1)value=0.1;
+    return true;
 }
 
 bool ReadLevelGrowth(ConfigFile file,const char[] profile,bool &growth,int &anchor,int &maximum)
@@ -83,6 +85,7 @@ bool IntegerLevelBounds(const char[] key,int &minimum,int &maximum)
     if(StrEqual(key,"burn_damage")){maximum=1000000;return true;}
     if(StrEqual(key,"power_priority")){maximum=1000;return true;}
     if(StrEqual(key,"light_brightness")){maximum=8;return true;}
+    if(StrEqual(key,"build_limit") || StrEqual(key,"build_limit_bonus")){maximum=MAX_BUILDINGS;return true;}
     return false;
 }
 
@@ -98,6 +101,8 @@ bool FloatLevelBounds(const char[] key,float &minimum,float &maximum)
     if(StrEqual(key,"power_output") || StrEqual(key,"power_required")){maximum=100000.0;return true;}
     if(StrEqual(key,"light_radius")){minimum=32.0;maximum=2048.0;return true;}
     if(StrEqual(key,"projectile_speed")){minimum=100.0;maximum=3000.0;return true;}
+    if(StrEqual(key,"build_range_bonus")){maximum=8192.0;return true;}
+    if(StrEqual(key,"build_half_extents_x") || StrEqual(key,"build_half_extents_y")){minimum=1.0;maximum=8192.0;return true;}
     return false;
 }
 
@@ -134,11 +139,17 @@ bool ReadLevelFloat(ConfigFile file,const char[] profile,int level,const char[] 
     char path[192],field[96];bool found;
     Format(path,sizeof(path),"%s/Levels/%d",profile,level);
     if(!StoredLevelFloat(file,path,key,fallback,value,found))return false;
-    if(found)return value>=safeMin && value<=safeMax;
+    if(found)
+    {
+        if(StrEqual(key,"fire_interval") && value>0.0 && value<0.1)value=0.1;
+        return value>=safeMin && value<=safeMax;
+    }
     bool growth;int anchor,maximum;if(!ReadLevelGrowth(file,profile,growth,anchor,maximum))return false;
     if(!growth || level<=anchor)return value>=safeMin && value<=safeMax;
     Format(path,sizeof(path),"%s/Levels/%d",profile,anchor);
-    if(!StoredLevelFloat(file,path,key,fallback,value,found) || !(value>=safeMin && value<=safeMax))return false;
+    if(!StoredLevelFloat(file,path,key,fallback,value,found))return false;
+    if(StrEqual(key,"fire_interval") && value>0.0 && value<0.1)value=0.1;
+    if(!(value>=safeMin && value<=safeMax))return false;
     float increment,lower,upper;
     Format(path,sizeof(path),"%s/Growth/Stats",profile);Format(field,sizeof(field),"%s_per_level",key);
     if(!StoredLevelFloat(file,path,field,0.0,increment,found))return false;
@@ -170,8 +181,9 @@ bool ReadLevelUpgradeCost(ConfigFile file,const char[] profile,int level,int cos
         Format(path,sizeof(path),"%s/Levels/%d/upgrade_cost",profile,anchor);
         if(anchor>1 && !Node(file,path))return false;
     }
+    if(!ValidateMaterialCostKeys(file,path))return false;
     char growthPath[192];Format(growthPath,sizeof(growthPath),"%s/Growth/UpgradeCost",profile);
-    for(int m=0;m<MATERIALS;m++)
+    for(int m=0;m<gMaterialCount;m++)
     {
         int amount,increment;char field[64];
         if(!StoredLevelInt(file,path,gMaterials[m].id,0,amount,found))return false;
@@ -187,6 +199,51 @@ bool ReadLevelUpgradeCost(ConfigFile file,const char[] profile,int level,int cos
     return true;
 }
 
+// Both the vector alias and scalar fields resolve through the same anchor.
+// Scalar x/y keys (and their Growth fields) are the canonical extensible form.
+bool ReadBuildHalfExtents(ConfigFile file,const char[] profile,int level,float extents[3])
+{
+    if(!LevelAvailable(file,profile,level))return false;
+    bool growth;int anchor,maximum;if(!ReadLevelGrowth(file,profile,growth,anchor,maximum))return false;
+    float defaults[3]={500.0,400.0,0.0};char path[192];
+    Format(path,sizeof(path),"%s/Levels/%d",profile,level);
+    bool explicitVector=Node(file,path) && gCfg[file].GetDataType("build_half_extents")!=KvData_None;
+    if(!explicitVector && growth && level>anchor)Format(path,sizeof(path),"%s/Levels/%d",profile,anchor);
+    if(Node(file,path) && gCfg[file].GetDataType("build_half_extents")!=KvData_None)
+    {
+        char text[160],values[4][40];gCfg[file].GetString("build_half_extents",text,sizeof(text));TrimString(text);
+        ReplaceString(text,sizeof(text),"\t"," ");while(StrContains(text,"  ")>=0)ReplaceString(text,sizeof(text),"  "," ");
+        if(ExplodeString(text," ",values,4,40)!=3)return false;
+        for(int axis=0;axis<3;axis++)
+            if(!values[axis][0] || StringToFloatEx(values[axis],defaults[axis])!=strlen(values[axis])
+                || !(defaults[axis]>=0.0 && defaults[axis]<=8192.0))return false;
+        if(defaults[2]!=0.0)return false;
+    }
+    for(int axis=0;axis<2;axis++)
+    {
+        char key[32];strcopy(key,sizeof(key),axis==0 ? "build_half_extents_x" : "build_half_extents_y");
+        if(explicitVector)
+        {
+            bool found;Format(path,sizeof(path),"%s/Levels/%d",profile,level);
+            if(!StoredLevelFloat(file,path,key,defaults[axis],extents[axis],found))return false;
+        }
+        else if(!ReadLevelFloat(file,profile,level,key,defaults[axis],extents[axis]))return false;
+        if(!(extents[axis]>0.0 && extents[axis]<=8192.0))return false;
+    }
+    extents[2]=0.0;return true;
+}
+
+bool ValidateMaterialCostKeys(ConfigFile file,const char[] path)
+{
+    if(!Node(file,path) || !gCfg[file].GotoFirstSubKey(false))return true;
+    do
+    {
+        char key[64],text[64];int amount;gCfg[file].GetSectionName(key,sizeof(key));gCfg[file].GetString(NULL_STRING,text,sizeof(text));
+        if(FindMaterial(key)<0 || !ParseLevelInteger(text,amount))return false;
+    }while(gCfg[file].GotoNextKey(false));
+    return true;
+}
+
 void BuildingProfilePath(int building,char[] path,int length)
 {
     if(gBuildings[building].kind==Kind_Base)
@@ -197,6 +254,7 @@ void BuildingProfilePath(int building,char[] path,int length)
 bool BuildingLevelAvailable(int building,int level)
 {
     if(building<0 || building>=MAX_BUILDINGS || !gBuildings[building].used)return false;
+    if(gBuildings[building].configRevision!=gConfigRevision)return false;
     char path[128];BuildingProfilePath(building,path,sizeof(path));
     return LevelAvailable(gBuildings[building].file,path,level);
 }
@@ -211,16 +269,18 @@ bool ReadBuildingLevelQuote(int building,int level,int cost[MATERIALS],int &next
 
 bool ValidateResolvedLevel(ConfigFile file,const char[] profile,int level)
 {
-    int maximum,value,cost[MATERIALS];float decimal;
+    int maximum,value,cost[MATERIALS];float decimal,extents[3];
     if(!ReadLevelInt(file,profile,level,"max_hp",0,maximum)
         || !ReadLevelInt(file,profile,level,"initial_hp",maximum,value) || value>maximum)return false;
     if(!ReadLevelInt(file,profile,level,"burn_damage",0,value)
         || !ReadLevelInt(file,profile,level,"minimum_base_level",1,value)
         || !ReadLevelInt(file,profile,level,"power_priority",10,value)
-        || !ReadLevelInt(file,profile,level,"light_brightness",2,value))return false;
+        || !ReadLevelInt(file,profile,level,"light_brightness",2,value)
+        || !ReadLevelInt(file,profile,level,"build_limit",24,value)
+        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,value))return false;
     for(int f=0;f<sizeof(sLevelFloatFields);f++)
         if(!ReadLevelFloat(file,profile,level,sLevelFloatFields[f],sLevelFloatDefaults[f],decimal))return false;
-    return ReadLevelUpgradeCost(file,profile,level,cost);
+    return ReadBuildHalfExtents(file,profile,level,extents) && ReadLevelUpgradeCost(file,profile,level,cost);
 }
 
 bool ValidateGrowthFieldNames(ConfigFile file,const char[] profile)
@@ -282,7 +342,7 @@ bool ValidateGrowthFieldNames(ConfigFile file,const char[] profile)
     for(int i=0;i<keys.Length;i++)
     {
         char field[96];keys.GetString(i,field,sizeof(field));bool known;
-        for(int m=0;m<MATERIALS;m++){char expected[64];Format(expected,sizeof(expected),"%s_per_level",gMaterials[m].id);if(StrEqual(field,expected))known=true;}
+        for(int m=0;m<gMaterialCount;m++){char expected[64];Format(expected,sizeof(expected),"%s_per_level",gMaterials[m].id);if(StrEqual(field,expected))known=true;}
         int value;bool found;
         if(!known || !StoredLevelInt(file,path,field,0,value,found) || !found){delete keys;return false;}
     }
@@ -321,7 +381,7 @@ bool ValidateLevelProfile(ConfigFile file,const char[] profile)
 
 bool ValidateLevelProfiles()
 {
-    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades};
+    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders};
     for(int f=0;f<sizeof(files);f++)
     {
         char section[16];strcopy(section,sizeof(section),f==0 ? "Profiles" : "Types");
@@ -334,9 +394,29 @@ bool ValidateLevelProfiles()
         for(int p=0;p<profiles.Length;p++)
         {
             char path[128];profiles.GetString(p,path,sizeof(path));
-            if(!ValidateLevelProfile(files[f],path)){delete profiles;return ConfigFailure(path);}
+            if(!ValidateLevelProfile(files[f],path))
+            {
+                if(files[f]==C_Bases){delete profiles;return ConfigFailure(path);}
+                LogError("[Shelter] Disabled building type %s in config %d: invalid level/growth/material cost",path,files[f]);
+            }
+            else WarnNormalizedFireIntervals(files[f],path);
         }
         delete profiles;
     }
     return true;
+}
+
+void WarnNormalizedFireIntervals(ConfigFile file,const char[] profile)
+{
+    char path[192];Format(path,sizeof(path),"%s/Levels",profile);
+    if(!Node(file,path) || !gCfg[file].GotoFirstSubKey())return;
+    do
+    {
+        float interval=gCfg[file].GetFloat("fire_interval",0.5);
+        if(interval>0.0 && interval<0.1)
+        {
+            char level[32];gCfg[file].GetSectionName(level,sizeof(level));
+            LogMessage("[Shelter] %s/Levels/%s/fire_interval %.4f normalized to 0.1 seconds",profile,level,interval);
+        }
+    }while(gCfg[file].GotoNextKey());
 }

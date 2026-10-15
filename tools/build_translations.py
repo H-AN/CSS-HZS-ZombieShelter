@@ -27,7 +27,8 @@ PLACEHOLDER = re.compile(r"\{([1-9][0-9]*)\}")
 # Values are zero-based: key argument, first translated value argument.
 # Keep these aligned with the external plugin's localization helpers.
 PHRASE_HELPERS = {"AnnouncePhrase": (0, 1), "TranslateLabel": (1, None),
-    "AdminAdd": (3, None), "AddDefenseMenuItem": (4, None)}
+    "AdminAdd": (3, None), "AddDefenseMenuItem": (4, None),
+    "AddBuildAction": (4, None), "AddRecipeStat": (2, None)}
 DIRECT_FORMATTERS = {"Format": 2, "FormatEx": 2, "PrintToChat": 1,
     "PrintToChatAll": 0, "PrintHintText": 1, "PrintCenterText": 1,
     "ReplyToCommand": 1, "ShowHudText": 2, "PrintToConsole": 1,
@@ -255,7 +256,7 @@ def audit_sources(root, phrases, counts, allow_custom_labels=False):
                 if counts[right.value]:
                     errors.append(f"{path.name}:{right.line}: configured label {right.value!r} needs arguments")
                 refs.append({"file": path.relative_to(root).as_posix(), "line": right.line, "key": right.value})
-            elif allow_custom_labels:
+            elif allow_custom_labels or left.value == "display_name":
                 custom.append(f"{path.name}:{right.line}: literal custom label {right.value!r}")
             else:
                 errors.append(f"{path.name}:{right.line}: shipped label is not a phrase: {right.value!r}")

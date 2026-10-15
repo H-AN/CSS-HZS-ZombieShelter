@@ -1,3 +1,15 @@
+float gNextTargetFallback[MAX_NPCS];
+int gFallbackAssignments;
+
+void ClearDisconnectedNPCTarget(int n,int client,int serial)
+{
+    int entity=Resolve(gNPCs[n].ref);if(entity<0)return;
+    if(gNPCs[n].targetClientSerial!=serial && (gLeaderOffset<0 || GetEntDataEnt2(entity,gLeaderOffset)!=client))return;
+    Han_UnlockZombie(entity);gNPCs[n].targetClientSerial=0;StopBuildingAttack(n);
+    if(gLeaderOffset>=0)SetEntDataEnt2(entity,gLeaderOffset,entity);
+    gNextTargetFallback[n]=0.0;
+}
+
 bool APIAvailable()
 {
     return GetFeatureStatus(FeatureType_Native,"Han_IsZombie")==FeatureStatus_Available
@@ -29,7 +41,7 @@ void ReadNPCAnimations(int index,const char[] publicName)
     gHanData.Rewind();if(!gHanData.GotoFirstSubKey())return;
     do
     {
-        char name[64];gHanData.GetString("name",name,sizeof(name));if(!StrEqual(name,publicName))continue;
+        char name[128];gHanData.GetString("name",name,sizeof(name));if(!StrEqual(name,publicName))continue;
         char list[256];gHanData.GetString("idle_anim",list,sizeof(list));AnimationName(list,gNPCs[index].idle,sizeof(gNPCs[].idle),"idle");
         gHanData.GetString("attack_anim",list,sizeof(list));AnimationName(list,gNPCs[index].attack,sizeof(gNPCs[].attack),"attack1");return;
     }while(gHanData.GotoNextKey());
@@ -41,15 +53,16 @@ void BindNPC(int entity)
     int slot=-1;
     for(int i=0;i<MAX_NPCS;i++)if(!gNPCs[i].used){slot=i;break;}
     if(slot<0){LogError("[Shelter] NPC tracking budget exceeded; native spawn count must fit configured pool");return;}
-    char name[64];if(!Han_GetZombieName(entity,name,sizeof(name)))return;
-    NPC npc;npc.used=true;npc.ref=EntIndexToEntRef(entity);npc.visualRef=INVALID_ENT_REFERENCE;npc.boss=-1;
+    char name[128];if(!Han_GetZombieName(entity,name,sizeof(name)))return;
+    NPC npc;npc.used=true;npc.registrationEpoch=gEpoch;npc.ref=EntIndexToEntRef(entity);npc.visualRef=INVALID_ENT_REFERENCE;npc.boss=-1;
     for(int i=0;i<gBossCount;i++)if(StrEqual(name,gBosses[i].publicName))
     {
         if(!gBosses[i].boundThisRound){npc.boss=i;gBosses[i].boundThisRound=true;}
         else LogError("[Shelter] Duplicate fixed boss %s: kept in parked ordinary overflow pool",gBosses[i].id);
         break;
     }
-    gNPCs[slot]=npc;
+    gNPCs[slot]=npc;gNextTargetFallback[slot]=0.0;
+    ClearNPCRewardContext(slot);CacheNPCDrops(slot,name);
     if(entity<sizeof(gNPCBinding)){gNPCBinding[entity]=slot+1;gNPCBindingRef[entity]=npc.ref;}
     ReadNPCAnimations(slot,name);
     // This notification runs inside HZS CreateZombie. Only visibility is changed now;
@@ -77,6 +90,7 @@ public void NPCReady(any value)
     DataPack pack=view_as<DataPack>(value);pack.Reset();int ref=pack.ReadCell(),epoch=pack.ReadCell();delete pack;
     int entity=Resolve(ref);if(!gEnabled || !gCoreReady || epoch!=gEpoch || entity<0)return;
     int n=FindNPC(entity);if(n<0)return;
+    char publicName[128];if(Han_GetZombieName(entity,publicName,sizeof(publicName)))CacheNPCDrops(n,publicName);
     gNPCs[n].ready=true;gNPCs[n].baseHP=GetEntProp(entity,Prop_Data,"m_iHealth");gNPCs[n].lastHP=gNPCs[n].baseHP;
     gNPCs[n].takeDamage=GetEntProp(entity,Prop_Data,"m_takedamage");gNPCs[n].solidFlags=GetEntProp(entity,Prop_Send,"m_usSolidFlags");
     gNPCs[n].moveType=GetEntityMoveType(entity);
@@ -222,12 +236,25 @@ void NPCTick(float now)
         if(gNPCs[i].burnUntil>now && now>=gNPCs[i].nextBurn)
         {
             gNPCs[i].nextBurn=now+gNPCs[i].burnInterval;
-            DamageNPC(i,gNPCs[i].burnDamage,gNPCs[i].burnClientSerial,true);
+            DamageBurningNPC(i);
             if(gNPCs[i].dead || Resolve(gNPCs[i].ref)<0)continue;
         }
-        // HZS owns acquisition. Consume its current leader/target; do not choose
-        // or periodically lock a nearest player again in the external mode.
+        // Keep valid native targets. Only an active NPC without one receives a
+        // short fallback lock; parking, dormant Bosses and wall attacks are excluded.
         int target=gLeaderOffset>=0 ? GetEntDataEnt2(entity,gLeaderOffset) : 0;
+        if((target<=0 || target==entity || (target<=MaxClients && !LiveHuman(target))
+            || (target>MaxClients && !IsValidEntity(target)))
+            && !gNPCs[i].attackingUID && !gNPCs[i].paused && now>=gNextTargetFallback[i])
+        {
+            gNextTargetFallback[i]=now+0.5;
+            int fallback=NearestFallbackPlayer(entity);
+            if(fallback>0 && Han_SetZombieTarget(entity,fallback,0.75))
+            {
+                target=fallback;gNPCs[i].targetClientSerial=GetClientSerial(fallback);
+                if(gLeaderOffset>=0)SetEntDataEnt2(entity,gLeaderOffset,fallback);
+                gFallbackAssignments++;
+            }
+        }
         if(LiveHuman(target))gNPCs[i].targetClientSerial=GetClientSerial(target);
         else if(gNPCs[i].attackingUID)target=GetClientFromSerial(gNPCs[i].targetClientSerial);
         if(!LiveHuman(target))target=0;
@@ -243,7 +270,7 @@ void NPCTick(float now)
                 float interval=boss>=0 ? gBosses[boss].interval : Decimal(C_Zombies,"BuildingAttack","interval_seconds",1.0);
                 float damage=boss>=0 ? gBosses[boss].damage : Decimal(C_Zombies,"BuildingAttack","damage",20.0)*HPScale();
                 Han_SetCustomAnimationEx(entity,gNPCs[i].attack,interval+0.1);
-                gNPCs[i].nextAttack=now+interval;WallImpactSound(building);DamageBuilding(building,RoundToNearest(damage),true);
+                gNPCs[i].nextAttack=now+interval;WallImpactSound(building);DamageBuilding(building,RoundToNearest(damage),true,i);
             }
         }
         else
@@ -251,6 +278,20 @@ void NPCTick(float now)
             StopBuildingAttack(i);
         }
     }
+}
+
+int NearestFallbackPlayer(int entity)
+{
+    float origin[3];GetEntPropVector(entity,Prop_Data,"m_vecOrigin",origin);
+    float nearest;int chosen,ties;
+    for(int client=1;client<=MaxClients;client++)
+    {
+        if(!LiveHuman(client) || IsFakeClient(client) || IsClientSourceTV(client) || IsClientReplay(client))continue;
+        float point[3];GetClientAbsOrigin(client,point);float distance=GetVectorDistance(origin,point,true);
+        if(chosen==0 || distance<nearest-0.01){nearest=distance;chosen=client;ties=1;}
+        else if(FloatAbs(distance-nearest)<=0.01 && GetRandomInt(1,++ties)==1)chosen=client;
+    }
+    return chosen;
 }
 
 public void NPCThinkPost(int entity)
@@ -275,32 +316,27 @@ public void Han_OnZombieDamagePre(int zombie,int attacker,int &damage)
 
 public void Han_OnZombieDeath(int zombie,int killer)
 {
-    int n=FindNPC(zombie);if(n<0 || gNPCs[n].dead)return;
-    bool active=gNPCs[n].active;gNPCs[n].dead=true;gNPCs[n].active=false;gNPCs[n].burnUntil=0.0;
+    int n=FindNPC(zombie);if(n<0 || gNPCs[n].dead || gNPCs[n].settled || gNPCs[n].registrationEpoch!=gEpoch)return;
+    bool actualDeath=gNPCs[n].active && Running();
+    // Consume once before rewards/forward re-entry and before the final Boss ends play.
+    gNPCs[n].dead=true;gNPCs[n].settled=true;gNPCs[n].active=false;gNPCs[n].burnUntil=0.0;
+    if(!actualDeath)return;
+    if(!gNPCs[n].publicName[0])
+    {
+        char publicName[128];if(Han_GetZombieName(zombie,publicName,sizeof(publicName)))CacheNPCDrops(n,publicName);
+    }
+    SettleZombieDrops(n,killer);
     int boss=gNPCs[n].boss;
-    if(boss>=0 && Running() && active)
+    if(boss>=0)
     {
         gBosses[boss].defeated=true;gBosses[boss].savedHP=0;
         if(AllBossesDefeated())QueueOutcome(true);
     }
-    else if(active && Running())
+    else
     {
-        gNativeKills++;GrantDeathDrop(killer);
+        gNativeKills++;
         if(gNativeKills==90000)LogError("[Shelter] Native count is nearing the finite 99999 bridge threshold");
     }
-}
-
-void GrantDeathDrop(int client)
-{
-    if(client<1 || client>MaxClients || !IsClientInGame(client))return;
-    if(!SelectDay())return;
-    char profile[64];gCfg[C_Days].GetString("drop_profile",profile,sizeof(profile),"night_raider");
-    float multiplier=gCfg[C_Days].GetFloat("drop_multiplier",1.0);char path[128];Format(path,sizeof(path),"Profiles/%s",profile);
-    if(!Node(C_Drops,path))return;
-    float chance=gCfg[C_Drops].GetFloat("drop_chance",0.25);int low=gCfg[C_Drops].GetNum("amount_min",1),high=gCfg[C_Drops].GetNum("amount_max",2);
-    if(GetRandomFloat(0.0,1.0)>chance || low<1 || high<low)return;
-    Format(path,sizeof(path),"Profiles/%s/Weights",profile);int material=WeightedMaterial(C_Drops,path);
-    if(material>=0)Grant(material,RoundToNearest(float(GetRandomInt(low,high))*multiplier),client);
 }
 
 bool AllBossesDefeated()

@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "rcon": "zsh_test v05_admin_travel"
+    },
+    {
+      "rcon": "zsh_test v05_rotation_ui_setup"
+    },
+    {
+      "wait": 0.5
+    },
+    {
+      "rcon": "zsh_test v05_rotation_aim"
+    },
+    {
+      "client": "+use"
+    },
+    {
+      "wait": 0.2
+    },
+    {
+      "client": "-use"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "screenshot": "defensive_management"
+    },
+    {
+      "client": "menuselect 3"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "client": "menuselect 1"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "client": "menuselect 1"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "client": "menuselect 2"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "screenshot": "vertical_rotation_persistent"
+    },
+    {
+      "client": "menuselect 3"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "screenshot": "defensive_management_after_rotation"
+    },
+    {
+      "client": "menuselect 4"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "client": "menuselect 1"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "client": "menuselect 1"
+    },
+    {
+      "wait": 0.4
+    },
+    {
+      "screenshot": "horizontal_rotation_persistent"
+    },
+    {
+      "rcon": "zsh_test v05_rotation_ui_verify"
+    },
+    {
+      "rcon": "zsh_test v05_real_cleanup"
+    }
+  ]
+}

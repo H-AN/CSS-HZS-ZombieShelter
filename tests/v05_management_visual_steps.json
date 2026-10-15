@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {"rcon": "zsh_test v05_ui_setup"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"client": "menuselect 1"},
+    {"wait": 0.6},
+    {"rcon": "zsh_test v05_ui_verify"},
+    {"client": "+use"},
+    {"wait": 0.2},
+    {"client": "-use"},
+    {"wait": 0.8},
+    {"screenshot": "defense_management_capacity"},
+    {"rcon": "zsh_test v05_real_cleanup"},
+    {"rcon": "zsh_test summary", "contains": "Failed=0"}
+  ]
+}

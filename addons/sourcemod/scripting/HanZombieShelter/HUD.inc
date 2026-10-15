@@ -18,6 +18,8 @@ void CoreDisplayName(int core,char[] name,int length,int client=LANG_SERVER)
 
 void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SERVER)
 {
+    if(gBuildings[building].kind!=Kind_Base && gBuildings[building].meta.label[0])
+    {TranslateLabel(client,gBuildings[building].meta.label,name,length);return;}
     switch(gBuildings[building].kind)
     {
         case Kind_Base: CoreDisplayName(gBuildings[building].core,name,length,client);
@@ -29,6 +31,7 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Generator: TranslateLabel(client,"HUDGeneratorName",name,length);
         case Kind_Light: TranslateLabel(client,"HUDLightName",name,length);
         case Kind_Grenade: TranslateLabel(client,"HUDGrenadeName",name,length);
+        case Kind_Expander: TranslateLabel(client,"BuildExpanderName",name,length);
     }
 }
 
@@ -50,12 +53,26 @@ void HudBuildingTarget(int client,int building)
 {
     char name[64],action[128];BuildingDisplayName(building,name,sizeof(name),client);
     TranslateLabel(client,gBuildings[building].kind==Kind_Base ? "HUDBaseUseHint" : "HUDDefenseUseHint",action,sizeof(action));
-    SetHudTextParams(-1.0,0.69,0.4,225,245,255,255,0,0.0,0.0,0.1);
+    SetHudTextParams(-1.0,0.54,0.4,225,245,255,255,0,0.0,0.0,0.1);
     char text[512];
     Format(text,sizeof(text),"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
         gBuildings[building].level,gBuildings[building].hp,gBuildings[building].maxHP,action);
-    if(gBuildings[building].kind==Kind_Base)AppendGridInfo(client,gBuildings[building].core,text,sizeof(text));
-    else AppendBuildingPowerInfo(client,building,gBuildings[building].level,text,sizeof(text));
+    char line[160];int core=gBuildings[building].kind==Kind_Base ? gBuildings[building].core : gBuildings[building].buildCore;
+    if(gBuildings[building].kind==Kind_Base)
+    {Format(line,sizeof(line),"%T","HUDTargetGridCompact",client,gGridProduction[core],gGridAllocated[core],gGridDemand[core]);StrCat(text,sizeof(text),line);}
+    else if(gBuildings[building].kind==Kind_Generator)
+    {Format(line,sizeof(line),"%T","HUDTargetGeneratorCompact",client,GeneratorOutput(building),gBuildings[building].powerOutput);StrCat(text,sizeof(text),line);}
+    else if(gBuildings[building].powerDemand>0.0)
+    {
+        char state[48];TranslateLabel(client,BuildingPowered(building) ? "PowerOnline" : "PowerOffline",state,sizeof(state));
+        Format(line,sizeof(line),"%T","HUDTargetPowerCompact",client,state,gBuildings[building].powerDemand);StrCat(text,sizeof(text),line);
+    }
+    RefreshBuildAreas();
+    if(core>=0 && core<gCoreCount)
+    {
+        char baseName[64];CoreDisplayName(core,baseName,sizeof(baseName),client);
+        Format(line,sizeof(line),"%T","HUDTargetCapacityCompact",client,baseName,gBuildAreas[core].count,gBuildAreas[core].limit);StrCat(text,sizeof(text),line);
+    }
     ShowHudText(client,HUD_TARGET,"%s",text);
 }
 
@@ -118,6 +135,7 @@ void RenderCampaignHUD()
         gNextHUD=now+1.0;
         if(Running())DrawSafeZones();
     }
+    if(Running())DrawBuildZones();
     int bosses;for(int i=0;i<gBossCount;i++)if(gBosses[i].defeated)bosses++;
     for(int client=1;client<=MaxClients;client++)
     {
@@ -147,8 +165,16 @@ void RenderCampaignHUD()
                 gDay,phase,RoundToCeil(seconds),AliveCores(),gCoreCount,
                 ActiveOrdinary(),OrdinaryTarget(),bosses,gBossCount);
             SetHudTextParams(0.64,0.18,1.2,220,225,170,255,0,0.0,0.0,0.1);
-            ShowHudText(client,HUD_MATERIALS,"%T","HUDInventory",client,
-                gPlayerInventory[client][0],gPlayerInventory[client][1],gPlayerInventory[client][2],gPlayerInventory[client][3],gPlayerInventory[client][4]);
+            char balances[512],entry[100];int shown;
+            for(int m=0;m<gMaterialCount;m++)if(gPlayerInventory[client][m]>0)
+            {
+                char materialName[64];TranslateLabel(client,gMaterials[m].label,materialName,sizeof(materialName));
+                Format(entry,sizeof(entry),"%s%s: %d",shown>0 ? " / " : "",materialName,gPlayerInventory[client][m]);
+                if(strlen(balances)+strlen(entry)>=sizeof(balances)-1)break;
+                StrCat(balances,sizeof(balances),entry);shown++;
+            }
+            if(shown==0)TranslateLabel(client,"PersonalBackpackEmpty",balances,sizeof(balances));
+            ShowHudText(client,HUD_MATERIALS,"%s",balances);
         }
         if(!LiveHuman(client))continue;
         int entity=AimedEntity(client,1024.0),building=FindBuilding(entity),node=FindNode(entity);

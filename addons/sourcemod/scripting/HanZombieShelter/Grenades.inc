@@ -16,10 +16,12 @@ enum struct ShelterGrenade
     float expires;
 }
 ShelterGrenade gGrenades[MAX_GRENADES];
+RewardContext gGrenadeRewardContext[MAX_GRENADES];
 
 void RemoveGrenade(int p)
 {
-    int ref=gGrenades[p].ref;gGrenades[p].used=false;gGrenades[p].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
+    int ref=gGrenades[p].ref;gGrenades[p].used=false;gGrenades[p].ref=INVALID_ENT_REFERENCE;
+    RewardContext empty;gGrenadeRewardContext[p]=empty;RemoveOwnedRef(ref);
 }
 void ClearGrenades(){for(int p=0;p<MAX_GRENADES;p++)if(gGrenades[p].used)RemoveGrenade(p);}
 int GrenadeCount(){int count;for(int p=0;p<MAX_GRENADES;p++)if(gGrenades[p].used)count++;return count;}
@@ -28,6 +30,7 @@ bool LaunchGrenade(int b,const float muzzle[3],const float target[3])
 {
     if(!Running() || !BuildingPowered(b) || GrenadeCount()>=gGrenadeLimit || !CanAllocateEntities(1,true))return false;
     int slot=-1;for(int p=0;p<MAX_GRENADES;p++)if(!gGrenades[p].used){slot=p;break;}if(slot<0)return false;
+    RewardContext context;if(!CaptureBuildingReward(b,context))return false;
     float delta[3];SubtractVectors(target,muzzle,delta);
     float flight=GetVectorLength(delta)/gBuildings[b].projectileSpeed;
     if(flight<0.05)flight=0.05;if(flight>=gGrenadeLifetime)return false;
@@ -42,6 +45,7 @@ bool LaunchGrenade(int b,const float muzzle[3],const float target[3])
     if(!DispatchSpawn(entity) || !CanAllocateEntities(1,true)){RemoveEntity(entity);return false;}
     SetEntProp(entity,Prop_Data,"m_takedamage",0,1);SetEntityMoveType(entity,MOVETYPE_NONE);
     TeleportEntity(entity,muzzle,NULL_VECTOR,NULL_VECTOR);next.ref=EntIndexToEntRef(entity);gGrenades[slot]=next;
+    gGrenadeRewardContext[slot]=context;
     return true;
 }
 
@@ -57,15 +61,17 @@ public bool GrenadeTraceFilter(int entity,int mask,any slot)
 void ExplodeGrenade(int p,const float position[3])
 {
     if(!gGrenades[p].used)return;
-    int damage=gGrenades[p].damage,serial=gGrenades[p].serial,epoch=gGrenades[p].epoch;float radius=gGrenades[p].radius;
+    int damage=gGrenades[p].damage,epoch=gGrenades[p].epoch;float radius=gGrenades[p].radius;
+    RewardContext context;context=gGrenadeRewardContext[p];
     RemoveGrenade(p); // Commit before re-entrant HZS death/award callbacks.
     if(!Running() || epoch!=gEpoch)return;
     TE_SetupExplosion(position,gExplosionSprite,1.5,15,0,RoundToNearest(radius),damage);TE_SendToAll();
     for(int n=0;n<MAX_NPCS;n++)
     {
+        if(!Running() || epoch!=gEpoch)return;
         if(!DefenseTarget(n))continue;
         int entity=Resolve(gNPCs[n].ref);float center[3];EntityCenter(entity,center);
-        if(GetVectorDistance(position,center)<=radius && LineClear(position,center,-1,entity))DamageNPC(n,damage,serial,true);
+        if(GetVectorDistance(position,center)<=radius && LineClear(position,center,-1,entity))DamageNPCWithContext(n,damage,context);
     }
 }
 
@@ -104,12 +110,12 @@ public Action GrenadeTimer(Handle timer)
 
 void GrenadeFire(int b,float now)
 {
-    if(!BuildingPowered(b) || now<gBuildings[b].nextFire)return;
-    float muzzle[3];muzzle=gBuildings[b].origin;muzzle[2]+=64.0;
-    int target=TurretTarget(b,muzzle);if(target<0)return;
-    float point[3];EntityCenter(Resolve(gNPCs[target].ref),point);
+    if(now+0.00001<gBuildings[b].nextFire || !BuildingPowered(b))return;
+    float muzzle[3];BuildingAttachmentPosition(b,gBuildings[b].meta.muzzleOffset,muzzle);
+    int target=CachedTurretTarget(b,muzzle,now);if(target<0)return;
+    float point[3];if(!AimDefenseBody(b,target,muzzle,point))return;
     if(!LaunchGrenade(b,muzzle,point))return;
-    float delta[3],angles[3];SubtractVectors(point,muzzle,delta);GetVectorAngles(delta,angles);angles[0]=0.0;angles[2]=0.0;
-    TeleportEntity(Resolve(gBuildings[b].ref),NULL_VECTOR,angles,NULL_VECTOR);
-    gBuildings[b].nextFire=now+gBuildings[b].interval;
+    gBuildings[b].nextFire=NextFireDeadline(gBuildings[b].nextFire,now,gBuildings[b].interval);
+    TraceDefenseShot(b,now,target);
+    PlayBuildingSound(b,"attack");
 }

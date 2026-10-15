@@ -1,22 +1,51 @@
-#define SHELTER_VERSION "0.4.0"
-#define MAX_BUILDINGS 128
+#define SHELTER_VERSION "0.5.0-dev"
+#define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 256
 #define MAX_CORES 8
 #define MAX_BOSSES 8
 #define MAX_BOXES 8
 #define MAX_POINTS 32
-#define MAX_RECIPES 32
-#define MATERIALS 5
+#define MAX_RECIPES 256 // Configuration catalogue, independent of live building capacity.
+#define MATERIALS 64 // Bounded storage; enumerate only gMaterialCount registered IDs.
+#define LEGACY_MATERIALS 5
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
-enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade }
-enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Count }
+enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander }
+enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops, C_Count }
+
+// Reward identity is independent of the living client required by the HZS
+// damage API. Delayed hits retain this snapshot after a facility is removed.
+enum struct RewardContext
+{
+    bool valid;
+    bool facility;
+    int epoch;
+    int sourceUID;
+    int sourceRef;
+    int buildCore;
+    int ownerSerial;
+    char ownerKey[64];
+}
+
+// A real NPC strike owns one immutable reply, even if it destroys the fence.
+enum struct FenceRetaliationEvent
+{
+    bool pending;
+    int epoch;
+    int npc;
+    int npcRef;
+    int damage;
+    RewardContext reward;
+}
 
 enum struct MaterialDef
 {
     char id[32];
     char label[64];
+    char description[256];
+    bool currency;
+    bool gatherable;
     char model[PLATFORM_MAX_PATH];
     int quota;
     int yield;
@@ -37,6 +66,11 @@ enum struct CoreDef
     int boxCount;
     int pointCount;
     int building;
+    float buildCenter[3];
+    float buildAngles[3];
+    float buildZMin;
+    float buildZMax;
+    int buildHardLimit;
 }
 
 enum struct BossDef
@@ -60,6 +94,25 @@ enum struct BossDef
     float interval;
 }
 
+enum struct BuildingMetadata
+{
+    char label[128];
+    char description[256];
+    int render[4];
+    int skin;
+    char placementMode[16];
+    float originOffset[3];
+    float angleOffset[3];
+    bool allowOverlap;
+    float maxDistance;
+    float muzzleOffset[3];
+    float lightOffset[3];
+    char buildSound[PLATFORM_MAX_PATH];
+    char attackSound[PLATFORM_MAX_PATH];
+    char upgradeSound[PLATFORM_MAX_PATH];
+    char destroySound[PLATFORM_MAX_PATH];
+}
+
 enum struct Building
 {
     bool used;
@@ -68,9 +121,13 @@ enum struct Building
     int uid;
     int generation;
     int core;
+    int buildCore;
+    int configRevision;
+    float placementAnchor[3];
     ConfigFile file;
     char type[64];
     char model[PLATFORM_MAX_PATH];
+    BuildingMetadata meta;
     int level;
     int hp;
     int maxHP;
@@ -78,6 +135,12 @@ enum struct Building
     float origin[3];
     float angles[3];
     float nextFire;
+    float nextSearch;
+    int targetRef;
+    int targetNPC;
+    int targetEpoch;
+    int targetBuildingUID;
+    int targetBuildingRef;
     float range;
     float damage;
     float interval;
@@ -104,6 +167,11 @@ enum struct Building
     int lightBrightness;
     float projectileSpeed;
     float blastRadius;
+    float buildRangeBonus;
+    int buildLimitBonus;
+    int baseBuildLimit;
+    float buildHalfExtents[3];
+    float restoreRetryAt;
 }
 
 enum struct ResourceNode
@@ -124,6 +192,9 @@ enum struct ResourceNode
 enum struct NPC
 {
     bool used;
+    bool settled;
+    int registrationEpoch;
+    char publicName[128];
     bool ready;
     bool active;
     bool dead;
@@ -161,7 +232,8 @@ enum struct Recipe
 {
     char id[64];
     char type[64];
-    char label[64];
+    char label[128];
+    BuildingMetadata meta;
     ConfigFile file;
     BuildingKind kind;
     int cost[MATERIALS];
@@ -170,6 +242,7 @@ enum struct Recipe
 KeyValues gCfg[C_Count];
 KeyValues gHanData;
 MaterialDef gMaterials[MATERIALS];
+int gMaterialCount;
 CoreDef gCores[MAX_CORES];
 float gCoreMins[MAX_CORES][MAX_BOXES][3], gCoreMaxs[MAX_CORES][MAX_BOXES][3];
 float gCorePoints[MAX_CORES][MAX_POINTS][3], gCorePointAngles[MAX_CORES][MAX_POINTS][3];
@@ -181,7 +254,7 @@ Recipe gRecipes[MAX_RECIPES];
 int gCoreCount, gBossCount, gNodeCount, gRecipeCount;
 int gPlayerInventory[MAXPLAYERS+1][MATERIALS];
 int gBaseInventory[MAX_CORES][MATERIALS];
-int gEpoch, gUID;
+int gEpoch, gUID, gConfigRevision;
 int gDay=1, gNativeKills;
 Phase gPhase=Phase_Waiting;
 bool gEnabled, gCoreReady, gSnapshot, gRollback, gTerminal, gFailureCandidate, gVictoryCandidate;
@@ -202,7 +275,7 @@ int gNPCBinding[2049], gNPCBindingRef[2049];
 int gWorldBinding[2049], gWorldBindingRef[2049];
 float gNextBossAudit;
 int gLeaderOffset=-1, gBeamSprite, gFireSprite, gExplosionSprite;
-Handle gTick,gProjectileTimer;
+Handle gTick,gProjectileTimer,gDefenseTimer;
 ConVar gCorePoolCvar;
 int gOriginalPool;
 bool gPoolOverridden;
@@ -255,7 +328,7 @@ int FindNode(int entity)
 
 int FindMaterial(const char[] id)
 {
-    for(int i=0;i<MATERIALS;i++)if(StrEqual(id,gMaterials[i].id))return i;
+    for(int i=0;i<gMaterialCount;i++)if(StrEqual(id,gMaterials[i].id))return i;
     return -1;
 }
 

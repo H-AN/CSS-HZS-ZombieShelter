@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess,socket,secrets,time,json,shutil,re,sys,os
 import struct,argparse
+from local_server_runtime import runtime_paths,startup_arguments
 def packet(sock,pid,kind,s):
     data=struct.pack('<ii',pid,kind)+s.encode()+b'\0\0'
     sock.sendall(struct.pack('<i',len(data))+data)
@@ -64,24 +65,31 @@ def write_error_classification(report,errors):
     return classification
 
 parser=argparse.ArgumentParser(description='RCON tests for a prepared HZS shelter server')
-parser.add_argument('--server-root',default=r'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server')
-parser.add_argument('--report-dir',default=str(Path(__file__).resolve().parents[1]/'tests'/'reports'))
+parser.add_argument('--server-root',default=str(Path(__file__).resolve().parents[1]/'tests/runtime/v05_server'))
+parser.add_argument('--report-dir',default=str(Path(__file__).resolve().parents[1]/'tests/reports/v05/runtime'))
 parser.add_argument('--integration',action='store_true',help='Requires the test-only probe compiled as HanZombieShelter.smx')
 parser.add_argument('--focused',action='store_true')
-parser.add_argument('--port',type=int,default=27129,help='Use an isolated port when another shelter server is running')
+parser.add_argument('--port',type=int,default=27139,help='Isolated test port; recording port 27129 is prohibited')
+parser.add_argument('--legacy-scenarios',action='store_true',help='Run the old map-specific mutation scenarios using a connected living real player')
 parser.add_argument('--power',action='store_true',help='Include 0.4 power, light, projectile and public API checks')
 parser.add_argument('--power-only',action='store_true',help='Run only new 0.4 engine scenarios (requires --integration --power)')
 parser.add_argument('--classify-existing',action='store_true',help='Classify the existing error-log report offline; do not launch a server')
 options=parser.parse_args()
-CSS=Path(options.server_root);STAGE=CSS/'cstrike';PORT=options.port;SERVER_CONFIG='zsh_codex_test.cfg'
+if options.legacy_scenarios and not options.integration:raise SystemExit('--legacy-scenarios requires --integration and an already connected living real client')
+CSS,STAGE,REPORT=runtime_paths(options.server_root,options.report_dir)
+PORT=options.port;SERVER_CONFIG='zsh_codex_test.cfg'
 if not 1024 <= PORT <= 65535:raise SystemExit('Invalid test port')
-REPORT=Path(options.report_dir);REPORT.mkdir(parents=True,exist_ok=True)
+if PORT==27129:raise SystemExit('Recording port 27129 is not a test target')
+REPORT.mkdir(parents=True,exist_ok=True)
 sys_encoding='utf-8'
 sys.stdout.reconfigure(encoding='utf-8',errors='backslashreplace')
 if options.classify_existing:
     existing=json.loads((REPORT/'原生主体联合错误日志.json').read_text(encoding='utf-8-sig'))
     classified=write_error_classification(REPORT,existing)
     raise SystemExit(0 if classified['runtime_check_passed'] else 1)
+runtime_root=Path(__file__).resolve().parents[1]/'tests/runtime'
+if not CSS.resolve().is_relative_to(runtime_root.resolve()):raise SystemExit('Tests may launch only an isolated tree below tests/runtime')
+if not (CSS/'.shelter-v05-isolated.json').is_file():raise SystemExit('Prepare a v0.5 isolated tree first; safety marker missing')
 if not (STAGE/'cfg'/SERVER_CONFIG).is_file():raise SystemExit('Prepare the local server first; test cfg missing')
 
 def configured_integer(path,key,fallback):
@@ -110,10 +118,19 @@ def run():
     assertions=STAGE/'addons/sourcemod/logs/shelter_probe_assertions.log'
     if assertions.exists():shutil.move(str(assertions),str(history/(str(time.time_ns())+'_probe_assertions.log')))
     startup=subprocess.STARTUPINFO();startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=0
-    proc=subprocess.Popen([str(CSS/'srcds_win64.exe'),'-game',str(STAGE),'-console','-insecure','-nohltv','-dev',
-        '-ip','127.0.0.1','-port',str(PORT),'+maxplayers','32','+sv_lan','1','+sv_cheats','1','+servercfgfile',SERVER_CONFIG,
-        '+rcon_password',secret,'+con_logfile','shelter_runtime.log','+map','zsh_desertplant_cso_v1_d','+bot_add_ct'],
-        cwd=CSS,startupinfo=startup,creationflags=subprocess.CREATE_NEW_CONSOLE)
+    process_record={'schema_version':1,'server_root':str(CSS),'game_root':str(STAGE),'report_dir':str(REPORT),
+        'port':PORT,'startupPID':None,'exitCode':None,'startupTimeUnix':time.time(),
+        'rconEstablished':False,'terminatedByRunner':False}
+    process_report=REPORT/'startup_process.json'
+    try:
+        proc=subprocess.Popen(startup_arguments(CSS,PORT,SERVER_CONFIG,secret),
+            cwd=CSS,startupinfo=startup,creationflags=subprocess.CREATE_NEW_CONSOLE)
+    except OSError as error:
+        process_record['startupErrorType']=type(error).__name__
+        process_report.write_text(json.dumps(process_record,ensure_ascii=False,indent=2),encoding='utf-8')
+        raise RuntimeError('Isolated server launch failed; see startup_process.json') from None
+    process_record['startupPID']=proc.pid
+    process_report.write_text(json.dumps(process_record,ensure_ascii=False,indent=2),encoding='utf-8')
     sock=None;nextid=10;last_status=''
     def command(cmd):
         nonlocal nextid,last_status
@@ -140,23 +157,49 @@ def run():
         raise AssertionError(description+' timed out; last state: '+state)
     try:
         for _ in range(45):
-            if proc.poll() is not None:raise RuntimeError('server exited before RCON')
+            if proc.poll() is not None:raise RuntimeError('server exited before RCON (exit code %s)' % proc.returncode)
             try:
                 sock=socket.create_connection(('127.0.0.1',PORT),timeout=1);sock.settimeout(.5);packet(sock,1,3,secret)
                 while True:
                     current,kind,_=recv(sock)
-                    if kind==2:assert current!=-1;break
+                    if kind==2:assert current!=-1;process_record['rconEstablished']=True;break
                 break
             except (OSError,ConnectionError):
                 if sock:sock.close();sock=None
                 time.sleep(.5)
         assert sock
-        command('sm plugins list');command('status');command('hzs_maxzombiespawn');command('bot_stop 1')
-        if options.integration:command('zsh_test_client')
-        else:
-            command('bot_join_after_player 0');command('bot_join_team ct');command('bot_quota 1')
-            status=command('status')
-            if '1 bots' not in status:command('bot_add_ct')
+        command('sm plugins list');command('status');command('hzs_maxzombiespawn');command('bot_quota 0')
+        fixture=command('zsh_test_client') if options.integration else ''
+        if not options.integration:
+            wait_status(lambda state: status_number(state,'enabled')==1,'production configuration loads',timeout=15)
+            unavailable=command('zsh_test summary')
+            assert 'Unknown command' in unavailable or '未知命令' in unavailable,'Production plugin exposes a test command'
+        if options.integration:
+            command('zsh_test logic');command('zsh_test v05build');command('zsh_test v05_materials');command('zsh_test v05_variants')
+            api=command('hzsh_api_test snapshot')
+            assert 'Failed=0' in api,'Independent API snapshot assertion failed'
+        # An empty server is a valid startup-only sample. Never manufacture a
+        # participant or claim the client-dependent legacy suite passed.
+        if not options.legacy_scenarios or '[ShelterFixture] real_client=' not in fixture:
+            skipped={'scope':'startup_and_logic_only','client_scenarios':'not_run',
+                'reason':'legacy scenarios not requested' if not options.legacy_scenarios else 'no living real client',
+                'bots_added':0,'fake_clients_created':0,'multiplayer':'not_verified'}
+            if options.integration:
+                summary=command('zsh_test summary')
+                assert 'Failed=0' in summary,'Logic assertion failed'
+                command('sm plugins unload HanZombieShelter')
+                absent=command('hzsh_api_test absent')
+                assert '[ShelterAPI] PASS optional consumer survives provider absence' in absent,absent
+                command('sm plugins load HanZombieShelter')
+                wait_status(lambda state: status_number(state,'enabled')==1,'late-loaded shelter configuration')
+                api=command('hzsh_api_test snapshot')
+                assert 'Failed=0' in api,'Independent consumer failed after provider reload'
+                skipped['api_lifecycle']='provider unload, optional absence, late load and snapshot passed'
+            (REPORT/'coverage.json').write_text(json.dumps(skipped,ensure_ascii=False,indent=2),encoding='utf-8')
+            command('sm_zsh_status')
+            command('sm_zsh_fail');time.sleep(4.5)
+            command('sm plugins unload UnmodifiedHZS');command('quit');proc.wait(timeout=15)
+            return
         day=wait_status(lambda state: status_number(state,'enabled')==1 and status_number(state,'phase')==1
             and status_number(state,'raiders')==DAY_TARGET and status_number(state,'tracked')==NATIVE_POOL+1,
             'initial native startup and daytime population',timeout=90)
@@ -271,7 +314,12 @@ def run():
         command('sm plugins unload UnmodifiedHZS');command('quit');proc.wait(timeout=15)
     finally:
         if sock:sock.close()
-        if proc.poll() is None:proc.terminate();proc.wait(timeout=5)
+        try:
+            if proc.poll() is None:
+                process_record['terminatedByRunner']=True;proc.terminate();proc.wait(timeout=5)
+        finally:
+            process_record['exitCode']=proc.poll()
+            process_report.write_text(json.dumps(process_record,ensure_ascii=False,indent=2),encoding='utf-8')
         if assertions.exists():shutil.copy2(assertions,REPORT/'probe_assertions.log')
         if log.exists():shutil.copy2(log,REPORT/'原生主体联合服务端.txt')
         (REPORT/'原生主体联合RCON.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')
