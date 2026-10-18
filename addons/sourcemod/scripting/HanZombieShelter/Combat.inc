@@ -144,7 +144,7 @@ bool CaptureFenceRetaliation(int b,int n,FenceRetaliationEvent hit)
 {
     FenceRetaliationEvent empty;hit=empty;
     int damage=FenceRetaliationDamage(b);
-    if(damage<1 || !Running() || n<0 || n>=MAX_NPCS || !gNPCs[n].used || !gNPCs[n].ready
+    if(damage<1 || !BuildingPowered(b) || !Running() || n<0 || n>=MAX_NPCS || !gNPCs[n].used || !gNPCs[n].ready
         || !gNPCs[n].active || gNPCs[n].dead || gNPCs[n].registrationEpoch!=gEpoch
         || gNPCs[n].attackingUID!=gBuildings[b].uid || Resolve(gNPCs[n].ref)<0 || Resolve(gBuildings[b].ref)<0)return false;
     int client=SelectFenceRetaliationClient(b);if(client==0)return false;
@@ -345,6 +345,7 @@ void TurretFire(int b,float now)
 
 void MineTick(int b)
 {
+    if(!BuildingPowered(b))return;
     int body=Resolve(gBuildings[b].ref);if(body<0)return;
     float source[3];source=gBuildings[b].origin;source[2]+=20.0;
     bool triggered=false;

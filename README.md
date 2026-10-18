@@ -1,5 +1,9 @@
 # CSS-HZS-ZombieShelter
 
+## 本轮恢复、信标与基地断电
+
+当前实施入口见 [恢复信标与基地断电实施记录](docs/v0.5_恢复信标与基地断电_实施记录.md)：新增三类恢复设施和信标，照明及防御工事统一 ±10° 旋转，基地摧毁后关闭其电网。[probe02](tests/reports/v05/support_buildings/probe_02/session.json) 已实际 **307/0/0**，[live_03 独立补验](tests/reports/v05/support_buildings/live_03/session.json) **18/0/0**；照明修复、恢复、信标、生产放行达到日 100/夜 250，以及真实基地损毁入口和断电均已验证。人口使用 god、NPC 禁伤、建筑临时高 HP 的保护夹具，保留原生 251 与 Boss 并完整清理，不作为正常战斗负载成绩。probe01 故障证据保留，[原始画面已复核](tests/reports/v05/support_buildings/probe_02/visual_review.json)：三色恢复圈部分可见、三基地近距离墙后蓝标记及真实菜单已验；音效未主观听音。仅 27139 隔离人口改为普通池 250、日 100/夜 250，发行原人口及 27129 日 20/夜 60 保留。配置测试 8/8 通过，[保留审计](tests/reports/v05/support_buildings/config_preservation.json) 无越界变更。最终干净正式留服已确认 [manual_handoff](tests/reports/v05/support_buildings/manual_handoff_final/session.json)；真人多人、远距离 PVS、128/256 座正常战斗负载待验。各套件分别计数，旧证据保留。
+
 ## 本轮真人复测修正状态
 
 新增入口见 [v0.5 复测修正](docs/v0.5_复测修正.md)：出生点与装饰藤蔓、NPC 无目标兜底、防御工事名称与双轴旋转、工事反伤、管理员指定基地回城，以及商店选择基地 API。本轮六项功能的 [probe09 追加回归](tests/reports/v05/followup_probe_09_final/session.json) 已实际 **87 通过／0 失败／0 跳过**，与旧套件独立计数；[四张 JPEG 已实际复核](tests/reports/v05/followup_probe_09_final/visual_review.json)，管理页及双轴菜单可读，首张有游戏信息面板遮挡场景。独立 [API01 验证](tests/reports/v05/followup_api_01/verification.json) 通过三个基地直传、三个基地选择、取消及超时；[API02 最终源码验证](tests/reports/v05/followup_api_02_final/verification.json) 通过三基地直传、选择基地 B、立即卸载 pending 调用方后不产生第二次回调，SourceMod 错误为 0，选择菜单截图已实际查看。

@@ -25,6 +25,14 @@ int tPassed,tFailed,tSkipped;
 #include "FenceRetaliationProbe.inc"
 #include "NPCFollowupProbe.inc"
 #include "TravelProbe.inc"
+#include "RestorationProbe.inc"
+#include "RestorationBuildProbe.inc"
+#include "BeaconProbe.inc"
+#include "BeaconRealClientProbe.inc"
+#include "SupportPopulationProbe.inc"
+#include "SupportPopulationLiveProbe.inc"
+#include "BaseBlackoutProbe.inc"
+#include "BaseExplosionLiveProbe.inc"
 
 int tSavedBossHP;
 int tNativeAttacks;
@@ -107,7 +115,12 @@ bool KnownClientTest(const char[] which)
 
 public Action TestCommand(int args)
 {
-    char which[32];GetCmdArg(1,which,sizeof(which));
+    char which[64];GetCmdArg(1,which,sizeof(which));
+    if(StrEqual(which,"v05_population_live_poll")){PollSupportPopulationLive();return Plugin_Handled;}
+    if(StrEqual(which,"v05_population_live_cleanup")){CleanupSupportPopulationLive(TestHuman());return Plugin_Handled;}
+    if(tSupportLiveActive && !StrEqual(which,"summary"))
+    {PrintToServer("[SupportPopulationLive] HOLD rejects other mutating probe commands until cleanup");return Plugin_Handled;}
+    if(StrEqual(which,"v05_population_live_start")){StartSupportPopulationLive(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"summary")){PrintToServer("[ShelterTestSummary] Passed=%d Failed=%d Skipped=%d",tPassed,tFailed,tSkipped);return Plugin_Handled;}
     if(StrEqual(which,"logic")){TestSchedulerLogic();return Plugin_Handled;}
     if(StrEqual(which,"v05build")){TestV05BuildLogic();return Plugin_Handled;}
@@ -117,9 +130,25 @@ public Action TestCommand(int args)
     if(StrEqual(which,"v05_rotation_math")){TestFenceRotationMath();return Plugin_Handled;}
     if(StrEqual(which,"v05_rotation_aim")){TestFenceRotationCurrentAim(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"v05_rotation_ui_setup")){SetupFenceRotationUI(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_light_rotation_ui_setup")){SetupFenceRotationUI(TestHuman(),Kind_Light);return Plugin_Handled;}
     if(StrEqual(which,"v05_rotation_ui_verify")){VerifyFenceRotationUI(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"v05_admin_travel")){TestAdminTravelReal(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"v05_fence_logic")){TestFenceRetaliationLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration")){TestRestorationLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_real")){TestRestorationReal(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_build")){TestRestorationBuildReal(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_visual_repair")){SetupRestorationVisual(TestHuman(),Kind_AutoRepair);return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_visual_heal")){SetupRestorationVisual(TestHuman(),Kind_Heal);return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_visual_armor")){SetupRestorationVisual(TestHuman(),Kind_Armor);return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_visual_verify")){VerifyRestorationVisual(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_restoration_visual_cleanup")){CleanupRestorationVisual(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_beacon")){TestBeaconLogic();return Plugin_Handled;}
+    if(StrEqual(which,"v05_beacon_pose")){TestBeaconMarkerPose();return Plugin_Handled;}
+    if(StrContains(which,"v05_beacon_")==0 && BeaconRealClientCommand(which[4],TestHuman()))return Plugin_Handled;
+    if(StrEqual(which,"v05_support_population")){TestSupportPopulation(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_support_population_active")){TestSupportPopulationActive();return Plugin_Handled;}
+    if(StrEqual(which,"v05_base_blackout")){TestBaseBlackoutReal(TestHuman());return Plugin_Handled;}
+    if(StrEqual(which,"v05_base_explosion_live")){TestBaseExplosionLive(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"v05_fence_real")){TestFenceRetaliationReal(TestHuman());return Plugin_Handled;}
     if(StrEqual(which,"v05_npc_followup_logic")){TestNPCFollowupLogic();return Plugin_Handled;}
     if(StrEqual(which,"v05_npc_followup_real")){TestNPCFollowupReal(TestHuman());return Plugin_Handled;}

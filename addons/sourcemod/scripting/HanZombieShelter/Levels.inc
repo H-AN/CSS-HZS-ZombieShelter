@@ -2,11 +2,11 @@
 // and no gameplay cap such as 16 or 100; limits below protect SourcePawn cells.
 #define LEVEL_CELL_LIMIT 2000000000
 
-static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness","build_limit","build_limit_bonus"};
+static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness","build_limit","build_limit_bonus","restore_amount","max_per_base"};
 static const char sLevelFloatFields[][]={"damage","range","fire_interval","cone_half_angle_degrees","burn_interval",
     "burn_duration","blast_radius","player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus",
-    "power_output","power_required","light_radius","projectile_speed","build_range_bonus","build_half_extents_x","build_half_extents_y"};
-static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,900.0,0.0,512.0,512.0};
+    "power_output","power_required","light_radius","projectile_speed","build_range_bonus","build_half_extents_x","build_half_extents_y","restore_interval_seconds"};
+static const float sLevelFloatDefaults[]={0.0,0.0,0.5,30.0,0.5,0.0,180.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,900.0,0.0,512.0,512.0,20.0};
 
 bool ParseLevelInteger(const char[] input,int &value,bool signedValue=false)
 {
@@ -41,6 +41,8 @@ bool StoredLevelFloat(ConfigFile file,const char[] path,const char[] key,float f
     // All supported scalar coefficients fit this bound; it also rejects NaN/Inf.
     if(!text[0] || StringToFloatEx(text,value)!=strlen(text) || !(value>=-1000000.0 && value<=1000000.0))return false;
     if((StrEqual(key,"fire_interval_min") || StrEqual(key,"fire_interval_max")) && value>0.0 && value<0.1)value=0.1;
+    if((StrEqual(key,"restore_interval_seconds") || StrEqual(key,"restore_interval_seconds_min")
+        || StrEqual(key,"restore_interval_seconds_max")) && value<1.0)value=1.0;
     return true;
 }
 
@@ -86,6 +88,8 @@ bool IntegerLevelBounds(const char[] key,int &minimum,int &maximum)
     if(StrEqual(key,"power_priority")){maximum=1000;return true;}
     if(StrEqual(key,"light_brightness")){maximum=8;return true;}
     if(StrEqual(key,"build_limit") || StrEqual(key,"build_limit_bonus")){maximum=MAX_BUILDINGS;return true;}
+    if(StrEqual(key,"restore_amount")){maximum=1000000;return true;}
+    if(StrEqual(key,"max_per_base")){minimum=1;maximum=MAX_BUILDINGS;return true;}
     return false;
 }
 
@@ -103,6 +107,7 @@ bool FloatLevelBounds(const char[] key,float &minimum,float &maximum)
     if(StrEqual(key,"projectile_speed")){minimum=100.0;maximum=3000.0;return true;}
     if(StrEqual(key,"build_range_bonus")){maximum=8192.0;return true;}
     if(StrEqual(key,"build_half_extents_x") || StrEqual(key,"build_half_extents_y")){minimum=1.0;maximum=8192.0;return true;}
+    if(StrEqual(key,"restore_interval_seconds")){minimum=1.0;maximum=3600.0;return true;}
     return false;
 }
 
@@ -277,7 +282,9 @@ bool ValidateResolvedLevel(ConfigFile file,const char[] profile,int level)
         || !ReadLevelInt(file,profile,level,"power_priority",10,value)
         || !ReadLevelInt(file,profile,level,"light_brightness",2,value)
         || !ReadLevelInt(file,profile,level,"build_limit",24,value)
-        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,value))return false;
+        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,value)
+        || !ReadLevelInt(file,profile,level,"restore_amount",0,value)
+        || !ReadLevelInt(file,profile,level,"max_per_base",2,value))return false;
     for(int f=0;f<sizeof(sLevelFloatFields);f++)
         if(!ReadLevelFloat(file,profile,level,sLevelFloatFields[f],sLevelFloatDefaults[f],decimal))return false;
     return ReadBuildHalfExtents(file,profile,level,extents) && ReadLevelUpgradeCost(file,profile,level,cost);
@@ -381,10 +388,11 @@ bool ValidateLevelProfile(ConfigFile file,const char[] profile)
 
 bool ValidateLevelProfiles()
 {
-    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders};
+    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons};
     for(int f=0;f<sizeof(files);f++)
     {
         char section[16];strcopy(section,sizeof(section),f==0 ? "Profiles" : "Types");
+        if(files[f]>=C_Repair && gCfg[files[f]]==null)continue;
         if(!Node(files[f],section) || !gCfg[files[f]].GotoFirstSubKey())return ConfigFailure("building level profiles missing");
         ArrayList profiles=new ArrayList(ByteCountToCells(128));
         do

@@ -270,7 +270,7 @@ public Action WorldTick(Handle timer)
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
-    ResourceTick(elapsed);NPCTick(now);PowerTick();MineWorldTick();ExposureTick(now);CampaignHUD();
+    ResourceTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

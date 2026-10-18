@@ -114,14 +114,24 @@ bool ApplyBuildingLevel(int index,bool initializing)
         || !ReadLevelFloat(file,profile,level,"projectile_speed",900.0,next.projectileSpeed)
         || !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.blastRadius)
         || !ReadLevelFloat(file,profile,level,"build_range_bonus",0.0,next.buildRangeBonus)
-        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,next.buildLimitBonus))return false;
+        || !ReadLevelInt(file,profile,level,"build_limit_bonus",0,next.buildLimitBonus)
+        || !ReadLevelInt(file,profile,level,"restore_amount",0,next.restoreAmount)
+        || !ReadLevelFloat(file,profile,level,"restore_interval_seconds",20.0,next.restoreInterval))return false;
+    if(IsBaseSupportKind(next.kind))
+    {
+        next.maxPerBase=SupportBuildLimit(file,next.type,level);if(next.maxPerBase<1)return false;
+        next.nextRestore=GetGameTime()+next.restoreInterval;
+        next.powerCore=next.buildCore;next.gridAssigned=true;
+    }
     if(next.kind==Kind_Base)
     {
         if(!ReadLevelInt(file,profile,level,"build_limit",24,next.baseBuildLimit)
             || !ReadBuildHalfExtents(file,profile,level,next.buildHalfExtents))return false;
     }
     if(next.kind==Kind_Mine && !ReadLevelFloat(file,profile,level,"blast_radius",180.0,next.range))return false;
-    gBuildings[index]=next;InvalidateDefenseCache(index);MarkBuildAreasDirty();RecalculatePower();return true;
+    gBuildings[index]=next;InvalidateDefenseCache(index);MarkBuildAreasDirty();RecalculatePower();
+    if(next.kind==Kind_Beacon)SyncBeaconMarker(index);
+    return true;
 }
 
 bool SpawnBuildingBody(int index)
@@ -136,6 +146,7 @@ bool SpawnBuildingBody(int index)
         if(HasEntProp(entity,Prop_Send,"m_nSkin"))SetEntProp(entity,Prop_Send,"m_nSkin",gBuildings[index].meta.skin);
     }
     gBuildings[index].ref=EntIndexToEntRef(entity);gBuildings[index].nextFire=GetGameTime()+0.5;gBuildings[index].lastAttackAt=0.0;
+    if(IsRestorationKind(gBuildings[index].kind))gBuildings[index].nextRestore=GetGameTime()+gBuildings[index].restoreInterval;
     float worldMin[3],worldMax[3];ModelWorldBounds(entity,gBuildings[index].origin,gBuildings[index].angles,worldMin,worldMax);
     for(int a=0;a<3;a++){gBuildings[index].restoreMins[a]=worldMin[a]-gBuildings[index].origin[a];gBuildings[index].restoreMaxs[a]=worldMax[a]-gBuildings[index].origin[a];}
     gBuildings[index].boundsKnown=true;
@@ -146,12 +157,13 @@ bool SpawnBuildingBody(int index)
         int failedRef=gBuildings[index].ref;gBuildings[index].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(failedRef);return false;
     }
     InvalidateDefenseCache(index);MarkBuildAreasDirty();RecalculatePower();
+    if(gBuildings[index].kind==Kind_Beacon)SyncBeaconMarker(index);
     return true;
 }
 
 void CleanWorld()
 {
-    ClearDefenseState();ClearGrenades();StopPowerEffects();MarkBuildAreasDirty();
+    ClearDefenseState();ClearGrenades();ClearBeaconMarkers();StopPowerEffects();MarkBuildAreasDirty();
     for(int i=0;i<MAX_BUILDINGS;i++)
     {
         RemoveBuildingEffect(i);
@@ -589,6 +601,12 @@ bool BuildRecipe(int client,int recipe,int expectedCore=-1)
         Tell(client,"%t",horizontal ? "BuildHeightOutside" : "BuildOutsideArea");return false;
     }
     if(!CheckBuildCapacity(client,buildCore))return false;
+    if(IsBaseSupportKind(gRecipes[recipe].kind))
+    {
+        int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
+        int count=gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind);
+        if(limit<1 || count>=limit){Tell(client,"%t","BuildSupportGroupLimitReached",count,limit);return false;}
+    }
     if(!CheckConstructionBudget(client))return false;
     if(!Spend(gRecipes[recipe].cost,client)){Tell(client,"%t","BuildPersonalMaterialsMissing");return false;}
     Building value;value.used=true;value.alive=true;value.kind=gRecipes[recipe].kind;value.uid=++gUID;value.core=-1;

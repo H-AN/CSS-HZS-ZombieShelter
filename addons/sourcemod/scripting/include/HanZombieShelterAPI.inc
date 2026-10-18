@@ -8,7 +8,8 @@
 enum HZSHPhase { HZSHPhase_Waiting, HZSHPhase_Day, HZSHPhase_Night, HZSHPhase_Ending }
 enum HZSHEnvironmentPhase { HZSHEnvironment_Day, HZSHEnvironment_Night }
 enum HZSHBuildingKind { HZSHBuilding_Base, HZSHBuilding_Turret, HZSHBuilding_Flame, HZSHBuilding_Fence,
-    HZSHBuilding_Mine, HZSHBuilding_Amplifier, HZSHBuilding_Generator, HZSHBuilding_Light, HZSHBuilding_Grenade, HZSHBuilding_Expander }
+    HZSHBuilding_Mine, HZSHBuilding_Amplifier, HZSHBuilding_Generator, HZSHBuilding_Light, HZSHBuilding_Grenade, HZSHBuilding_Expander,
+    HZSHBuilding_AutoRepair, HZSHBuilding_Heal, HZSHBuilding_Armor, HZSHBuilding_Beacon }
 
 native int HZSH_GetAPIVersion();
 native int HZSH_GetEnvironmentAPIVersion();

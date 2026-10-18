@@ -1,0 +1,23 @@
+{
+  "BuildAutoRepairName": {"en":"Automatic repair station","chi":"自动维修设施"},
+  "BuildHealName": {"en":"Healing station","chi":"治疗设施"},
+  "BuildArmorName": {"en":"Armor restoration station","chi":"护甲恢复设施"},
+  "BuildBeaconName": {"en":"Teleport beacon","chi":"传送信标"},
+  "BuildStatRestoreInterval": {"en":"Restoration interval (seconds)","chi":"恢复间隔 (秒)"},
+  "BuildStatRepairAmount": {"en":"Building HP restored per pulse","chi":"每次修复建筑耐久"},
+  "BuildStatHealAmount": {"en":"Player HP restored per pulse","chi":"每次恢复玩家生命"},
+  "BuildStatArmorAmount": {"en":"Player armor restored per pulse","chi":"每次恢复玩家护甲"},
+  "BuildStatMaxPerBase": {"en":"Shared category limit per base","chi":"每基地同组共享上限"},
+  "BuildRepairScope": {"en":"Repairs this base's structures inside its current red building rectangle.","chi":"修复本基地当前红色建造范围内的建筑."},
+  "BuildHealScope": {"en":"Restores HP to living real players inside this base's green safe zone.","chi":"恢复本基地绿色安全区内存活真人的生命."},
+  "BuildArmorScope": {"en":"Restores armor to living real players inside this base's green safe zone.","chi":"恢复本基地绿色安全区内存活真人的护甲."},
+  "BuildSupportGroupInfo": {"format":"{1:s},{2:d},{3:d}","en":"\n{1} | Same category {2}/{3}","chi":"\n{1} | 同组设施 {2}/{3}"},
+  "BuildSupportQuotaFull": {"en":"This base's shared category limit is full","chi":"此基地同组设施已满额"},
+  "BuildSupportGroupLimitReached": {"format":"{1:d},{2:d}","en":"This base's shared category limit is full: {1}/{2}. Upgrade an existing station or dismantle one first.","chi":"此基地同组设施已满额: {1}/{2}. 可升级已有设施, 或先拆除一台."},
+  "HUDRepairEffectCompact": {"format":"{1:d},{2:.1f}","en":"\nRepairs +{1} HP every {2}s","chi":"\n每{2}秒修复 +{1}耐久"},
+  "HUDHealEffectCompact": {"format":"{1:d},{2:.1f}","en":"\nHeals +{1} HP every {2}s","chi":"\n每{2}秒恢复 +{1}生命"},
+  "HUDArmorEffectCompact": {"format":"{1:d},{2:.1f}","en":"\nRestores +{1} armor every {2}s","chi":"\n每{2}秒恢复 +{1}护甲"},
+  "HUDSupportCapacityCompact": {"format":"{1:s},{2:d},{3:d},{4:d},{5:d}","en":"\n{1} | Structures {2}/{3} | Same category {4}/{5}","chi":"\n{1} | 建筑 {2}/{3} | 同组 {4}/{5}"},
+  "HUDBeaconUseHint": {"en":"Aim and press E: choose a destination","chi":"瞄准按 E 选择传送目的地"},
+  "BeaconOpenDestinations": {"en":"Use this beacon / choose a destination","chi":"使用信标 / 选择传送目的地"}
+}

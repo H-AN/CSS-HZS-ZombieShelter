@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg","repair_stations.cfg","heal_stations.cfg","armor_stations.cfg","beacons.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops","ShelterRepairStations","ShelterHealStations","ShelterArmorStations","ShelterBeacons"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -54,6 +54,8 @@ bool LoadConfigs()
         gCfg[i]=new KeyValues(sRoots[i]);
         if(!gCfg[i].ImportFromFile(path))
         {
+            if(i>=view_as<int>(C_Repair) && !FileExists(path))
+            {delete gCfg[i];gCfg[i]=null;continue;} // New optional categories do not disable an older installation.
             if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops.cfg missing/invalid: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
             return ConfigFailure(path);
         }
@@ -62,7 +64,8 @@ bool LoadConfigs()
         int actualSchema=gCfg[i].GetNum("schema_version");
         bool buildingSchema=i==view_as<int>(C_Bases) || i==view_as<int>(C_Turrets) || i==view_as<int>(C_Flames)
             || i==view_as<int>(C_Fences) || i==view_as<int>(C_Mines) || i==view_as<int>(C_Amplifiers)
-            || i==view_as<int>(C_Generators) || i==view_as<int>(C_Lights) || i==view_as<int>(C_Grenades) || i==view_as<int>(C_Expanders);
+            || i==view_as<int>(C_Generators) || i==view_as<int>(C_Lights) || i==view_as<int>(C_Grenades) || i==view_as<int>(C_Expanders)
+            || i>=view_as<int>(C_Repair);
         if(!StrEqual(root,sRoots[i]) || (actualSchema!=schema && !(buildingSchema && actualSchema==2)))
         {
             if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops root/schema mismatch: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
@@ -108,7 +111,8 @@ bool LoadConfigs()
     bool valid=ReadMaterials() && ReadMapData() && LoadBuildAreaSettings()
         && (ValidateResourcePools() || ConfigFailure("resource pool weights, regrow option or map pool reference"))
         && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
-        && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && ValidateDayRanges() && ValidateNativeBridge();
+        && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && LoadSupportSettings()
+        && LoadBeaconSettings() && ValidateDayRanges() && ValidateNativeBridge();
     if(!valid)return false;
     ReadZombieDrops();
     gConfigRevision=gConfigRevision==2147483647 ? 1 : gConfigRevision+1;
@@ -125,6 +129,33 @@ bool ValidResourceGrowth(float hold,float grow,float scale)
     float total=hold+grow;
     return (view_as<int>(total)&0x7f800000)!=0x7f800000
         && hold>=0.0 && grow>=0.25 && scale>0.0 && scale<=4.0;
+}
+
+bool IsBaseSupportKind(BuildingKind kind)
+{
+    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon;
+}
+
+bool LoadSupportSettings()
+{
+    ConfigFile files[]={C_Repair,C_Heal,C_Armor,C_Beacons};
+    for(int f=0;f<sizeof(files);f++)
+    {
+        if(gCfg[files[f]]==null)continue;
+        int limit;bool found;
+        if(!StoredLevelInt(files[f],"Limits","max_per_base",files[f]==C_Beacons ? 1 : 2,limit,found)
+            || limit<1 || limit>MAX_BUILDINGS)return ConfigFailure("support group max_per_base must be 1..1024");
+    }
+    return true;
+}
+
+int SupportBuildLimit(ConfigFile file,const char[] type,int level)
+{
+    if(file==C_Beacons)return 1; // One logical beacon per base, across every variant.
+    if(file!=C_Repair && file!=C_Heal && file!=C_Armor)return 0;
+    int group=Number(file,"Limits","max_per_base",2),limit;char profile[128];Format(profile,sizeof(profile),"Types/%s",type);
+    if(!ReadLevelInt(file,profile,level,"max_per_base",group,limit))return 0;
+    return limit<group ? limit : group;
 }
 
 bool ReadMaterials()
@@ -358,6 +389,7 @@ bool ReadBuildingMetadata(ConfigFile file,const char[] profile,BuildingKind kind
     Text(file,path,"attack",meta.attackSound,sizeof(meta.attackSound));RegisterBuildingSound(meta.attackSound,sizeof(meta.attackSound));
     Text(file,path,"upgrade",meta.upgradeSound,sizeof(meta.upgradeSound));RegisterBuildingSound(meta.upgradeSound,sizeof(meta.upgradeSound));
     Text(file,path,"destroy",meta.destroySound,sizeof(meta.destroySound));RegisterBuildingSound(meta.destroySound,sizeof(meta.destroySound));
+    Text(file,path,"pulse",meta.pulseSound,sizeof(meta.pulseSound));RegisterBuildingSound(meta.pulseSound,sizeof(meta.pulseSound));
     Format(path,sizeof(path),"%s/Downloads",profile);
     if(Node(file,path) && gCfg[file].GotoFirstSubKey(false))
     {
@@ -382,8 +414,9 @@ bool ReadTypeMetadata(ConfigFile file,const char[] type,BuildingMetadata meta)
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders};
-    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade,Kind_Expander};
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons};
+    BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade,Kind_Expander,
+        Kind_AutoRepair,Kind_Heal,Kind_Armor,Kind_Beacon};
     for(int file=0;file<sizeof(files);file++)
     {
         ConfigFile source=files[file];ArrayList ids=new ArrayList(ByteCountToCells(64));

@@ -39,7 +39,8 @@ int GridAt(const float origin[3])
 float GeneratorOutput(int b)
 {
     if(b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive
-        || gBuildings[b].kind!=Kind_Generator || gBuildings[b].hp<=0 || gBuildings[b].maxHP<1 || Resolve(gBuildings[b].ref)<0)return 0.0;
+        || gBuildings[b].kind!=Kind_Generator || gBuildings[b].hp<=0 || gBuildings[b].maxHP<1 || Resolve(gBuildings[b].ref)<0
+        || !BuildCoreAlive(gBuildings[b].powerCore))return 0.0;
     float fraction=float(gBuildings[b].hp)/float(gBuildings[b].maxHP);if(fraction>1.0)fraction=1.0;
     return gBuildings[b].powerOutput*fraction;
 }
@@ -47,7 +48,8 @@ float GeneratorOutput(int b)
 bool BuildingPowered(int b)
 {
     return Running() && b>=0 && b<MAX_BUILDINGS && gBuildings[b].used && gBuildings[b].alive
-        && Resolve(gBuildings[b].ref)>0 && (!gPowerEnabled || gBuildings[b].powerDemand<=0.0 || gBuildings[b].powered);
+        && Resolve(gBuildings[b].ref)>0 && BuildCoreAlive(gBuildings[b].powerCore)
+        && (!gPowerEnabled || gBuildings[b].powerDemand<=0.0 || gBuildings[b].powered);
 }
 
 void RecalculatePower()
@@ -63,12 +65,17 @@ void RecalculatePower()
     {
         gBuildings[b].powered=false;
         if(!gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0)continue;
+        if(IsBaseSupportKind(gBuildings[b].kind))
+        {gBuildings[b].powerCore=gBuildings[b].buildCore;gBuildings[b].gridAssigned=true;}
         if(!gBuildings[b].gridAssigned)
         {gBuildings[b].powerCore=gBuildings[b].kind==Kind_Base ? gBuildings[b].core : GridAt(gBuildings[b].origin);gBuildings[b].gridAssigned=true;}
         int core=gBuildings[b].powerCore;
         if(!Running() || core<0 || core>=gCoreCount)continue;
         gGridProduction[core]+=GeneratorOutput(b);
         gGridDemand[core]+=gBuildings[b].powerDemand;
+        // A destroyed base disconnects its entire grid, including free loads
+        // and the power-disabled compatibility mode. Other bases stay independent.
+        if(!BuildCoreAlive(core)){if(gBuildings[b].powerDemand>0.0)gGridOffline[core]++;continue;}
         if(!gPowerEnabled || gBuildings[b].powerDemand<=0.0)gBuildings[b].powered=true;
         if(gBuildings[b].powerDemand>0.0)
         {
@@ -102,6 +109,7 @@ void RecalculatePower()
             if(gBuildings[b].kind==Kind_Expander)MarkBuildAreasDirty();
         }
         if(gBuildings[b].used && gBuildings[b].kind==Kind_Light)UpdateBuildingLight(b);
+        if(gBuildings[b].used && gBuildings[b].kind==Kind_Beacon)SyncBeaconMarker(b);
     }
     RefreshBuildAreas();
     for(int c=0;c<gCoreCount;c++)
@@ -115,6 +123,7 @@ int LightCount()
 
 void RemoveBuildingEffect(int b)
 {
+    RemoveBeaconMarker(b);
     int ref=gBuildings[b].effectRef;gBuildings[b].effectRef=INVALID_ENT_REFERENCE;
     if(ref!=0)RemoveOwnedRef(ref);
 }
@@ -127,9 +136,17 @@ bool CreateBuildingLight(int b)
     DispatchKeyValue(light,"style","0");DispatchKeyValue(light,"inner_cone","0");DispatchKeyValue(light,"cone","0");
     DispatchKeyValueFloat(light,"distance",gBuildings[b].lightRadius);
     if(!DispatchSpawn(light) || !CanAllocateEntities(1,true)){RemoveEntity(light);return false;}
-    float source[3];BuildingAttachmentPosition(b,gBuildings[b].meta.lightOffset,source);TeleportEntity(light,source,NULL_VECTOR,NULL_VECTOR);
     SetVariantString("!activator");AcceptEntityInput(light,"SetParent",body);
-    gBuildings[b].effectRef=EntIndexToEntRef(light);UpdateBuildingLight(b);return true;
+    gBuildings[b].effectRef=EntIndexToEntRef(light);SyncBuildingLightTransform(b);UpdateBuildingLight(b);return true;
+}
+
+void SyncBuildingLightTransform(int b)
+{
+    if(b<0 || b>=MAX_BUILDINGS || gBuildings[b].kind!=Kind_Light)return;
+    int light=Resolve(gBuildings[b].effectRef);if(light<0)return;
+    // Parented entities consume local coordinates; the body supplies world rotation.
+    float localAngles[3];
+    TeleportEntity(light,gBuildings[b].meta.lightOffset,localAngles,NULL_VECTOR);
 }
 
 void UpdateBuildingLight(int b)
@@ -142,6 +159,7 @@ void UpdateBuildingLight(int b)
 
 void StopPowerEffects()
 {
+    ClearBeaconMarkers();
     for(int b=0;b<MAX_BUILDINGS;b++)
     {
         gBuildings[b].powered=false;int effect=Resolve(gBuildings[b].effectRef);

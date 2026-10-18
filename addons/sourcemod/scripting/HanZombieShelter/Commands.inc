@@ -1,5 +1,6 @@
 static const char sBuildCategoryPhrases[][]={"HUDBaseGeneric","HUDTurretName","HUDFlameName","HUDFenceName","HUDMineName",
-    "HUDAmplifierName","HUDGeneratorName","HUDLightName","HUDGrenadeName","BuildExpanderName"};
+    "HUDAmplifierName","HUDGeneratorName","HUDLightName","HUDGrenadeName","BuildExpanderName",
+    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName"};
 int gBuildMenuNonce[MAXPLAYERS+1],gBuildMenuEpoch[MAXPLAYERS+1],gBuildMenuSerial[MAXPLAYERS+1],gBuildMenuRevision[MAXPLAYERS+1];
 int gBuildMenuPreviewCore[MAXPLAYERS+1];
 BuildingKind gBuildMenuCategory[MAXPLAYERS+1];
@@ -66,6 +67,24 @@ void AddRecipeStat(Menu menu,int client,const char[] phrase,float value)
     Format(line,sizeof(line),"%T","BuildStatValue",client,label,value);menu.AddItem("",line,ITEMDRAW_DISABLED);
 }
 
+bool SupportMenuKind(BuildingKind kind)
+{
+    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon;
+}
+
+int SupportMenuCount(int core,BuildingKind kind)
+{
+    if(core<0 || core>=gCoreCount || !SupportMenuKind(kind))return 0;
+    return kind==Kind_Beacon ? BeaconCount(core,-1) : RestorationCount(core,kind,-1);
+}
+
+void AppendSupportMenuInfo(int client,int core,BuildingKind kind,int limit,char[] text,int length)
+{
+    if(core<0 || core>=gCoreCount || !SupportMenuKind(kind))return;
+    char base[64],line[192];CoreDisplayName(core,base,sizeof(base),client);
+    Format(line,sizeof(line),"%T","BuildSupportGroupInfo",client,base,SupportMenuCount(core,kind),limit);StrCat(text,length,line);
+}
+
 void AddRecipeCostItems(Menu menu,int client,const int cost[MATERIALS])
 {
     bool any;
@@ -107,7 +126,21 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
     {ReadLevelFloat(file,profile,level,"power_output",0.0,value);AddRecipeStat(menu,client,"BuildStatPowerOutput",value);}
     if(kind==Kind_Fence)
     {ReadLevelFloat(file,profile,level,"damage",0.0,value);if(value>0.0)AddRecipeStat(menu,client,"BuildStatReflectDamage",value);}
-    ReadLevelFloat(file,profile,level,"power_required",0.0,value);if(value>0.0)AddRecipeStat(menu,client,"BuildStatPowerRequired",value);
+    if(SupportMenuKind(kind))
+    {
+        char type[64];if(StrContains(profile,"Types/")==0)strcopy(type,sizeof(type),profile[6]);
+        AddRecipeStat(menu,client,"BuildStatMaxPerBase",float(SupportBuildLimit(file,type,level)));
+        if(kind!=Kind_Beacon)
+        {
+            ReadLevelFloat(file,profile,level,"restore_interval_seconds",20.0,value);if(value<1.0)value=1.0;
+            AddRecipeStat(menu,client,"BuildStatRestoreInterval",value);
+            int amount;ReadLevelInt(file,profile,level,"restore_amount",0,amount);
+            AddRecipeStat(menu,client,kind==Kind_AutoRepair ? "BuildStatRepairAmount" : (kind==Kind_Heal ? "BuildStatHealAmount" : "BuildStatArmorAmount"),float(amount));
+            TranslateLabel(client,kind==Kind_AutoRepair ? "BuildRepairScope" : (kind==Kind_Heal ? "BuildHealScope" : "BuildArmorScope"),line,sizeof(line));
+            menu.AddItem("",line,ITEMDRAW_DISABLED);
+        }
+    }
+    ReadLevelFloat(file,profile,level,"power_required",0.0,value);if(value>0.0 || SupportMenuKind(kind))AddRecipeStat(menu,client,"BuildStatPowerRequired",value);
     if(kind==Kind_Light)
     {
         ReadLevelFloat(file,profile,level,"light_radius",500.0,value);AddRecipeStat(menu,client,"BuildStatLightRadius",value);
@@ -154,9 +187,17 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
     if(PlacementForRecipe(client,recipe,anchor,origin,angles,false))gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
     if(gBuildMenuPreviewCore[client]>=0)AppendBuildCapacityInfo(client,gBuildMenuPreviewCore[client],title,sizeof(title));
     else{Format(line,sizeof(line),"%T","BuildPreviewUnavailable",client);StrCat(title,sizeof(title),line);}
+    bool groupAvailable=true;
+    if(SupportMenuKind(gRecipes[recipe].kind) && gBuildMenuPreviewCore[client]>=0)
+    {
+        int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
+        AppendSupportMenuInfo(client,gBuildMenuPreviewCore[client],gRecipes[recipe].kind,limit,title,sizeof(title));
+        groupAvailable=SupportMenuCount(gBuildMenuPreviewCore[client],gRecipes[recipe].kind)<limit;
+    }
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
     bool enough=HasBaseUpgradeMaterials(gRecipes[recipe].cost,client);
-    AddBuildAction(menu,client,recipe,confirmation ? 3 : 2,confirmation ? "BuildConfirmPlace" : "BuildOpenConfirm",!confirmation || (enough && gBuildMenuPreviewCore[client]>=0));
+    AddBuildAction(menu,client,recipe,confirmation ? 3 : 2,confirmation ? (groupAvailable ? "BuildConfirmPlace" : "BuildSupportQuotaFull") : "BuildOpenConfirm",
+        !confirmation || (enough && groupAvailable && gBuildMenuPreviewCore[client]>=0));
     AddBuildAction(menu,client,recipe,confirmation ? 6 : 5,confirmation ? "BuildBackDetails" : "BuildBackVariants");
     AddRecipeCostItems(menu,client,gRecipes[recipe].cost);
     if(!confirmation)
@@ -241,6 +282,8 @@ public Action StatusCommand(int client,int args)
         SHELTER_VERSION,gEnabled,gCoreReady,gPhase,gDay,AliveCores(),gCoreCount,gNodeCount,SummonCount(),tracked,parked,ActiveOrdinary(),activeBoss,gEpoch,gRollback);
     ReplyToCommand(client,"[Shelter] revision=%d materials=%d recipes=%d global_build_cap=%d red_constructed=%d red_line_deliveries=%d",
         gConfigRevision,gMaterialCount,gRecipeCount,gSummonLimit,gRedConstructed,gRedDeliveries);
+    ReplyToCommand(client,"[ShelterSupport] native_pool=%d day_target=%d night_target=%d restoration_pulses=%d restored_targets=%d beacon_markers=%d",
+        gNativePoolSize,DayTarget(),NightTarget(),gRestorationPulseCount,gRestorationTargetCount,gBeaconMarkerCount);
     for(int i=0;i<gCoreCount;i++){int b=gCores[i].building;if(b>=0)ReplyToCommand(client,"%T","CmdStatusBase",client,gCores[i].id,gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP,gBuildings[b].alive,gBuildings[b].ref);}
     for(int i=0;i<gBossCount;i++)ReplyToCommand(client,"%T","CmdStatusBoss",client,gBosses[i].id,gBosses[i].savedHP,gBosses[i].awakened,gBosses[i].defeated,gBosses[i].boundThisRound,gBosses[i].positionedHP);
     for(int c=0;c<gCoreCount;c++)ReplyToCommand(client,"%T","CmdPowerStatus",client,gCores[c].id,gGridProduction[c],gGridDemand[c],gGridAllocated[c],gGridOffline[c]);
@@ -299,6 +342,10 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     bool rising=(buttons&IN_USE)!=0 && (gLastButtons[client]&IN_USE)==0;gLastButtons[client]=buttons;
     if(!rising || !Running() || !LiveHuman(client) || GetGameTime()<gNextUse[client])return Plugin_Continue;
     int b=FindBuilding(AimedEntity(client,gUseDistance));
+    if(b>=0 && gBuildings[b].kind==Kind_Beacon)
+    {
+        gNextUse[client]=GetGameTime()+gUseCooldown;ShowBeaconMenu(client,b);return Plugin_Continue;
+    }
     if(b>=0 && gBuildings[b].kind!=Kind_Base)
     {
         gNextUse[client]=GetGameTime()+gUseCooldown;ShowDefenseMenu(client,b);return Plugin_Continue;
@@ -343,12 +390,13 @@ bool ValidateDefenseMenuToken(int client,const char[] token,int &building,int &o
     if(!DefenseMenuBuildingAvailable(client,building) || (requireAim && !(FenceRotationContinuationOperation(operation)
         ? FenceRotationInRange(client,building) : BuildingInUseRange(client,building)))
         || gBuildings[building].uid!=values[4] || gBuildings[building].generation!=values[7]
-        || gBuildings[building].level!=values[5] || operation<0 || operation>15)return false;
+        || gBuildings[building].level!=values[5] || operation<0 || operation>16)return false;
     if((operation==2 || operation==3 || operation==4) && !CanManageBuilding(client,building))return false;
     if(operation==5 && !IsShelterAdmin(client))return false;
     if(((operation>=6 && operation<=11) || (operation>=13 && operation<=15))
         && (!CanContinueFenceRotationMenu(client,building) || !CanManageBuilding(client,building)))return false;
     if(operation==12 && (gBuildings[building].kind!=Kind_Fence || BuildingOwnerOnline(building)>0 || IsFakeClient(client)))return false;
+    if(operation==16 && (gBuildings[building].kind!=Kind_Beacon || IsFakeClient(client)))return false;
     gDefenseMenuNonce[client]++;return true;
 }
 
@@ -360,8 +408,13 @@ bool DefenseMenuBuildingAvailable(int client,int building)
 
 bool CanContinueFenceRotationMenu(int client,int building)
 {
-    return DefenseMenuBuildingAvailable(client,building) && !IsFakeClient(client) && gBuildings[building].kind==Kind_Fence
+    return DefenseMenuBuildingAvailable(client,building) && !IsFakeClient(client) && BuildingRotationKind(gBuildings[building].kind)
         && gBuildings[building].configRevision==gConfigRevision && CanManageBuilding(client,building);
+}
+
+bool BuildingRotationKind(BuildingKind kind)
+{
+    return kind==Kind_Fence || kind==Kind_Light;
 }
 
 float NormalizeFenceAngle(float angle)
@@ -391,13 +444,15 @@ bool RotateFenceBuilding(int client,int building,int axis,int direction)
     if(!CanContinueFenceRotationMenu(client,building) || !FenceRotationInRange(client,building)
         || (axis!=0 && axis!=1) || (direction!=1 && direction!=-1))return false;
     int body=Resolve(gBuildings[building].ref),ref=gBuildings[building].ref,uid=gBuildings[building].uid;
-    float nextAngles[3];nextAngles=gBuildings[building].angles;nextAngles[axis]=NormalizeFenceAngle(nextAngles[axis]+float(direction)*5.0);
+    float nextAngles[3];nextAngles=gBuildings[building].angles;nextAngles[axis]=NormalizeFenceAngle(nextAngles[axis]+float(direction)*10.0);
     TeleportEntity(body,NULL_VECTOR,nextAngles,NULL_VECTOR);
     if(Resolve(ref)!=body || !gBuildings[building].alive || gBuildings[building].uid!=uid)return false;
     gBuildings[building].angles=nextAngles;
     float mins[3],maxs[3];ModelWorldBounds(body,gBuildings[building].origin,nextAngles,mins,maxs);
     for(int a=0;a<3;a++){gBuildings[building].restoreMins[a]=mins[a]-gBuildings[building].origin[a];gBuildings[building].restoreMaxs[a]=maxs[a]-gBuildings[building].origin[a];}
-    gBuildings[building].boundsKnown=true;return true;
+    gBuildings[building].boundsKnown=true;
+    if(gBuildings[building].kind==Kind_Light)SyncBuildingLightTransform(building);
+    return true;
 }
 
 void ShowFenceRotationMenu(int client,int building,int axis)
@@ -445,10 +500,15 @@ void AddDefenseMenuItem(Menu menu,int client,int building,int operation,const ch
     TranslateLabel(client,phrase,line,sizeof(line));menu.AddItem(token,line,enabled ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 }
 
-void AppendBuildingCapacityInfo(int client,int building,char[] text,int length)
+void AppendBuildingCapacityInfo(int client,int building,char[] text,int length,int level=0)
 {
     int core=gBuildings[building].kind==Kind_Base ? gBuildings[building].core : gBuildings[building].buildCore;
     AppendBuildCapacityInfo(client,core,text,length);
+    if(SupportMenuKind(gBuildings[building].kind))
+    {
+        int limit=level>0 ? SupportBuildLimit(gBuildings[building].file,gBuildings[building].type,level) : gBuildings[building].maxPerBase;
+        AppendSupportMenuInfo(client,core,gBuildings[building].kind,limit,text,length);
+    }
     if(gBuildings[building].kind==Kind_Expander)
     {
         bool effective=EffectiveExpander(building);char state[64],line[192];
@@ -473,12 +533,13 @@ void ShowDefenseMenu(int client,int building,bool rotationContinuation=false)
     int cost[MATERIALS],nextHP;bool upgrade=ReadBaseUpgrade(building,cost,nextHP);
     AddDefenseMenuItem(menu,client,building,1,upgrade ? "DefenseUpgradeView" : "DefenseUpgradeUnavailable",upgrade);
     AddDefenseMenuItem(menu,client,building,3,"DefenseDismantleView",manage);
-    if(gBuildings[building].kind==Kind_Fence)
+    if(BuildingRotationKind(gBuildings[building].kind))
     {
         AddDefenseMenuItem(menu,client,building,rotationContinuation ? 14 : 6,"DefenseRotateVertical",manage);
         AddDefenseMenuItem(menu,client,building,rotationContinuation ? 15 : 7,"DefenseRotateHorizontal",manage);
-        if(BuildingOwnerOnline(building)<1)AddDefenseMenuItem(menu,client,building,12,"DefenseClaimStructure");
     }
+    if(gBuildings[building].kind==Kind_Fence && BuildingOwnerOnline(building)<1)AddDefenseMenuItem(menu,client,building,12,"DefenseClaimStructure");
+    if(gBuildings[building].kind==Kind_Beacon)AddDefenseMenuItem(menu,client,building,16,"BeaconOpenDestinations");
     if(IsShelterAdmin(client))AddDefenseMenuItem(menu,client,building,5,"AdminBuildingControls");
     char profile[128];BuildingProfilePath(building,profile,sizeof(profile));
     AddProfileLevelItems(menu,client,gBuildings[building].file,gBuildings[building].kind,profile,gBuildings[building].level);
@@ -494,7 +555,7 @@ void ShowDefenseUpgradeMenu(int client,int building)
     Format(title,sizeof(title),"%T","MenuUpgradeTitle",client,name,gBuildings[building].level,
         gBuildings[building].level+1,gBuildings[building].maxHP,nextHP);
     AppendBuildingPowerInfo(client,building,gBuildings[building].level+1,title,sizeof(title));
-    AppendBuildingCapacityInfo(client,building,title,sizeof(title));
+    AppendBuildingCapacityInfo(client,building,title,sizeof(title),gBuildings[building].level+1);
     bool progression=true;int required;
     if(gBuildings[building].kind==Kind_Amplifier)
     {
@@ -561,6 +622,7 @@ public int DefenseMenuHandler(Menu menu,MenuAction action,int client,int item)
             case 7: ShowFenceRotationMenu(client,building,1);
             case 14: ShowFenceRotationMenu(client,building,0);
             case 15: ShowFenceRotationMenu(client,building,1);
+            case 16: ShowBeaconMenu(client,building);
             case 12:
             {
                 Tell(client,"%T",TakeBuildingOwnership(client,building) ? "DefenseClaimed" : "DefenseClaimFailed",client);

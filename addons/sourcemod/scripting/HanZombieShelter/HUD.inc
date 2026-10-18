@@ -32,6 +32,10 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Light: TranslateLabel(client,"HUDLightName",name,length);
         case Kind_Grenade: TranslateLabel(client,"HUDGrenadeName",name,length);
         case Kind_Expander: TranslateLabel(client,"BuildExpanderName",name,length);
+        case Kind_AutoRepair: TranslateLabel(client,"BuildAutoRepairName",name,length);
+        case Kind_Heal: TranslateLabel(client,"BuildHealName",name,length);
+        case Kind_Armor: TranslateLabel(client,"BuildArmorName",name,length);
+        case Kind_Beacon: TranslateLabel(client,"BuildBeaconName",name,length);
     }
 }
 
@@ -52,7 +56,8 @@ void HudFeedback(int client,const char[] format,any ...)
 void HudBuildingTarget(int client,int building)
 {
     char name[64],action[128];BuildingDisplayName(building,name,sizeof(name),client);
-    TranslateLabel(client,gBuildings[building].kind==Kind_Base ? "HUDBaseUseHint" : "HUDDefenseUseHint",action,sizeof(action));
+    TranslateLabel(client,gBuildings[building].kind==Kind_Base ? "HUDBaseUseHint" :
+        (gBuildings[building].kind==Kind_Beacon ? "HUDBeaconUseHint" : "HUDDefenseUseHint"),action,sizeof(action));
     SetHudTextParams(-1.0,0.54,0.4,225,245,255,255,0,0.0,0.0,0.1);
     char text[512];
     Format(text,sizeof(text),"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
@@ -62,16 +67,26 @@ void HudBuildingTarget(int client,int building)
     {Format(line,sizeof(line),"%T","HUDTargetGridCompact",client,gGridProduction[core],gGridAllocated[core],gGridDemand[core]);StrCat(text,sizeof(text),line);}
     else if(gBuildings[building].kind==Kind_Generator)
     {Format(line,sizeof(line),"%T","HUDTargetGeneratorCompact",client,GeneratorOutput(building),gBuildings[building].powerOutput);StrCat(text,sizeof(text),line);}
-    else if(gBuildings[building].powerDemand>0.0)
+    else if(gBuildings[building].powerDemand>0.0 || SupportMenuKind(gBuildings[building].kind))
     {
         char state[48];TranslateLabel(client,BuildingPowered(building) ? "PowerOnline" : "PowerOffline",state,sizeof(state));
         Format(line,sizeof(line),"%T","HUDTargetPowerCompact",client,state,gBuildings[building].powerDemand);StrCat(text,sizeof(text),line);
+    }
+    BuildingKind kind=gBuildings[building].kind;
+    if(SupportMenuKind(kind) && kind!=Kind_Beacon)
+    {
+        float interval=gBuildings[building].restoreInterval;if(interval<1.0)interval=1.0;
+        Format(line,sizeof(line),"%T",kind==Kind_AutoRepair ? "HUDRepairEffectCompact" : (kind==Kind_Heal ? "HUDHealEffectCompact" : "HUDArmorEffectCompact"),
+            client,gBuildings[building].restoreAmount,interval);StrCat(text,sizeof(text),line);
     }
     RefreshBuildAreas();
     if(core>=0 && core<gCoreCount)
     {
         char baseName[64];CoreDisplayName(core,baseName,sizeof(baseName),client);
-        Format(line,sizeof(line),"%T","HUDTargetCapacityCompact",client,baseName,gBuildAreas[core].count,gBuildAreas[core].limit);StrCat(text,sizeof(text),line);
+        if(SupportMenuKind(kind))Format(line,sizeof(line),"%T","HUDSupportCapacityCompact",client,baseName,gBuildAreas[core].count,gBuildAreas[core].limit,
+            SupportMenuCount(core,kind),gBuildings[building].maxPerBase);
+        else Format(line,sizeof(line),"%T","HUDTargetCapacityCompact",client,baseName,gBuildAreas[core].count,gBuildAreas[core].limit);
+        StrCat(text,sizeof(text),line);
     }
     ShowHudText(client,HUD_TARGET,"%s",text);
 }

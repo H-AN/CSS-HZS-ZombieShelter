@@ -22,6 +22,8 @@
 #include "HanZombieShelter/EntityBudget.inc"
 #include "HanZombieShelter/Audio.inc"
 #include "HanZombieShelter/Power.inc"
+#include "HanZombieShelter/Restoration.inc"
+#include "HanZombieShelter/Beacon.inc"
 #include "HanZombieShelter/API.inc"
 #include "HanZombieShelter/World.inc"
 #include "HanZombieShelter/NPC.inc"
@@ -32,7 +34,7 @@
 #include "HanZombieShelter/Commands.inc"
 #include "HanZombieShelter/Admin.inc"
 
-public Plugin myinfo={name="HZS Zombie Shelter",author="H-AN / Codex",description="External cooperative day/night shelter mode; no core source changes",version=SHELTER_VERSION,url=""};
+public Plugin myinfo={name="HZS Zombie Shelter",author="H-AN",description="External cooperative day/night shelter mode; no core source changes",version=SHELTER_VERSION,url=""};
 
 public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 {
@@ -96,6 +98,7 @@ void BootMode()
 
 public void OnClientPutInServer(int client)
 {
+    ResetBeaconClient(client);
     StartClientInventory(client);
     gLastButtons[client]=0;gNextGather[client]=0.0;gNextRepair[client]=0.0;gNextUse[client]=0.0;
     SDKHook(client,SDKHook_OnTakeDamage,HumanDamageHook);
@@ -103,6 +106,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    ResetBeaconClient(client);
     CancelBaseTeleportSelection(client);
     SaveClientInventory(client);
     if(!gEnabled || !APIAvailable())return;

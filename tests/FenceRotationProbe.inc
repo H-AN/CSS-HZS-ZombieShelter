@@ -1,19 +1,39 @@
 // Test-only rotation checks. No bot, client or NPC is created.
+bool FenceRotationLightPose(int building,float source[3],float angles[3])
+{
+    int light=Resolve(gBuildings[building].effectRef),body=Resolve(gBuildings[building].ref);
+    if(light<1 || body<1)return false;
+    int parent=-1;
+    if(HasEntProp(light,Prop_Data,"m_hMoveParent"))parent=GetEntPropEnt(light,Prop_Data,"m_hMoveParent");
+    else if(HasEntProp(light,Prop_Send,"moveparent"))parent=GetEntPropEnt(light,Prop_Send,"moveparent");
+    if(parent!=body)return false;
+    float localOrigin[3],localAngles[3],parentOrigin[3],parentAngles[3];
+    GetEntPropVector(light,Prop_Data,"m_vecOrigin",localOrigin);GetEntPropVector(light,Prop_Data,"m_angRotation",localAngles);
+    GetEntPropVector(body,Prop_Data,"m_vecOrigin",parentOrigin);GetEntPropVector(body,Prop_Data,"m_angRotation",parentAngles);
+    WorldPoint(localOrigin,parentOrigin,parentAngles,source);ComposeModelAngles(parentAngles,localAngles,angles);
+    // Parented local fields must contain the attachment offset and zero angles,
+    // never another copy of the body's world origin/rotation. Immediate absolute
+    // caches are deliberately ignored here; the delayed UI check reads them.
+    bool correct=GetVectorDistance(localOrigin,gBuildings[building].meta.lightOffset)<0.1;
+    for(int a=0;a<3;a++)if(FloatAbs(NormalizeFenceAngle(localAngles[a]))>0.1)correct=false;
+    return correct;
+}
+
 void TestFenceRotationMath()
 {
-    Check(FloatAbs(NormalizeFenceAngle(179.0+5.0)+176.0)<0.001,"defensive pitch/yaw +5 wraps through +180 into the normalized negative range");
-    Check(FloatAbs(NormalizeFenceAngle(-179.0-5.0)-176.0)<0.001,"defensive pitch/yaw -5 wraps through -180 into the normalized positive range");
+    Check(FloatAbs(NormalizeFenceAngle(179.0+10.0)+171.0)<0.001,"defensive/light pitch/yaw +10 wraps through +180 into the normalized negative range");
+    Check(FloatAbs(NormalizeFenceAngle(-179.0-10.0)-171.0)<0.001,"defensive/light pitch/yaw -10 wraps through -180 into the normalized positive range");
     Check(NormalizeFenceAngle(360.0)==0.0 && NormalizeFenceAngle(-360.0)==0.0,"complete rotations normalize to zero without changing the other axes");
     Check(NormalizeFenceAngle(180.0)==-180.0 && NormalizeFenceAngle(-180.0)==-180.0,"rotation has a deterministic inclusive -180 and exclusive +180 boundary");
 }
 
-// Invoke only while a real test player aims at their existing test-built fence.
+// Invoke only while a real test player aims at their existing test-built fence/light.
 // Original orientation and menu state are restored at the end of this callback.
 void TestFenceRotationCurrentAim(int client)
 {
     int building=client>0 ? FindBuilding(AimedEntity(client,gUseDistance)) : -1;
     if(client<1 || IsFakeClient(client) || !CanContinueFenceRotationMenu(client,building) || !BuildingInUseRange(client,building))
-    {tSkipped++;PrintToServer("[ShelterTest] SKIP rotation security requires a living real client aiming at a manageable defensive structure");return;}
+    {tSkipped++;PrintToServer("[ShelterTest] SKIP rotation security requires a living real client aiming at a manageable defensive structure or light");return;}
     Building before;before=gBuildings[building];int nonce=gDefenseMenuNonce[client],decoded,operation;char token[128];
     DefenseMenuToken(client,building,8,token,sizeof(token));
     Check(ValidateDefenseMenuToken(client,token,decoded,operation) && decoded==building && operation==8,
@@ -25,10 +45,18 @@ void TestFenceRotationCurrentAim(int client)
     Check(!ValidateDefenseMenuToken(client,token,decoded,operation),"a different configuration revision rejects a rotation menu");gConfigRevision--;
     bool rotated=RotateFenceBuilding(client,building,0,1);float actual[3];int entity=Resolve(gBuildings[building].ref);
     if(entity>0)GetEntPropVector(entity,Prop_Data,"m_angRotation",actual);
-    Check(rotated && FloatAbs(gBuildings[building].angles[0]-NormalizeFenceAngle(before.angles[0]+5.0))<0.001
+    Check(rotated && FloatAbs(gBuildings[building].angles[0]-NormalizeFenceAngle(before.angles[0]+10.0))<0.001
         && FloatAbs(NormalizeFenceAngle(actual[0]-gBuildings[building].angles[0]))<0.01
         && gBuildings[building].angles[1]==before.angles[1] && gBuildings[building].angles[2]==before.angles[2],
-        "a real vertical rotation changes saved and actual pitch by exactly five degrees while preserving yaw and roll");
+        "a real vertical rotation changes saved and actual pitch by exactly ten degrees while preserving yaw and roll");
+    if(before.kind==Kind_Light)
+    {
+        float expectedSource[3],source[3],lightAngles[3];
+        BuildingAttachmentPosition(building,gBuildings[building].meta.lightOffset,expectedSource);
+        bool aligned=FenceRotationLightPose(building,source,lightAngles) && GetVectorDistance(source,expectedSource)<0.1;
+        for(int a=0;a<3;a++)if(FloatAbs(NormalizeFenceAngle(lightAngles[a]-gBuildings[building].angles[a]))>0.1)aligned=false;
+        Check(aligned,"rotating a real light retains its body parent, local attachment offset and zero local angles, deriving the correct world pose");
+    }
     Check(GetVectorDistance(gBuildings[building].placementAnchor,before.placementAnchor)<0.001
         && GetVectorDistance(gBuildings[building].origin,before.origin)<0.001
         && GetVectorDistance(gBuildings[building].meta.angleOffset,before.meta.angleOffset)<0.001,
@@ -56,11 +84,18 @@ void TestFenceRotationCurrentAim(int client)
     DefenseMenuToken(client,building,4,token,sizeof(token));
     Check(!ValidateDefenseMenuToken(client,token,decoded,operation),"rotation continuation does not relax the dismantle action's actual aim requirement");
     TeleportEntity(client,NULL_VECTOR,savedView,NULL_VECTOR);
-    gBuildings[building].kind=Kind_Turret;
-    Check(!RotateFenceBuilding(client,building,1,1),"the same rotation action refuses every non-defensive building kind");gBuildings[building].kind=before.kind;
+    bool rejected=true;
+    for(int kind=0;kind<=view_as<int>(Kind_Beacon);kind++)
+    {
+        if(kind==view_as<int>(Kind_Fence) || kind==view_as<int>(Kind_Light))continue;
+        gBuildings[building].kind=view_as<BuildingKind>(kind);
+        if(RotateFenceBuilding(client,building,1,1))rejected=false;
+    }
+    Check(rejected,"the real rotation action rejects every building kind except defensive structures and lights");gBuildings[building].kind=before.kind;
     // Restore only fields this test intentionally changes; do not roll UID or generation backwards.
     gBuildings[building].angles=before.angles;gBuildings[building].restoreMins=before.restoreMins;gBuildings[building].restoreMaxs=before.restoreMaxs;
     gBuildings[building].boundsKnown=before.boundsKnown;if(entity>0)TeleportEntity(entity,NULL_VECTOR,before.angles,NULL_VECTOR);
+    if(before.kind==Kind_Light)SyncBuildingLightTransform(building);
     gDefenseMenuNonce[client]=nonce+1;
 }
 
@@ -147,23 +182,24 @@ public void PrepareFenceRotationUIFrame(any serial)
     tFenceRotationUIActive=true;CancelClientMenu(client);gNextUse[client]=0.0;
     Check(CanManageBuilding(client,building) && BuildingInUseRange(client,building) && FenceRotationInRange(client,building),
         "rotation UI begins with the real owner aiming at their defensive structure inside its actual OBB use distance");
-    PrintToServer("[FenceRotationUI] READY uid=%d building=%d owner=%d core=%d initial_angles=%.3f %.3f %.3f; client +use/-use, then 3,1,1,2,3,4,1,1; cleanup uses v05_real_cleanup",
+    PrintToServer("[FenceRotationUI] READY uid=%d building=%d owner=%d core=%d initial_angles=%.3f %.3f %.3f step=10; client +use/-use, then 3,1,1,2,3,4,1,1; cleanup uses v05_real_cleanup",
         gBuildings[building].uid,building,gBuildings[building].ownerSerial,gBuildings[building].buildCore,gBuildings[building].angles[0],gBuildings[building].angles[1],gBuildings[building].angles[2]);
 }
 
 // Real Steam client input drives every rotation after this setup. This fixture
 // makes one production build, then snapshots its paid balance and identity.
-void SetupFenceRotationUI(int client)
+void SetupFenceRotationUI(int client,BuildingKind desiredKind=Kind_Fence)
 {
     tFenceRotationUIActive=false;
+    if(!BuildingRotationKind(desiredKind)){Check(false,"rotation UI fixture only supports defensive structures and lights");return;}
     if(client<1 || client!=V05RealClient() || !V05BeginRealFixture(client))return;
     int recipe=-1;
-    for(int r=0;r<gRecipeCount;r++)if(gRecipes[r].kind==Kind_Fence){recipe=r;break;}
+    for(int r=0;r<gRecipeCount;r++)if(gRecipes[r].kind==desiredKind){recipe=r;break;}
     float feet[3],point[3],normal[3];int hit,core;
     if(recipe<0 || !V05FindRealPlacement(client,recipe,0,feet,point,normal,hit,core))
-    {tSkipped++;PrintToServer("[ShelterTest] SKIP rotation UI could not find a legal real interior placement for a defensive recipe");return;}
+    {tSkipped++;PrintToServer("[ShelterTest] SKIP rotation UI could not find a legal real interior placement for the requested defensive/light recipe");return;}
     SetEntityMoveType(client,MOVETYPE_WALK);V05EnsureRecipeMaterials(client,recipe);
-    int building=V05BuildFromRealAim(client,recipe,core,"rotation UI creates exactly one real defensive structure and pays its recipe once");
+    int building=V05BuildFromRealAim(client,recipe,core,"rotation UI creates exactly one requested defensive/light structure and pays its recipe once");
     if(building<0 || !CanContinueFenceRotationMenu(client,building))return;
     RefreshBuildAreas();tFenceRotationUIBefore=gBuildings[building];tFenceRotationUIBuilding=building;
     tFenceRotationUISerial=GetClientSerial(client);tFenceRotationUIEpoch=gEpoch;tFenceRotationUIRevision=gConfigRevision;
@@ -181,13 +217,32 @@ void VerifyFenceRotationUI(int client)
         || b<0 || !gBuildings[b].used || !gBuildings[b].alive || gBuildings[b].uid!=tFenceRotationUIBefore.uid || Resolve(gBuildings[b].ref)<1)
     {Check(false,"rotation UI verification requires its original living real actor and unchanged built UID/session");return;}
     float expected[3],actual[3];expected=tFenceRotationUIBefore.angles;
-    expected[0]=NormalizeFenceAngle(expected[0]+5.0);expected[1]=NormalizeFenceAngle(expected[1]+10.0);
+    expected[0]=NormalizeFenceAngle(expected[0]+10.0);expected[1]=NormalizeFenceAngle(expected[1]+20.0);
     GetEntPropVector(Resolve(gBuildings[b].ref),Prop_Data,"m_angRotation",actual);
     bool anglesMatch=true,paidOnce=true;
     for(int a=0;a<3;a++)if(FloatAbs(NormalizeFenceAngle(gBuildings[b].angles[a]-expected[a]))>0.01
         || FloatAbs(NormalizeFenceAngle(actual[a]-expected[a]))>0.01)anglesMatch=false;
     for(int m=0;m<gMaterialCount;m++)if(gPlayerInventory[client][m]!=tFenceRotationUIInventory[m])paidOnce=false;
-    Check(anglesMatch,"actual client vertical +5,+5,-5 and horizontal +5,+5 change saved/body pitch +5 and yaw +10 while retaining roll");
+    Check(anglesMatch,"actual client vertical +10,+10,-10 and horizontal +10,+10 change saved/body pitch +10 and yaw +20 while retaining roll");
+    if(tFenceRotationUIBefore.kind==Kind_Light)
+    {
+        float expectedSource[3],source[3],lightAngles[3];BuildingAttachmentPosition(b,gBuildings[b].meta.lightOffset,expectedSource);
+        bool aligned=FenceRotationLightPose(b,source,lightAngles) && GetVectorDistance(source,expectedSource)<0.1;
+        for(int a=0;a<3;a++)if(FloatAbs(NormalizeFenceAngle(lightAngles[a]-expected[a]))>0.1)aligned=false;
+        Check(aligned,"actual client light rotation retains the correct parent/local attachment transform and derived pitch/yaw");
+        int light=Resolve(gBuildings[b].effectRef);float absoluteOrigin[3],absoluteAngles[3];
+        bool actualAvailable=light>0 && HasEntProp(light,Prop_Data,"m_vecAbsOrigin") && HasEntProp(light,Prop_Data,"m_angAbsRotation");
+        if(actualAvailable)
+        {
+            GetEntPropVector(light,Prop_Data,"m_vecAbsOrigin",absoluteOrigin);GetEntPropVector(light,Prop_Data,"m_angAbsRotation",absoluteAngles);
+        }
+        bool actualAligned=actualAvailable && GetVectorDistance(absoluteOrigin,expectedSource)<0.1;
+        for(int a=0;a<3;a++)if(FloatAbs(NormalizeFenceAngle(absoluteAngles[a]-expected[a]))>0.1)actualAligned=false;
+        Check(actualAligned,"delayed actual client verification reads matching native absolute light origin/angles after the real rotation frames");
+        PrintToServer("[FenceRotationLight] uid=%d light=%d local_transform_ok=%d native_absolute_available=%d expected_origin=%.3f %.3f %.3f derived_origin=%.3f %.3f %.3f actual_absolute_origin=%.3f %.3f %.3f actual_absolute_angles=%.3f %.3f %.3f",
+            gBuildings[b].uid,light,aligned,actualAvailable,expectedSource[0],expectedSource[1],expectedSource[2],source[0],source[1],source[2],
+            absoluteOrigin[0],absoluteOrigin[1],absoluteOrigin[2],absoluteAngles[0],absoluteAngles[1],absoluteAngles[2]);
+    }
     Check(GetClientMenu(client)==MenuSource_Normal,"the continuous rotation menu remains open after the last actual client button");
     Check(paidOnce,"five actual menu rotation steps do not deduct any material after the single production build");
     Check(gBuildings[b].ownerSerial==tFenceRotationUIBefore.ownerSerial && StrEqual(gBuildings[b].ownerKey,tFenceRotationUIBefore.ownerKey)

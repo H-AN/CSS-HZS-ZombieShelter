@@ -1,7 +1,7 @@
 #define SHELTER_VERSION "0.5.0-dev"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
-#define MAX_NPCS 256
+#define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
 #define MAX_CORES 8
 #define MAX_BOSSES 8
 #define MAX_BOXES 8
@@ -11,8 +11,10 @@
 #define LEGACY_MATERIALS 5
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
-enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander }
-enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops, C_Count }
+enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander,
+    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon }
+enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops,
+    C_Repair, C_Heal, C_Armor, C_Beacons, C_Count }
 
 // Reward identity is independent of the living client required by the HZS
 // damage API. Delayed hits retain this snapshot after a facility is removed.
@@ -111,6 +113,7 @@ enum struct BuildingMetadata
     char attackSound[PLATFORM_MAX_PATH];
     char upgradeSound[PLATFORM_MAX_PATH];
     char destroySound[PLATFORM_MAX_PATH];
+    char pulseSound[PLATFORM_MAX_PATH];
 }
 
 enum struct Building
@@ -144,6 +147,10 @@ enum struct Building
     float range;
     float damage;
     float interval;
+    int restoreAmount;
+    int maxPerBase;
+    float restoreInterval;
+    float nextRestore;
     float halfAngle;
     float burnDuration;
     int burnDamage;

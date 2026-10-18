@@ -21,6 +21,8 @@ def package(output: Path):
     output.mkdir(parents=True)
     shutil.copytree(ROOT / 'addons', output / 'addons', ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copytree(ROOT / 'sound', output / 'sound')
+    if (ROOT / 'materials').is_dir():
+        shutil.copytree(ROOT / 'materials', output / 'materials')
     shutil.copytree(ROOT / 'docs', output / 'docs')
     shutil.copy2(ROOT / 'README.md', output / 'README.md')
     shutil.copy2(ROOT / 'build.ps1', output / 'build.ps1')
@@ -50,7 +52,7 @@ def package(output: Path):
     # the optional patch binaries. Earlier acceptance sets above are retained.
     report_root = ROOT / 'tests/reports/v05'
     for source_dir in report_root.iterdir():
-        if not source_dir.is_dir() or not source_dir.name.startswith(('followup', 'supporting_patches', 'manual_review')):
+        if not source_dir.is_dir() or not source_dir.name.startswith(('followup', 'supporting_patches', 'manual_review', 'support_buildings')):
             continue
         for source in source_dir.rglob('*'):
             if not source.is_file():
@@ -73,6 +75,7 @@ def package(output: Path):
                  'start_v05_manual_review.py', 'test_v05_real_client.py',
                  'local_server_runtime.py', 'prepare_isolated_server.py',
                  'apply_v05_followup_config.py', 'control_v05_running.py',
+                 'apply_support_building_config.py',
                  'package_v05.py'):
         (output / 'tools').mkdir(exist_ok=True)
         shutil.copy2(ROOT / 'tools' / name, output / 'tools' / name)
@@ -99,6 +102,6 @@ def package(output: Path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT / 'dist/CSS-HZS-ZombieShelter-v0.5.0-dev-review2')
+    parser.add_argument('--output', type=Path, default=ROOT / 'dist/CSS-HZS-ZombieShelter-v0.5.0-dev-review3')
     args = parser.parse_args()
     print(package(args.output))

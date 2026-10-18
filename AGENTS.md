@@ -28,3 +28,11 @@
 用户已明确辅助补丁失败后不再追查。guarded BOT 与 focused follow 两项试验补丁最终停用，不继续调试或重新安装；不能把初始 ready 写成远距离跟随已修好。最终留服只加载正式 HanZombieShelter 与未修改 HZS 两个插件，保持零 BOT。NPC 使用外部 B 计划补最近有效真人目标，未醒 Boss 不补目标、不因兜底而唤醒，隐藏池／暂停／停车逻辑继续保留。
 
 本轮持续复用普通 Steam 客户端 PID `560`，未停止客户端；最终服务器正在切换正式构建，不沿用旧服务端 PID，交付时按新的留服 session 核对。`followup_probe_09_final` 尚在最终回归，不预判通过数；原测试与补丁失败证据继续保留。以上不改变 27129、现场数值和既有 BOT／换图限制。
+
+## 本轮恢复、信标与人口扩展：此段优先于较早隔离人口说明
+
+- 先读 `docs/v0.5_恢复信标与基地断电_实施记录.md`。本轮仅 27139 隔离配置使用普通原生池 250、外部普通上限 250、所有天白天 100/夜晚 250，`MAX_NPCS=512`；27129 录制服仍保持原白天 20/夜晚 60、普通基础 100HP、低成本和 M4A1 `+0.0`。发行原 `days.cfg` / `zombies.cfg` 不改成人口测试配置，旧时长保留。
+- 新四配置已存在时按字节保留。只用受标记的 `tools/apply_support_building_config.py` 处理 27139，禁止整套发行默认覆盖现场。保留审计在 `tests/reports/v05/support_buildings/config_preservation.json`；其中录制服 22 哈希是旧审计证据对照，本轮未读取录制路径。
+- 防御工事与照明当前步进为 ±10°。`support_buildings/probe_02` 已实际 307/0/0，另 `live_03` 独立 18/0/0，包含保护夹具下生产放行达到日 100/夜 250、原生 251/Boss 状态保留及真实 `DamageBuilding` 基地损毁/实体移除/全网断电。人口夹具的 god、禁伤、建筑临时 10000000HP 等保护不代表正常战斗负载；首轮 `probe_01` 故障证据保留。最终干净正式留服以 `tests/reports/v05/support_buildings/manual_handoff_final/session.json` 为准，已核对 ready=true、kept_running=true、仅两正式插件与零 BOT，不沿用旧进程或旧人口成绩扩大验收范围。
+- guarded BOT 和 focused follow 两项辅助补丁继续永久停用，不再自动加载、安装或调试。所有测试保持零 BOT，不能绕过主体保护，不创建 FakeClient 或复活 NPC；nearest 兜底不代表引擎远距离跟随已修好。
+- 保留现有普通 Steam 客户端（本轮持续复用 PID 560），继续固定路径 `-hijack` 与已有 RCON 方法；交付保留服务器和客户端。服务器 PID、构建哈希及 ready/kept_running 以最新最终 session 核实，不沿用旧进程号或未经核实的旧在线状态。

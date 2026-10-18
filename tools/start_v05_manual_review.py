@@ -15,6 +15,7 @@ import sys
 import time
 
 from local_server_runtime import startup_arguments
+from migrate_v05_materials import load as load_keyvalues
 from test_v05_real_client import (CLIENT_LAN_IP, PORT, REPO, SERVER_BIND_IP,
                                   RCON, RealClientSession, a2s_info,
                                   matching_processes, udp_endpoints,
@@ -67,6 +68,10 @@ class ManualReviewSession(RealClientSession):
         self.results['plugin_files'] = plugins
         self.results['supporting_fixes'] = self.options.supporting_fixes
         self.results['reused_client'] = self.options.reuse_client
+        cfg_root = self.server / 'cstrike/addons/sourcemod/configs/HanZombieShelter'
+        zombies = load_keyvalues(cfg_root / 'zombies.cfg')['ShelterZombies']
+        self.expected_native_pool = int(zombies['NativePool']['initial_ordinary_count'])
+        self.results['expected_native_pool'] = self.expected_native_pool
         if self.options.supporting_fixes:
             hashes = {}
             for name in ('hzs_botaddfix_guarded.smx', 'hzsh_followrange_fix.smx'):
@@ -233,13 +238,15 @@ class ManualReviewSession(RealClientSession):
             shelter = self.production_rcon('sm_zsh_status')
             fields = {key: int(value) for key, value in re.findall(r'(\w+)=(-?\d+)', shelter)}
             ready = (joined and humans == 1 and bots == 0 and fields.get('enabled') == 1
-                     and fields.get('phase') == 1 and fields.get('tracked') == 101)
+                     and fields.get('phase') == 1 and fields.get('bosses', 0) > 0
+                     and fields.get('tracked') == self.expected_native_pool + fields.get('bosses', 0))
             if ready:
                 if ready_at is None:
                     ready_at = time.monotonic()
                 if time.monotonic() - ready_at >= self.options.observe_seconds:
                     self.results['ready'] = True
-                    self.results['natural_hzs_startup'] = self.profile_label() + ' plugin: one human, zero bots, phase=1, tracked=101'
+                    self.results['natural_hzs_startup'] = (self.profile_label() + ' plugin: one human, zero bots, phase=1, tracked='
+                                                           + str(fields['tracked']))
                     self.results['ready_status'] = {'humans': humans, 'bots': bots, **fields}
                     break
             else:
