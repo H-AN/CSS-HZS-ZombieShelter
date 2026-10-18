@@ -217,6 +217,7 @@ bool SpawnResourceBody(int node)
     int material=gNodes[node].material;
     int entity=CreateBody(gMaterials[material].model,gNodes[node].origin,gNodes[node].angles,gNodes[node].id,true);
     if(entity<0)return false;
+    SetEntityCollisionGroup(entity,2); // COLLISION_GROUP_DEBRIS_TRIGGER: actor movement passes; MASK_SOLID knife traces remain enabled.
     gNodes[node].ref=EntIndexToEntRef(entity);
     if(entity<sizeof(gWorldBinding)){gWorldBinding[entity]=-(node+1);gWorldBindingRef[entity]=gNodes[node].ref;}
     ApplyResourceModel(node,entity);
@@ -238,6 +239,7 @@ bool ApplyResourceModel(int node,int entity)
     SetEntityModel(entity,gMaterials[material].model);
     char scale[64];Format(scale,sizeof(scale),"%.6f 0 0",gMaterials[material].scale);
     SetVariantString(scale);bool nativeScale=AcceptEntityInput(entity,"SetModelScale");
+    SetEntityCollisionGroup(entity,2); // SetModel / scale inputs may rebuild the collision representation.
     SetEntityRenderMode(entity,RENDER_TRANSCOLOR);
     return nativeScale;
 }
@@ -279,6 +281,7 @@ void UpdateResourceVisual(int node)
     // Native inputs update the collision partition as well as the solid flags.
     // Directly writing m_usSolidFlags left stale engine traces against physics props.
     AcceptEntityInput(entity,gNodes[node].growing ? "DisableCollision" : "EnableCollision");
+    SetEntityCollisionGroup(entity,2); // Mature resources stay traceable without blocking players or native NPCs.
 }
 
 void ResourceTick(float elapsed)
