@@ -36,3 +36,11 @@
 - 防御工事与照明当前步进为 ±10°。`support_buildings/probe_02` 已实际 307/0/0，另 `live_03` 独立 18/0/0，包含保护夹具下生产放行达到日 100/夜 250、原生 251/Boss 状态保留及真实 `DamageBuilding` 基地损毁/实体移除/全网断电。人口夹具的 god、禁伤、建筑临时 10000000HP 等保护不代表正常战斗负载；首轮 `probe_01` 故障证据保留。最终干净正式留服以 `tests/reports/v05/support_buildings/manual_handoff_final/session.json` 为准，已核对 ready=true、kept_running=true、仅两正式插件与零 BOT，不沿用旧进程或旧人口成绩扩大验收范围。
 - guarded BOT 和 focused follow 两项辅助补丁继续永久停用，不再自动加载、安装或调试。所有测试保持零 BOT，不能绕过主体保护，不创建 FakeClient 或复活 NPC；nearest 兜底不代表引擎远距离跟随已修好。
 - 保留现有普通 Steam 客户端（本轮持续复用 PID 560），继续固定路径 `-hijack` 与已有 RCON 方法；交付保留服务器和客户端。服务器 PID、构建哈希及 ready/kept_running 以最新最终 session 核实，不沿用旧进程号或未经核实的旧在线状态。
+
+## 2026-10-19 v0.7 录制与动画恢复：此段为最新现场入口
+
+- 先读 `D:\gmod昼夜求生资源\文档\进度文档\v0.7.0_进度文档\README.md`。用户现只保留一个测试服，地址为 `192.168.0.102:27169`；27129/27139 的历史配置和测试证据保留，不重新启动第二个留服。
+- 当前运行目录为 `D:\gmod昼夜求生资源\文档\制作计划\v0.7.0\preview_update\runtime\server\cstrike`。实际进程、插件、库存及动画报警复核以 `D:\gmod昼夜求生资源\文档\制作计划\v0.7.0\recording_update\reports\final_session.json` 为准；不要沿用历史 PID。交付继续保留服务端和普通 Steam 客户端，不代用户开始或停止 demo。
+- 用户要求从零自然采集录制，已移除百万补给 ReviewTools，换成不含供给逻辑的 Recording Access 权限助手。初始个人七项及六基地库存均为0；木/铁/铜/银/金基础有效采集10，斧头倍率2.0为20。当前昼夜180/180秒、第一天日8/夜50、普通100HP及既有低成本保留，不能用27129的20/60人口或发行默认整套覆盖。
+- 当前普通丧尸模型 `models/player/putonghe/tank_zombi_host.mdl` 的五组动画和三组音效已从两份一致的用户原配置恢复；`idle1,idle2`、`attack1`、`getattack1`、`xxx.wav` 是旧测试副本的错误模板，禁止再次覆盖回来。只恢复了这八个字段，普通100HP、Boss和其他字段保留；HZS与Shelter源码/二进制未因本次报警改动。证据见进度文档06及 `npc_configuration_restored.json`。旧坏副本只用于历史审计，不能当部署模板。
+- 完整静态资源日期包为 `D:\金源地图移植cs起源\csol地图移植\移植\服务器模型资源\2026年10月19日资源`，父目录 `LATEST.json` 指向当前版本。仓库只有源码、配置和增量音效/材质，没有完整地图/模型；后续发布同时核对日期资源包及其既有缺件清单。继续遵守零BOT、禁用两项失败补丁和不扩展本地换图修复的边界。
