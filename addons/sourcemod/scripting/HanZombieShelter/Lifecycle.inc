@@ -144,7 +144,7 @@ public void ResolveOutcome(any epoch)
         ApplyDayCvars();
         RecoverBases();
         if(gDestroySummons)
-            for(int b=gCoreCount;b<MAX_BUILDINGS;b++){gBuildings[b].alive=false;gBuildings[b].used=false;}
+            for(int b=MAX_CORES;b<MAX_BUILDINGS;b++){gBuildings[b].alive=false;gBuildings[b].used=false;}
         gRollback=true;AnnouncePhrase(gDestroySummons ? "CampaignRollbackDestroy" : "CampaignRollbackRetain",gDay);
         if(!gTerminationExpected)CS_TerminateRound(3.0,CSRoundEnd_Draw,true);
     }
@@ -157,6 +157,9 @@ void RecoverBases()
     for(int c=0;c<gCoreCount;c++)
     {
         int b=gCores[c].building;if(b<0)continue;
+        // Player bases retain their exact health/blueprint state on rollback.
+        // In particular a placed blueprint cannot become a free living base.
+        if(gCores[c].dynamic)continue;
         if(!gBuildings[b].upgraded)
         {
             gBuildings[b].level=1;ApplyBuildingLevel(b,true);
@@ -224,7 +227,7 @@ void ExposureTick(float now)
     for(int client=1;client<=MaxClients;client++)
     {
         if(!LiveHuman(client))continue;
-        float position[3];GetClientAbsOrigin(client,position);if(InSafeBase(position))continue;
+        float position[3];GetClientAbsOrigin(client,position);if(InSafeBase(position) || CampfireSafeAt(position))continue;
         int health=GetClientHealth(client)-gExposureDamage;
         if(health<=0)ForcePlayerSuicide(client);else SetEntityHealth(client,health);
     }
@@ -263,14 +266,14 @@ public Action WorldTick(Handle timer)
     {
         CampaignHUD();if(now>=gDeadline)ChangeCampaignMap();return Plugin_Continue;
     }
-    if(!Running())return Plugin_Continue;
+    if(!Running()){SuspendCampfires();return Plugin_Continue;}
     if(now>=gDeadline){if(gPhase==Phase_Day)StartNight();else StartDay(true);}
     else if(gPhase==Phase_Day && !gWarningSent && gDeadline-now<=gWarningSeconds)
     {
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
-    ResourceTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExposureTick(now);CampaignHUD();
+    SyncDynamicBasesGeometry();ResourceTick(elapsed);CampfireTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

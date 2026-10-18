@@ -1,8 +1,8 @@
 {
   "HUDBuildingAttacked": {
     "format": "{1:s},{2:d},{3:d},{4:d},{5:s}",
-    "en": "{1} | Level {2} | UNDER ATTACK\nHP {3}/{4}\nKnife: repair | {5}",
-    "chi": "{1} | 等级 {2} | 正在被攻击\n血量 {3}/{4}\n刀修复 | {5}"
+    "en": "{1} | Level {2} | UNDER ATTACK\nHP {3}/{4}\nWeapon hit: repair | {5}",
+    "chi": "{1} | 等级 {2} | 正在被攻击\n血量 {3}/{4}\n攻击修复 | {5}"
   },
   "HUDBaseAttackList": {
     "format": "{1:s}",

@@ -23,6 +23,7 @@ int SafeCoreAt(const float position[3])
     int closest=-1;float best=999999999.0;
     for(int i=0;i<gCoreCount;i++)
     {
+        if(gCores[i].dynamic && !BuildCoreAlive(i))continue;
         float local[3];LocalPoint(position,gCores[i].origin,gCores[i].angles,local);
         for(int box=0;box<gCores[i].boxCount;box++)if(InBox(local,gCoreMins[i][box],gCoreMaxs[i][box]))
         {
@@ -44,19 +45,23 @@ void DrawSafeZones()
     int color[4]={40,255,80,220};
     float width=Decimal(C_Mode,"SafeZoneDisplay","line_width",3.0);
     float height=Decimal(C_Mode,"SafeZoneDisplay","height_above_base",4.0);
-    for(int c=0;c<gCoreCount;c++)for(int box=0;box<gCores[c].boxCount;box++)
+    for(int c=0;c<gCoreCount;c++)
     {
-        float corners[4][3];
-        for(int p=0;p<4;p++)
+        if(gCores[c].dynamic && !BuildCoreAlive(c))continue;
+        for(int box=0;box<gCores[c].boxCount;box++)
         {
-            float local[3];local[0]=(p==0 || p==3) ? gCoreMins[c][box][0] : gCoreMaxs[c][box][0];
-            local[1]=p<2 ? gCoreMins[c][box][1] : gCoreMaxs[c][box][1];local[2]=height;
-            WorldPoint(local,gCores[c].origin,gCores[c].angles,corners[p]);
-        }
-        for(int p=0;p<4;p++)
-        {
-            TE_SetupBeamPoints(corners[p],corners[(p+1)%4],gBeamSprite,0,0,0,1.2,width,width,0,0.0,color,0);
-            TE_SendToAll();
+            float corners[4][3];
+            for(int p=0;p<4;p++)
+            {
+                float local[3];local[0]=(p==0 || p==3) ? gCoreMins[c][box][0] : gCoreMaxs[c][box][0];
+                local[1]=p<2 ? gCoreMins[c][box][1] : gCoreMaxs[c][box][1];local[2]=height;
+                WorldPoint(local,gCores[c].origin,gCores[c].angles,corners[p]);
+            }
+            for(int p=0;p<4;p++)
+            {
+                TE_SetupBeamPoints(corners[p],corners[(p+1)%4],gBeamSprite,0,0,0,1.2,width,width,0,0.0,color,0);
+                TE_SendToAll();
+            }
         }
     }
 }
@@ -128,11 +133,15 @@ void NPCBounds(int entity,float mins[3],float maxs[3])
 bool SafeHumanPoint(int client,float position[3],float angles[3])
 {
     float mins[3]={-16.0,-16.0,0.0},maxs[3]={16.0,16.0,72.0};
+    if(gCoreCount<1)return false;
     int first=GetRandomInt(0,gCoreCount-1);
     for(int index=0;index<gCoreCount;index++)
     {
         int core=(first+index)%gCoreCount,b=gCores[core].building;
-        if(b<0 || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0)continue;
+        if(b<0 || !BuildingOperational(b) || Resolve(gBuildings[b].ref)<0)continue;
+        if(gCores[core].dynamic)
+        {if(SafeHumanPointForDynamicBase(client,core,position,angles))return true;continue;}
+        if(gCores[core].pointCount<1)continue;
         int start=GetRandomInt(0,gCores[core].pointCount-1);
         for(int j=0;j<gCores[core].pointCount;j++)
         {

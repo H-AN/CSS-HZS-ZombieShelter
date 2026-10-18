@@ -9,6 +9,7 @@ void ResetInventories()
     for(int c=0;c<MAX_CORES;c++)for(int m=0;m<MATERIALS;m++)gBaseInventory[c][m]=0;
     for(int client=1;client<=MaxClients;client++)
     {
+        ResetClientGathering(client);
         gInventoryOwner[client][0]=0;
         for(int m=0;m<MATERIALS;m++)gPlayerInventory[client][m]=0;
         if(IsClientInGame(client))BindClientInventory(client);
@@ -30,6 +31,7 @@ void BindClientInventory(int client)
 
 void StartClientInventory(int client)
 {
+    ResetClientGathering(client);
     gInventoryOwner[client][0]=0;
     for(int m=0;m<MATERIALS;m++)gPlayerInventory[client][m]=0;
     BindClientInventory(client);
@@ -37,6 +39,7 @@ void StartClientInventory(int client)
 
 void SaveClientInventory(int client)
 {
+    ResetClientGathering(client);
     bool hadMaterials;
     if(gEnabled && gCoreCount>0)
     {
@@ -71,6 +74,7 @@ int NearestStorageCore(const float position[3])
     for(int pass=0;pass<2 && best<0;pass++)for(int core=0;core<gCoreCount;core++)
     {
         int b=gCores[core].building;
+        if(gCores[core].dynamic && !BuildingOperational(b))continue;
         if(pass==0 && (b<0 || !gBuildings[b].alive))continue;
         float candidate=GetVectorDistance(position,gCores[core].origin,true);
         if(candidate<distance){distance=candidate;best=core;}
@@ -86,6 +90,7 @@ int PlaceSharedMaterial(int preferred,int material,int amount)
     for(int step=0;step<gCoreCount && amount>0;step++)
     {
         int core=(preferred+step)%gCoreCount,room=capacity-gBaseInventory[core][material];
+        if(gCores[core].dynamic && !BuildingOperational(gCores[core].building))continue;
         if(room<=0)continue;
         int deposit=amount<room ? amount : room;gBaseInventory[core][material]+=deposit;amount-=deposit;
     }

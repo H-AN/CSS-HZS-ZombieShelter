@@ -188,7 +188,7 @@ public int NativeShelterBaseInfo(Handle plugin,int params)
     int core=GetNativeCell(1);if(!APIValidCore(core))return false;
     int b=gCores[core].building;if(b<0 || !gBuildings[b].used)return false;
     SetNativeCellRef(2,gBuildings[b].uid);SetNativeCellRef(3,gBuildings[b].level);SetNativeCellRef(4,gBuildings[b].hp);
-    SetNativeCellRef(5,gBuildings[b].maxHP);SetNativeCellRef(6,gBuildings[b].alive);return true;
+    SetNativeCellRef(5,gBuildings[b].maxHP);SetNativeCellRef(6,BuildingOperational(b));return true;
 }
 public int NativeShelterPower(Handle plugin,int params)
 {
@@ -203,7 +203,7 @@ public int NativeShelterBuilding(Handle plugin,int params)
     if(b<0)return false;
     SetNativeCellRef(2,gBuildings[b].kind);SetNativeCellRef(3,gBuildings[b].kind==Kind_Base ? gBuildings[b].core : gBuildings[b].powerCore);
     SetNativeCellRef(4,gBuildings[b].level);SetNativeCellRef(5,gBuildings[b].hp);SetNativeCellRef(6,gBuildings[b].maxHP);
-    SetNativeCellRef(7,gBuildings[b].alive);SetNativeCellRef(8,BuildingPowered(b));
+    SetNativeCellRef(7,BuildingOperational(b));SetNativeCellRef(8,BuildingPowered(b));
     SetNativeCellRef(9,view_as<int>(gBuildings[b].powerDemand));SetNativeCellRef(10,view_as<int>(GeneratorOutput(b)));return true;
 }
 public int NativeShelterMaterials(Handle plugin,int params)

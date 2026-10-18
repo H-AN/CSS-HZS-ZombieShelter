@@ -62,12 +62,12 @@ bool BuildCoreAlive(int core)
 {
     if(core<0 || core>=gCoreCount)return false;
     int b=gCores[core].building;
-    return b>=0 && b<MAX_BUILDINGS && gBuildings[b].used && gBuildings[b].alive && gBuildings[b].hp>0;
+    return BuildingOperational(b);
 }
 
 bool EffectiveExpander(int b)
 {
-    return gBuildings[b].used && gBuildings[b].alive && gBuildings[b].kind==Kind_Expander
+    return BuildingOperational(b) && gBuildings[b].kind==Kind_Expander
         && gBuildings[b].hp>0 && BuildCoreAlive(gBuildings[b].buildCore) && BuildingPowered(b);
 }
 

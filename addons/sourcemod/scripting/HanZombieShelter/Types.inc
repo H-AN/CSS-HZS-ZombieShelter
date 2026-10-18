@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.5.0-dev"
+#define SHELTER_VERSION "0.6.0"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
@@ -12,9 +12,9 @@
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
 enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander,
-    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon }
+    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire }
 enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops,
-    C_Repair, C_Heal, C_Armor, C_Beacons, C_Count }
+    C_Repair, C_Heal, C_Armor, C_Beacons, C_Campfires, C_Shelters, C_Count }
 
 // Reward identity is independent of the living client required by the HZS
 // damage API. Delayed hits retain this snapshot after a facility is removed.
@@ -60,6 +60,7 @@ enum struct MaterialDef
 
 enum struct CoreDef
 {
+    bool dynamic;
     char id[64];
     char profile[64];
     char model[PLATFORM_MAX_PATH];
@@ -120,6 +121,8 @@ enum struct Building
 {
     bool used;
     bool alive;
+    bool constructing;
+    int constructionTarget;
     BuildingKind kind;
     int uid;
     int generation;
@@ -269,7 +272,10 @@ bool gRoundPrepared, gRoundRestored, gWarningSent, gRebuilding;
 bool gOutcomeQueued, gTerminationExpected;
 float gDeadline, gNextHUD, gNextExposure, gNextAdmissions, gPreviousTick;
 float gDaySeconds, gNightSeconds, gWarningSeconds, gExposureInterval, gRecoveryFraction, gOutcomeSeconds;
+// gRepairCooldown/gNextRepair remain for older probe source compatibility.
+// Manual building hits use weapon rules without an independent rate limit.
 float gGatherCooldown, gRepairCooldown, gUseDistance, gUseCooldown;
+#pragma unused gRepairCooldown
 int gExposureDamage, gSummonLimit, gPopulationLimit, gNativePoolSize, gInventoryCap;
 int gRollbackDays, gMinimumDay;
 bool gDestroySummons, gDirectLoss, gExposureEnabled;

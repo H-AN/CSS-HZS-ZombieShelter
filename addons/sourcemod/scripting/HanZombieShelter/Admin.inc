@@ -29,7 +29,7 @@ bool TravelBaseAlive(int core)
 {
     if(!Running() || core<0 || core>=gCoreCount)return false;
     int b=gCores[core].building;
-    return b>=0 && b<MAX_BUILDINGS && gBuildings[b].used && gBuildings[b].alive && gBuildings[b].hp>0
+    return BuildingOperational(b)
         && gBuildings[b].kind==Kind_Base && Resolve(gBuildings[b].ref)>0;
 }
 
@@ -42,7 +42,9 @@ bool TravelPointInsideBase(int core,const float point[3])
 
 bool SafeHumanPointForBase(int client,int core,float position[3],float angles[3])
 {
-    if(!TravelBaseAlive(core) || gCores[core].pointCount<1)return false;
+    if(!TravelBaseAlive(core))return false;
+    if(gCores[core].dynamic)return SafeHumanPointForDynamicBase(client,core,position,angles);
+    if(gCores[core].pointCount<1)return false;
     float mins[3]={-16.0,-16.0,0.0},maxs[3]={16.0,16.0,72.0};int first=GetRandomInt(0,gCores[core].pointCount-1);
     for(int offset=0;offset<gCores[core].pointCount;offset++)
     {
@@ -299,9 +301,9 @@ void ShowAdminBuildingMenu(int client,int b,bool nearby)
     TranslateLabel(client,nearby ? "AdminNearbyScope" : "AdminGlobalScope",scope,sizeof(scope));
     Format(title,sizeof(title),"%T","AdminBuildingTitle",client,name,gBuildings[b].uid,gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP,scope);
     Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
-    bool canUpgrade=BuildingLevelAvailable(b,gBuildings[b].level+1);
+    bool canUpgrade=!gBuildings[b].constructing && BuildingLevelAvailable(b,gBuildings[b].level+1);
     AdminAdd(menu,client,Admin_BuildingConfirm,"AdminLevelUp",b,gBuildings[b].uid,gBuildings[b].level,-1,gBuildings[b].level+1,nearby,canUpgrade);
-    AdminAdd(menu,client,Admin_BuildingConfirm,"AdminLevelDown",b,gBuildings[b].uid,gBuildings[b].level,-1,gBuildings[b].level-1,nearby,gBuildings[b].level>1);
+    AdminAdd(menu,client,Admin_BuildingConfirm,"AdminLevelDown",b,gBuildings[b].uid,gBuildings[b].level,-1,gBuildings[b].level-1,nearby,!gBuildings[b].constructing && gBuildings[b].level>1);
     AdminAdd(menu,client,Admin_BuildingConfirm,"AdminDestroyBuilding",b,gBuildings[b].uid,gBuildings[b].level,-1,0,nearby);
     AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");menu.Display(client,30);
 }
@@ -309,6 +311,7 @@ void ShowAdminBuildingMenu(int client,int b,bool nearby)
 void ShowAdminBuildingConfirm(int client,int b,int nextLevel,bool nearby)
 {
     if(!AdminBuildingAvailable(client,b,nearby))return;
+    if(nextLevel!=0 && gBuildings[b].constructing){Tell(client,"%t","ConstructionIncomplete");return;}
     gAdminMenuNonce[client]++;
     char title[512],name[64];BuildingDisplayName(b,name,sizeof(name),client);
     if(nextLevel==0)Format(title,sizeof(title),"%T","AdminDestroyTitle",client,name,gBuildings[b].uid);
@@ -403,6 +406,7 @@ public int ShelterAdminMenuHandler(Menu menu,MenuAction action,int client,int it
             case Admin_BuildingApply:
             {
                 if(!AdminBuildingAvailable(client,subject,nearby))return 0;
+                if(fields[AT_Value]!=0 && gBuildings[subject].constructing){Tell(client,"%t","ConstructionIncomplete");return 0;}
                 bool success=fields[AT_Value]==0 ? DismantleBuilding(client,subject,true)
                     : AdminSetBuildingLevel(client,subject,fields[AT_Value]);
                 if(!success)Tell(client,"%T","AdminMutationRejected",client);

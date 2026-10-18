@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg","repair_stations.cfg","heal_stations.cfg","armor_stations.cfg","beacons.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops","ShelterRepairStations","ShelterHealStations","ShelterArmorStations","ShelterBeacons"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg","repair_stations.cfg","heal_stations.cfg","armor_stations.cfg","beacons.cfg","campfires.cfg","shelters.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops","ShelterRepairStations","ShelterHealStations","ShelterArmorStations","ShelterBeacons","ShelterCampfires","ShelterShelters"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -73,6 +73,9 @@ bool LoadConfigs()
         }
     }
     if(!Number(C_Mode,"","enabled_for_configured_maps",1))return false;
+    // Missing on an older installation: retain instant placement. A later
+    // administrator cvar change overrides this campaign's configured default.
+    ConfigureRealConstruction(Number(C_Mode,"Rules","real_construction",0)!=0);
     gDaySeconds=Decimal(C_Mode,"Rules","day_seconds",180.0);
     gNightSeconds=Decimal(C_Mode,"Rules","night_seconds",180.0);
     gWarningSeconds=Decimal(C_Mode,"Rules","warning_seconds_before_night",30.0);
@@ -112,7 +115,8 @@ bool LoadConfigs()
         && (ValidateResourcePools() || ConfigFailure("resource pool weights, regrow option or map pool reference"))
         && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
         && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && LoadSupportSettings()
-        && LoadBeaconSettings() && ValidateDayRanges() && ValidateNativeBridge();
+        && LoadBeaconSettings() && LoadCampfireSettings() && LoadShelterSettings()
+        && ValidateDayRanges() && ValidateNativeBridge() && LoadRepairWeapons();
     if(!valid)return false;
     ReadZombieDrops();
     gConfigRevision=gConfigRevision==2147483647 ? 1 : gConfigRevision+1;
@@ -408,15 +412,16 @@ bool ReadTypeMetadata(ConfigFile file,const char[] type,BuildingMetadata meta)
 {
     BuildingKind kind=Kind_Fence;
     if(file==C_Turrets)kind=Kind_Turret;else if(file==C_Flames)kind=Kind_Flame;else if(file==C_Grenades)kind=Kind_Grenade;
+    else if(file==C_Campfires)kind=Kind_Campfire;else if(file==C_Shelters)kind=Kind_Base;
     char path[128];Format(path,sizeof(path),"Types/%s",type);return ReadBuildingMetadata(file,path,kind,meta);
 }
 
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons};
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons,C_Campfires,C_Shelters};
     BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade,Kind_Expander,
-        Kind_AutoRepair,Kind_Heal,Kind_Armor,Kind_Beacon};
+        Kind_AutoRepair,Kind_Heal,Kind_Armor,Kind_Beacon,Kind_Campfire,Kind_Base};
     for(int file=0;file<sizeof(files);file++)
     {
         ConfigFile source=files[file];ArrayList ids=new ArrayList(ByteCountToCells(64));

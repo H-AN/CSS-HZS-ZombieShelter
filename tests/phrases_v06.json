@@ -1,0 +1,18 @@
+{
+  "BuildCampfireName": {"en":"Campfire","chi":"篝火"},
+  "RecipeCampfire": {"en":"Survival campfire","chi":"生存篝火"},
+  "CampfireDescription": {"en":"Temporary night shelter. Weapon hits repair it to keep it burning.","chi":"临时夜间庇护，攻击修复以维持篝火。"},
+  "BuildShelterName": {"en":"Player shelter base","chi":"自建庇护所基地"},
+  "RecipeShelter": {"en":"Build a new shelter base","chi":"建立新庇护所基地"},
+  "ShelterDescription": {"en":"Establish a new square base outside existing territory. It counts only after construction completes.","chi":"在现有基地外开辟方形基地，施工完成后才计入存活基地。"},
+  "ConstructionComplete": {"en":"Construction complete. The building is now active.","chi":"建造完成，建筑已启用。"},
+  "ConstructionIncomplete": {"en":"Under construction: hit with your weapon until full durability. Upgrades become available after completion.","chi":"施工中：用武器攻击建造至满耐久，完工后才能启用和升级。"},
+  "HUDConstruction": {"format":"{1:s},{2:d},{3:d}","en":"{1} | Construction {2}/{3}\nWeapon hit: continue building","chi":"{1} | 建造进度 {2}/{3}\n攻击继续建造"},
+  "BuildIndependentPlacement": {"en":"\nIndependent placement outside base territory is supported.","chi":"\n支持在基地建造区外独立放置。"},
+  "ShelterBaseLimit": {"format":"{1:d}","en":"Player base limit reached ({1}). Destroyed base IDs remain reserved until the next campaign.","chi":"自建基地数量已达上限（{1}），已毁基地名额保留至新战役。"},
+  "ShelterOutsideExistingBase": {"en":"Place the shelter outside existing base safety and construction areas.","chi":"请在现有基地安全区和建造区外放置庇护所。"},
+  "BuildStatSafeRadius": {"en":"Night shelter radius","chi":"夜间庇护半径"},
+  "BuildStatDecayAmount": {"en":"Durability decay","chi":"每次耐久消耗"},
+  "BuildStatDecayInterval": {"en":"Decay interval (seconds)","chi":"耐久消耗间隔（秒）"},
+  "BuildStatInactiveHP": {"en":"Inactive at or below HP","chi":"失效耐久阈值"}
+}

@@ -66,7 +66,7 @@ int RestorationDelta(int current,int maximum,int amount)
 
 bool RestorationRepairTarget(int station,int target)
 {
-    return station>=0 && station<MAX_BUILDINGS && target>=0 && target<MAX_BUILDINGS && gBuildings[target].used && gBuildings[target].alive
+    return station>=0 && station<MAX_BUILDINGS && BuildingOperational(target) && gBuildings[target].kind!=Kind_Campfire
         && gBuildings[target].hp>0 && gBuildings[target].hp<gBuildings[target].maxHP
         && gBuildings[target].buildCore==gBuildings[station].buildCore && Resolve(gBuildings[target].ref)>0
         && BuildAreaContains(gBuildings[station].buildCore,gBuildings[target].placementAnchor);

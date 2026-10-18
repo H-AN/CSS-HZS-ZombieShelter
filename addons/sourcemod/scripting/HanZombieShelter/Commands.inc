@@ -1,6 +1,6 @@
-static const char sBuildCategoryPhrases[][]={"HUDBaseGeneric","HUDTurretName","HUDFlameName","HUDFenceName","HUDMineName",
+static const char sBuildCategoryPhrases[][]={"BuildShelterName","HUDTurretName","HUDFlameName","HUDFenceName","HUDMineName",
     "HUDAmplifierName","HUDGeneratorName","HUDLightName","HUDGrenadeName","BuildExpanderName",
-    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName"};
+    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName","BuildCampfireName"};
 int gBuildMenuNonce[MAXPLAYERS+1],gBuildMenuEpoch[MAXPLAYERS+1],gBuildMenuSerial[MAXPLAYERS+1],gBuildMenuRevision[MAXPLAYERS+1];
 int gBuildMenuPreviewCore[MAXPLAYERS+1];
 BuildingKind gBuildMenuCategory[MAXPLAYERS+1];
@@ -36,7 +36,7 @@ void ShowBuildCategories(int client)
     if(!LiveHuman(client) || !Running())return;BeginBuildMenu(client);
     char title[192];Format(title,sizeof(title),"%T","BuildCategoryTitle",client);
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
-    for(int k=1;k<sizeof(sBuildCategoryPhrases);k++)
+    for(int k=0;k<sizeof(sBuildCategoryPhrases);k++)
     {
         bool available;for(int r=0;r<gRecipeCount;r++)if(view_as<int>(gRecipes[r].kind)==k){available=true;break;}
         if(!available)continue;
@@ -158,6 +158,18 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
         if(ReadBuildHalfExtents(file,profile,level,extents))
         {AddRecipeStat(menu,client,"BuildStatHalfX",extents[0]);AddRecipeStat(menu,client,"BuildStatHalfY",extents[1]);}
     }
+    if(kind==Kind_Campfire)
+    {
+        char type[64];if(StrContains(profile,"Types/")==0)strcopy(type,sizeof(type),profile[6]);
+        float radius,interval;int decay,threshold;bool noDecay;
+        if(ReadCampfireLevel(file,type,level,radius,decay,interval,threshold,noDecay))
+        {
+            AddRecipeStat(menu,client,"BuildStatSafeRadius",radius);
+            AddRecipeStat(menu,client,"BuildStatDecayAmount",float(decay));
+            AddRecipeStat(menu,client,"BuildStatDecayInterval",interval);
+            AddRecipeStat(menu,client,"BuildStatInactiveHP",float(threshold));
+        }
+    }
     if(kind==Kind_Amplifier)
     {
         static const char fields[][]={"player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus"};
@@ -184,8 +196,13 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
     Format(profile,sizeof(profile),"Types/%s",gRecipes[recipe].type);
     Format(title,sizeof(title),"%T",confirmation ? "BuildConfirmTitle" : "BuildDetailsTitle",client,name,description,ProfileMaximumLevel(gRecipes[recipe].file,profile));
     float anchor[3],origin[3],angles[3];gBuildMenuPreviewCore[client]=-1;
-    if(PlacementForRecipe(client,recipe,anchor,origin,angles,false))gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
-    if(gBuildMenuPreviewCore[client]>=0)AppendBuildCapacityInfo(client,gBuildMenuPreviewCore[client],title,sizeof(title));
+    bool outsideKind=gRecipes[recipe].kind==Kind_Campfire || gRecipes[recipe].file==C_Shelters;
+    bool previewValid=PlacementForRecipe(client,recipe,anchor,origin,angles,false);
+    if(previewValid)gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
+    if(previewValid && gRecipes[recipe].file==C_Shelters)
+    {previewValid=DynamicBasePositionAllowed(recipe,anchor,false,client);gBuildMenuPreviewCore[client]=gCoreCount;}
+    if(outsideKind && previewValid){Format(line,sizeof(line),"%T","BuildIndependentPlacement",client);StrCat(title,sizeof(title),line);}
+    else if(gBuildMenuPreviewCore[client]>=0)AppendBuildCapacityInfo(client,gBuildMenuPreviewCore[client],title,sizeof(title));
     else{Format(line,sizeof(line),"%T","BuildPreviewUnavailable",client);StrCat(title,sizeof(title),line);}
     bool groupAvailable=true;
     if(SupportMenuKind(gRecipes[recipe].kind) && gBuildMenuPreviewCore[client]>=0)
@@ -197,7 +214,7 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
     bool enough=HasBaseUpgradeMaterials(gRecipes[recipe].cost,client);
     AddBuildAction(menu,client,recipe,confirmation ? 3 : 2,confirmation ? (groupAvailable ? "BuildConfirmPlace" : "BuildSupportQuotaFull") : "BuildOpenConfirm",
-        !confirmation || (enough && groupAvailable && gBuildMenuPreviewCore[client]>=0));
+        !confirmation || (enough && groupAvailable && previewValid && (outsideKind || gBuildMenuPreviewCore[client]>=0)));
     AddBuildAction(menu,client,recipe,confirmation ? 6 : 5,confirmation ? "BuildBackDetails" : "BuildBackVariants");
     AddRecipeCostItems(menu,client,gRecipes[recipe].cost);
     if(!confirmation)
@@ -239,7 +256,7 @@ public int BuildMenuHandler(Menu menu,MenuAction action,int client,int item)
             && gBuildMenuRevision[client]==gConfigRevision && operation>=0 && operation<=6;
         if(!valid){if(LiveHuman(client))Tell(client,"%T","MenuExpired",client);return 0;}
         gBuildMenuNonce[client]++; // Consume before navigation, validation failure, or payment.
-        if(operation==0){if(key>0 && key<sizeof(sBuildCategoryPhrases))ShowBuildVariants(client,view_as<BuildingKind>(key));return 0;}
+        if(operation==0){if(key>=0 && key<sizeof(sBuildCategoryPhrases))ShowBuildVariants(client,view_as<BuildingKind>(key));return 0;}
         if(operation==4){ShowBuildCategories(client);return 0;}
         int recipe=key<view_as<int>(C_Count) ? FindRecipeByID(view_as<ConfigFile>(key),fields[3]) : -1;
         if(recipe<0){Tell(client,"%T","MenuExpired",client);return 0;}
@@ -342,6 +359,8 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     bool rising=(buttons&IN_USE)!=0 && (gLastButtons[client]&IN_USE)==0;gLastButtons[client]=buttons;
     if(!rising || !Running() || !LiveHuman(client) || GetGameTime()<gNextUse[client])return Plugin_Continue;
     int b=FindBuilding(AimedEntity(client,gUseDistance));
+    if(b>=0 && gBuildings[b].constructing)
+    {gNextUse[client]=GetGameTime()+gUseCooldown;Tell(client,"%t","ConstructionIncomplete");return Plugin_Continue;}
     if(b>=0 && gBuildings[b].kind==Kind_Beacon)
     {
         gNextUse[client]=GetGameTime()+gUseCooldown;ShowBeaconMenu(client,b);return Plugin_Continue;
@@ -670,6 +689,7 @@ bool ValidateBaseMenuToken(int client,const char[] token,int &core,int &operatio
 
 bool ReadBaseUpgrade(int building,int cost[MATERIALS],int &nextMaxHP)
 {
+    if(gBuildings[building].constructing)return false;
     return ReadBuildingLevelQuote(building,gBuildings[building].level+1,cost,nextMaxHP);
 }
 

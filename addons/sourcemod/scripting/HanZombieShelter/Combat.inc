@@ -26,7 +26,7 @@ int BlockingBuilding(int n,int client)
     }
     if(candidate<0 && gNPCs[n].touchedUntil>GetGameTime())
         for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].uid==gNPCs[n].touchedUID){candidate=b;break;}
-    if(candidate<0 || !gBuildings[candidate].alive || gBuildings[candidate].kind==Kind_Mine)return -1;
+    if(!BuildingOperational(candidate) || gBuildings[candidate].kind==Kind_Mine)return -1;
     int body=Resolve(gBuildings[candidate].ref);if(body<0)return -1;
     float local[3],mins[3],maxs[3],closest[3];LocalPoint(origin,gBuildings[candidate].origin,gBuildings[candidate].angles,local);
     GetEntPropVector(body,Prop_Send,"m_vecMins",mins);GetEntPropVector(body,Prop_Send,"m_vecMaxs",maxs);

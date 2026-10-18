@@ -34,16 +34,16 @@
   },
   "HUDBuildingTarget": {
     "format": "{1:s},{2:d},{3:d},{4:d},{5:s}",
-    "en": "{1} | Level {2}\nHP {3}/{4}\nKnife: repair | {5}",
-    "chi": "{1} | 等级 {2}\n血量 {3}/{4}\n刀修复 | {5}"
+    "en": "{1} | Level {2}\nHP {3}/{4}\nWeapon hit: repair | {5}",
+    "chi": "{1} | 等级 {2}\n血量 {3}/{4}\n攻击修复 | {5}"
   },
   "HUDResourceGrowing": {
     "en": "Regrowing",
     "chi": "正在恢复"
   },
   "HUDResourceKnife": {
-    "en": "Use your knife to gather",
-    "chi": "使用刀采集"
+    "en": "Attack to gather materials",
+    "chi": "攻击以采集材料"
   },
   "HUDResourceTarget": {
     "format": "{1:s},{2:d},{3:d},{4:s}",
@@ -161,8 +161,8 @@
     "chi": "[昼夜求生] 重新载入完成 enabled={1}"
   },
   "MenuBaseAlive": {
-    "en": "Knife repairs | Upgrades use your backpack",
-    "chi": "刀修复 | 升级消耗个人背包"
+    "en": "Weapon hits repair | Upgrades use your backpack",
+    "chi": "攻击修复 | 升级消耗个人背包"
   },
   "MenuBaseDestroyed": {
     "en": "Base destroyed; this safe area still offers shelter",

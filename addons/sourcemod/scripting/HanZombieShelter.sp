@@ -9,6 +9,9 @@
 #define HZSH_API_PROVIDER
 #include <HanZombieShelterAPI>
 #include "HanZombieShelter/Types.inc"
+#include "HanZombieShelter/Construction.inc"
+#include "HanZombieShelter/RepairWeapons.inc"
+#include "HanZombieShelter/Gathering.inc"
 #include "HanZombieShelter/Levels.inc"
 #include "HanZombieShelter/Progression.inc"
 #include "HanZombieShelter/Config.inc"
@@ -23,6 +26,8 @@
 #include "HanZombieShelter/Audio.inc"
 #include "HanZombieShelter/Power.inc"
 #include "HanZombieShelter/Restoration.inc"
+#include "HanZombieShelter/Campfires.inc"
+#include "HanZombieShelter/DynamicBases.inc"
 #include "HanZombieShelter/Beacon.inc"
 #include "HanZombieShelter/API.inc"
 #include "HanZombieShelter/World.inc"
@@ -45,6 +50,8 @@ public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 
 public void OnPluginStart()
 {
+    RegisterConstructionCvar();
+    RegisterRepairWeaponCommands();
     LoadTranslations("HanZombieShelter.phrases");
     LoadTranslations("common.phrases");
     InitializeShelterForwards();

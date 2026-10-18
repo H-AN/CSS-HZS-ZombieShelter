@@ -84,7 +84,7 @@ void RemoveOwnedRef(int ref)
 stock void LevelPath(int building,char[] path,int size,int level=0)
 {
     if(level==0)level=gBuildings[building].level;
-    if(gBuildings[building].kind==Kind_Base)Format(path,size,"Profiles/%s/Levels/%d",gCores[gBuildings[building].core].profile,level);
+    if(gBuildings[building].kind==Kind_Base && gBuildings[building].file==C_Bases)Format(path,size,"Profiles/%s/Levels/%d",gCores[gBuildings[building].core].profile,level);
     else Format(path,size,"Types/%s/Levels/%d",gBuildings[building].type,level);
 }
 
@@ -139,13 +139,14 @@ bool SpawnBuildingBody(int index)
     char target[64];Format(target,sizeof(target),"hzsh_build_%d_%d",gBuildings[index].uid,++gBuildings[index].generation);
     int entity=CreateBody(gBuildings[index].model,gBuildings[index].origin,gBuildings[index].angles,target,false,gBuildings[index].kind!=Kind_Base);
     if(entity<0)return false;
-    if(gBuildings[index].kind!=Kind_Base)
+    if(gBuildings[index].kind!=Kind_Base || gBuildings[index].file==C_Shelters)
     {
         SetEntityRenderMode(entity,RENDER_TRANSCOLOR);
         SetEntityRenderColor(entity,gBuildings[index].meta.render[0],gBuildings[index].meta.render[1],gBuildings[index].meta.render[2],gBuildings[index].meta.render[3]);
         if(HasEntProp(entity,Prop_Send,"m_nSkin"))SetEntProp(entity,Prop_Send,"m_nSkin",gBuildings[index].meta.skin);
     }
     gBuildings[index].ref=EntIndexToEntRef(entity);gBuildings[index].nextFire=GetGameTime()+0.5;gBuildings[index].lastAttackAt=0.0;
+    SyncConstructionVisual(index);
     if(IsRestorationKind(gBuildings[index].kind))gBuildings[index].nextRestore=GetGameTime()+gBuildings[index].restoreInterval;
     float worldMin[3],worldMax[3];ModelWorldBounds(entity,gBuildings[index].origin,gBuildings[index].angles,worldMin,worldMax);
     for(int a=0;a<3;a++){gBuildings[index].restoreMins[a]=worldMin[a]-gBuildings[index].origin[a];gBuildings[index].restoreMaxs[a]=worldMax[a]-gBuildings[index].origin[a];}
@@ -178,7 +179,8 @@ void CleanWorld()
 bool CreateWorld(bool restore)
 {
     gRebuilding=true;
-    for(int c=0;c<gCoreCount;c++)
+    if(!restore)ResetDynamicBases();
+    for(int c=0;c<gFixedCoreCount;c++)
     {
         int b=c;
         if(!restore)
@@ -192,7 +194,8 @@ bool CreateWorld(bool restore)
         gCores[c].building=b;
         if(gBuildings[b].alive && !SpawnBuildingBody(b)){gRebuilding=false;return false;}
     }
-    for(int i=gCoreCount;i<MAX_BUILDINGS;i++)
+    RestoreDynamicBaseBodies();
+    for(int i=MAX_CORES;i<MAX_BUILDINGS;i++)
         if(gBuildings[i].used && gBuildings[i].alive)
         {
             RestoreSavedBuilding(i);
@@ -329,8 +332,9 @@ bool ResourceSpaceOccupied(int node,int entity)
 
 void RestoreDeferredBuildings()
 {
+    RestoreDynamicBaseBodies();
     if(!CanAllocateEntities(2,true))return;
-    for(int b=gCoreCount;b<MAX_BUILDINGS;b++)
+    for(int b=MAX_CORES;b<MAX_BUILDINGS;b++)
     {
         if(!gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)>0)continue;
         if(GetGameTime()<gBuildings[b].restoreRetryAt)continue;
@@ -353,24 +357,18 @@ bool RestoreSavedBuilding(int b)
     LogMessage("[Shelter] defense UID %d deferred: entity/model capacity unavailable",gBuildings[b].uid);return false;
 }
 
-bool KnifeDamage(int attacker,int damageType)
-{
-    // CS:S knife TraceAttack uses DMG_BULLET | DMG_NEVERGIB (4098).
-    // Verify the actual active weapon; DMG_SLASH alone rejects real client swings.
-    bool cssKnife=(damageType&(DMG_BULLET|DMG_NEVERGIB))==(DMG_BULLET|DMG_NEVERGIB);
-    if(!LiveHuman(attacker) || (!(damageType&(DMG_SLASH|DMG_CLUB)) && !cssKnife))return false;
-    int weapon=GetEntPropEnt(attacker,Prop_Send,"m_hActiveWeapon");if(weapon<=MaxClients || !IsValidEntity(weapon))return false;
-    char classname[64];GetEntityClassname(weapon,classname,sizeof(classname));return StrEqual(classname,"weapon_knife");
-}
-
 public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType)
 {
     int n=FindNode(entity);damage=0.0;
-    if(n<0 || !Running() || gNodes[n].growing || !KnifeDamage(attacker,damageType))return Plugin_Handled;
-    // The engine has already traced this knife hit (including its swept hull).
+    if(n<0 || !Running() || gNodes[n].growing)return Plugin_Handled;
+    int repair,construction,multiplier;
+    if(!HeldWeaponWorkAmounts(attacker,repair,construction,multiplier,true) || multiplier<=0)return Plugin_Handled;
+    // The engine has already reported a resource hit. Current weapon classname
+    // selects the rule; neither a knife classname nor a weapon slot is required.
     float now=GetGameTime();if(now<gNextGather[attacker])return Plugin_Handled;
-    int m=gNodes[n].material,amount=Grant(m,gMaterials[m].yield,attacker);
-    if(amount<=0){Tell(attacker,"%t","PersonalBackpackFull");return Plugin_Handled;}
+    int amount;
+    if(!CollectGatherMaterial(attacker,gNodes[n].material,multiplier,amount))
+    {Tell(attacker,"%t","PersonalBackpackFull");return Plugin_Handled;}
     gNextGather[attacker]=now+gGatherCooldown;gNodes[n].remaining--;
     HudGatherFeedback(attacker,n,amount);
     PlayInteractionSound("gather",entity,gNodes[n].origin);
@@ -385,17 +383,19 @@ public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &
 public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType)
 {
     int b=FindBuilding(entity);damage=0.0;
-    if(b<0 || !gBuildings[b].alive || !Running() || !KnifeDamage(attacker,damageType))return Plugin_Handled;
-    float now=GetGameTime();if(now<gNextRepair[attacker])return Plugin_Handled;
-    gNextRepair[attacker]=now+gRepairCooldown;
-    int repair=Number(C_Bases,"Profiles/shelter_basic","repair_hp_per_hit",10);
-    if(gBuildings[b].kind==Kind_Generator)
-    {char profile[128];BuildingProfilePath(b,profile,sizeof(profile));repair=Number(C_Generators,profile,"repair_hp_per_hit",50);}
+    if(b<0 || !gBuildings[b].alive || !Running())return Plugin_Handled;
+    int repairHP,constructionHP;
+    if(!HeldRepairWeaponAmounts(attacker,repairHP,constructionHP))return Plugin_Handled;
+    // The external weapon system owns creation, firing rate and hit generation.
+    // Every received player hit uses one absolute amount; no building cooldown.
+    int repair=gBuildings[b].constructing ? constructionHP : repairHP;
+    if(repair<1)return Plugin_Handled;
     if(gBuildings[b].hp<gBuildings[b].maxHP)
     {
         int missing=gBuildings[b].maxHP-gBuildings[b].hp;if(repair>missing)repair=missing;
         if(repair<1)return Plugin_Handled;
         int before=gBuildings[b].hp;gBuildings[b].hp+=repair;
+        if(gBuildings[b].constructing && gBuildings[b].hp>=gBuildings[b].constructionTarget)CompleteBuildingConstruction(b,attacker);
         if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
         HudRepairFeedback(attacker,b,gBuildings[b].hp-before);
         PlayInteractionSound("repair",entity,gBuildings[b].origin);
@@ -408,7 +408,7 @@ public Action BuildingTouch(int entity,int other)
 {
     if(!Running())return Plugin_Continue;
     int b=FindBuilding(entity),n=FindNPC(other);
-    if(b>=0 && n>=0 && gBuildings[b].alive && gBuildings[b].kind!=Kind_Mine && gNPCs[n].active)
+    if(b>=0 && n>=0 && BuildingOperational(b) && gBuildings[b].kind!=Kind_Mine && gNPCs[n].active)
     {
         gNPCs[n].touchedUID=gBuildings[b].uid;gNPCs[n].touchedUntil=GetGameTime()+0.75;
     }
@@ -418,6 +418,7 @@ public Action BuildingTouch(int entity,int other)
 void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
 {
     if(!Running() || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive || damage<1)return;
+    if(attacked && gBuildings[b].constructing)return;
     FenceRetaliationEvent reply;
     if(attacked)CaptureFenceRetaliation(b,attackerNPC,reply);
     if(attacked)gBuildings[b].lastAttackAt=GetGameTime();
@@ -448,7 +449,7 @@ void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
 
 int AliveCores()
 {
-    int count;for(int i=0;i<gCoreCount;i++){int b=gCores[i].building;if(b>=0 && gBuildings[b].alive)count++;}return count;
+    int count;for(int i=0;i<gCoreCount;i++){int b=gCores[i].building;if(BuildingOperational(b))count++;}return count;
 }
 
 int SummonCount()
@@ -459,6 +460,7 @@ int SummonCount()
 bool TryUpgrade(int client,int b)
 {
     if(!Running() || !LiveHuman(client) || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0)return false;
+    if(gBuildings[b].constructing){Tell(client,"%t","ConstructionIncomplete");return false;}
     if(!CanManageBuilding(client,b)){Tell(client,"%t","BuildingNotOwned");return false;}
     if(gBuildings[b].kind==Kind_Base)
     {float position[3];GetClientAbsOrigin(client,position);if(SafeCoreAt(position)!=gBuildings[b].core)return false;}
@@ -586,24 +588,27 @@ stock bool Placement(int client,const char[] model,float origin[3],float angles[
 bool BuildRecipe(int client,int recipe,int expectedCore=-1)
 {
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
+    if(gRecipes[recipe].file==C_Shelters)return BuildDynamicBase(client,recipe,expectedCore);
     if(!CheckConstructionBudget(client))return false;
     if(SummonCount()>=gSummonLimit){Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
     if(gRecipes[recipe].kind==Kind_Light && LightCount()>=gLightLimit){Tell(client,"%t","LightLimitReached",gLightLimit);return false;}
     int required;
     if(gRecipes[recipe].kind==Kind_Amplifier && !CanBuildAmplifier(gRecipes[recipe].type,1,required))
     {Tell(client,"%t","AmplifierBaseLevelRequired",required);return false;}
-    int slot=-1;for(int i=gCoreCount;i<MAX_BUILDINGS;i++)if(!gBuildings[i].used || !gBuildings[i].alive){slot=i;break;}
+    int slot=-1;for(int i=MAX_CORES;i<MAX_BUILDINGS;i++)if(!gBuildings[i].used || !gBuildings[i].alive){slot=i;break;}
     if(slot<0)return false;
     char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
     float anchor[3],origin[3],angles[3];if(!PlacementForRecipe(client,recipe,anchor,origin,angles))return false;
     int buildCore=BuildCoreAt(anchor);
     if(expectedCore>=0 && buildCore!=expectedCore){Tell(client,"%t","BuildMenuTargetChanged");return false;}
-    if(buildCore<0)
+    bool independent=gRecipes[recipe].kind==Kind_Campfire;
+    if(independent)buildCore=-1;
+    if(buildCore<0 && !independent)
     {
         bool horizontal;for(int c=0;c<gCoreCount;c++)if(BuildAreaContains(c,anchor,false)){horizontal=true;break;}
         Tell(client,"%t",horizontal ? "BuildHeightOutside" : "BuildOutsideArea");return false;
     }
-    if(!CheckBuildCapacity(client,buildCore))return false;
+    if(!independent && !CheckBuildCapacity(client,buildCore))return false;
     if(IsBaseSupportKind(gRecipes[recipe].kind))
     {
         int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
@@ -619,7 +624,9 @@ bool BuildRecipe(int client,int recipe,int expectedCore=-1)
     strcopy(value.type,sizeof(value.type),gRecipes[recipe].type);strcopy(value.model,sizeof(value.model),model);gBuildings[slot]=value;
     AssignBuildingOwner(slot,client);
     for(int m=0;m<gMaterialCount;m++)gBuildings[slot].invested[m]=gRecipes[recipe].cost[m];
-    if(!ApplyBuildingLevel(slot,true) || !SpawnBuildingBody(slot))
+    bool prepared=ApplyBuildingLevel(slot,true);
+    if(prepared)BeginBuildingConstruction(slot);
+    if(!prepared || !SpawnBuildingBody(slot))
     {
         RemoveBuildingEffect(slot);int failedRef=gBuildings[slot].ref;gBuildings[slot].ref=INVALID_ENT_REFERENCE;
         gBuildings[slot].used=false;gBuildings[slot].alive=false;RemoveOwnedRef(failedRef);
@@ -627,5 +634,7 @@ bool BuildRecipe(int client,int recipe,int expectedCore=-1)
     }
     MarkBuildAreasDirty();RecalculatePower();PlayBuildingSound(slot,"build");
     char label[128];TranslateLabel(client,gRecipes[recipe].label,label,sizeof(label));
-    Tell(client,"%t","DefenseBuilt",label);return true;
+    if(gBuildings[slot].constructing)Tell(client,"%t","ConstructionIncomplete");
+    else Tell(client,"%t","DefenseBuilt",label);
+    return true;
 }

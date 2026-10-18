@@ -350,6 +350,11 @@
         "en"    "Teleport beacon"
         "chi"    "传送信标"
     }
+    "BuildCampfireName"
+    {
+        "en"    "Campfire"
+        "chi"    "篝火"
+    }
     "BuildCapacityInfo"
     {
         "#format"    "{1:s},{2:d},{3:d},{4:d}"
@@ -436,6 +441,11 @@
     {
         "en"    "This position exceeds the base's building height limits."
         "chi"    "此位置超出了基地允许的建造高度."
+    }
+    "BuildIndependentPlacement"
+    {
+        "en"    "\nIndependent placement outside base territory is supported."
+        "chi"    "\n支持在基地建造区外独立放置。"
     }
     "BuildInvalidSurface"
     {
@@ -539,6 +549,11 @@
         "en"    "Repairs this base's structures inside its current red building rectangle."
         "chi"    "修复本基地当前红色建造范围内的建筑."
     }
+    "BuildShelterName"
+    {
+        "en"    "Player shelter base"
+        "chi"    "自建庇护所基地"
+    }
     "BuildSkySurface"
     {
         "en"    "The sky is not a building surface."
@@ -599,6 +614,16 @@
         "en"    "Direct damage"
         "chi"    "直接伤害"
     }
+    "BuildStatDecayAmount"
+    {
+        "en"    "Durability decay"
+        "chi"    "每次耐久消耗"
+    }
+    "BuildStatDecayInterval"
+    {
+        "en"    "Decay interval (seconds)"
+        "chi"    "耐久消耗间隔（秒）"
+    }
     "BuildStatDefenseBoss"
     {
         "en"    "Defense damage bonus vs Boss (%)"
@@ -623,6 +648,11 @@
     {
         "en"    "Player HP restored per pulse"
         "chi"    "每次恢复玩家生命"
+    }
+    "BuildStatInactiveHP"
+    {
+        "en"    "Inactive at or below HP"
+        "chi"    "失效耐久阈值"
     }
     "BuildStatInterval"
     {
@@ -693,6 +723,11 @@
     {
         "en"    "Restoration interval (seconds)"
         "chi"    "恢复间隔 (秒)"
+    }
+    "BuildStatSafeRadius"
+    {
+        "en"    "Night shelter radius"
+        "chi"    "夜间庇护半径"
     }
     "BuildStatValue"
     {
@@ -777,6 +812,11 @@
         "en"    "You defeated the Boss. This map has been cleared!"
         "chi"    "你战胜了Boss, 本地图已经肃清!"
     }
+    "CampfireDescription"
+    {
+        "en"    "Temporary night shelter. Weapon hits repair it to keep it burning."
+        "chi"    "临时夜间庇护，攻击修复以维持篝火。"
+    }
     "CmdDayUsage"
     {
         "en"    "Usage: sm_zsh_day <1..100000>"
@@ -859,6 +899,16 @@
         "#format"    "{1:s}"
         "en"    "Configuration rejected: {1}"
         "chi"    "配置拒绝启动: {1}"
+    }
+    "ConstructionComplete"
+    {
+        "en"    "Construction complete. The building is now active."
+        "chi"    "建造完成，建筑已启用。"
+    }
+    "ConstructionIncomplete"
+    {
+        "en"    "Under construction: hit with your weapon until full durability. Upgrades become available after completion."
+        "chi"    "施工中：用武器攻击建造至满耐久，完工后才能启用和升级。"
     }
     "ConsumerPowerInfo"
     {
@@ -1107,20 +1157,26 @@
     "HUDBuildingAttacked"
     {
         "#format"    "{1:s},{2:d},{3:d},{4:d},{5:s}"
-        "en"    "{1} | Level {2} | UNDER ATTACK\nHP {3}/{4}\nKnife: repair | {5}"
-        "chi"    "{1} | 等级 {2} | 正在被攻击\n血量 {3}/{4}\n刀修复 | {5}"
+        "en"    "{1} | Level {2} | UNDER ATTACK\nHP {3}/{4}\nWeapon hit: repair | {5}"
+        "chi"    "{1} | 等级 {2} | 正在被攻击\n血量 {3}/{4}\n攻击修复 | {5}"
     }
     "HUDBuildingTarget"
     {
         "#format"    "{1:s},{2:d},{3:d},{4:d},{5:s}"
-        "en"    "{1} | Level {2}\nHP {3}/{4}\nKnife: repair | {5}"
-        "chi"    "{1} | 等级 {2}\n血量 {3}/{4}\n刀修复 | {5}"
+        "en"    "{1} | Level {2}\nHP {3}/{4}\nWeapon hit: repair | {5}"
+        "chi"    "{1} | 等级 {2}\n血量 {3}/{4}\n攻击修复 | {5}"
     }
     "HUDCampaign"
     {
         "#format"    "{1:d},{2:s},{3:d},{4:d},{5:d},{6:d},{7:d},{8:d},{9:d}"
         "en"    "Day {1} {2} | {3}s\nBases {4}/{5} | Boss {8}/{9}\nZombies {6}/{7}"
         "chi"    "第{1}天 {2} | {3}秒\n基地 {4}/{5} | Boss {8}/{9}\n丧尸 {6}/{7}"
+    }
+    "HUDConstruction"
+    {
+        "#format"    "{1:s},{2:d},{3:d}"
+        "en"    "{1} | Construction {2}/{3}\nWeapon hit: continue building"
+        "chi"    "{1} | 建造进度 {2}/{3}\n攻击继续建造"
     }
     "HUDDefenseUseHint"
     {
@@ -1216,8 +1272,8 @@
     }
     "HUDResourceKnife"
     {
-        "en"    "Use your knife to gather"
-        "chi"    "使用刀采集"
+        "en"    "Attack to gather materials"
+        "chi"    "攻击以采集材料"
     }
     "HUDResourceTarget"
     {
@@ -1315,8 +1371,8 @@
     }
     "MenuBaseAlive"
     {
-        "en"    "Knife repairs | Upgrades use your backpack"
-        "chi"    "刀修复 | 升级消耗个人背包"
+        "en"    "Weapon hits repair | Upgrades use your backpack"
+        "chi"    "攻击修复 | 升级消耗个人背包"
     }
     "MenuBaseDestroyed"
     {
@@ -1504,6 +1560,11 @@
         "en"    "Base beacon"
         "chi"    "基地信标"
     }
+    "RecipeCampfire"
+    {
+        "en"    "Survival campfire"
+        "chi"    "生存篝火"
+    }
     "RecipeDamageAmplifier"
     {
         "en"    "Damage amplifier"
@@ -1539,6 +1600,11 @@
         "en"    "Mine"
         "chi"    "地雷"
     }
+    "RecipeShelter"
+    {
+        "en"    "Build a new shelter base"
+        "chi"    "建立新庇护所基地"
+    }
     "RecipeTurretBasic"
     {
         "en"    "Basic machine gun turret"
@@ -1553,6 +1619,22 @@
     {
         "en"    "Safe spawn points are occupied. Head to a surviving base as soon as possible."
         "chi"    "安全出生点暂被占用, 请尽快前往存活基地."
+    }
+    "ShelterBaseLimit"
+    {
+        "#format"    "{1:d}"
+        "en"    "Player base limit reached ({1}). Destroyed base IDs remain reserved until the next campaign."
+        "chi"    "自建基地数量已达上限（{1}），已毁基地名额保留至新战役。"
+    }
+    "ShelterDescription"
+    {
+        "en"    "Establish a new square base outside existing territory. It counts only after construction completes."
+        "chi"    "在现有基地外开辟方形基地，施工完成后才计入存活基地。"
+    }
+    "ShelterOutsideExistingBase"
+    {
+        "en"    "Place the shelter outside existing base safety and construction areas."
+        "chi"    "请在现有基地安全区和建造区外放置庇护所。"
     }
     "StorageDeposited"
     {

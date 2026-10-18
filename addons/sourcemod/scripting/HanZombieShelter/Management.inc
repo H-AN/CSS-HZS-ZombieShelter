@@ -66,7 +66,7 @@ bool TakeBuildingOwnership(int client,int b)
 void AbandonClientBuildings(int client)
 {
     int serial=GetClientSerial(client);
-    for(int b=gCoreCount;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].ownerSerial==serial)
+    for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].ownerSerial==serial)
     {gBuildings[b].ownerSerial=0;gBuildings[b].ownerKey[0]=0;}
 }
 
@@ -122,7 +122,7 @@ bool DismantleBuilding(int client,int b,bool adminAction=false)
 bool AdminSetBuildingLevel(int client,int b,int level)
 {
     if(!IsShelterAdmin(client) || !Running() || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used
-        || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0 || !BuildingLevelAvailable(b,level))return false;
+        || !gBuildings[b].alive || gBuildings[b].constructing || Resolve(gBuildings[b].ref)<0 || !BuildingLevelAvailable(b,level))return false;
     Building previous;previous=gBuildings[b];gBuildings[b].level=level;
     if(!ApplyBuildingLevel(b,false)){gBuildings[b]=previous;return false;}
     gBuildings[b].upgraded=level>1;

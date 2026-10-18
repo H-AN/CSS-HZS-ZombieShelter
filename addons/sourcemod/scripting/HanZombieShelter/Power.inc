@@ -38,7 +38,7 @@ int GridAt(const float origin[3])
 
 float GeneratorOutput(int b)
 {
-    if(b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive
+    if(!BuildingOperational(b)
         || gBuildings[b].kind!=Kind_Generator || gBuildings[b].hp<=0 || gBuildings[b].maxHP<1 || Resolve(gBuildings[b].ref)<0
         || !BuildCoreAlive(gBuildings[b].powerCore))return 0.0;
     float fraction=float(gBuildings[b].hp)/float(gBuildings[b].maxHP);if(fraction>1.0)fraction=1.0;
@@ -47,7 +47,7 @@ float GeneratorOutput(int b)
 
 bool BuildingPowered(int b)
 {
-    return Running() && b>=0 && b<MAX_BUILDINGS && gBuildings[b].used && gBuildings[b].alive
+    return Running() && BuildingOperational(b)
         && Resolve(gBuildings[b].ref)>0 && BuildCoreAlive(gBuildings[b].powerCore)
         && (!gPowerEnabled || gBuildings[b].powerDemand<=0.0 || gBuildings[b].powered);
 }
@@ -64,7 +64,7 @@ void RecalculatePower()
     for(int b=0;b<MAX_BUILDINGS;b++)
     {
         gBuildings[b].powered=false;
-        if(!gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)<0)continue;
+        if(!BuildingOperational(b) || Resolve(gBuildings[b].ref)<0 || gBuildings[b].kind==Kind_Campfire)continue;
         if(IsBaseSupportKind(gBuildings[b].kind))
         {gBuildings[b].powerCore=gBuildings[b].buildCore;gBuildings[b].gridAssigned=true;}
         if(!gBuildings[b].gridAssigned)

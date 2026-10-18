@@ -36,6 +36,7 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Heal: TranslateLabel(client,"BuildHealName",name,length);
         case Kind_Armor: TranslateLabel(client,"BuildArmorName",name,length);
         case Kind_Beacon: TranslateLabel(client,"BuildBeaconName",name,length);
+        case Kind_Campfire: TranslateLabel(client,"BuildCampfireName",name,length);
     }
 }
 
@@ -60,6 +61,11 @@ void HudBuildingTarget(int client,int building)
         (gBuildings[building].kind==Kind_Beacon ? "HUDBeaconUseHint" : "HUDDefenseUseHint"),action,sizeof(action));
     SetHudTextParams(-1.0,0.54,0.4,225,245,255,255,0,0.0,0.0,0.1);
     char text[512];
+    if(gBuildings[building].constructing)
+    {
+        ShowHudText(client,HUD_TARGET,"%T","HUDConstruction",client,name,gBuildings[building].hp,gBuildings[building].constructionTarget);
+        return;
+    }
     Format(text,sizeof(text),"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
         gBuildings[building].level,gBuildings[building].hp,gBuildings[building].maxHP,action);
     char line[160];int core=gBuildings[building].kind==Kind_Base ? gBuildings[building].core : gBuildings[building].buildCore;

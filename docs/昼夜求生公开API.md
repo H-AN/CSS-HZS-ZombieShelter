@@ -1,6 +1,8 @@
 # HanZombieShelter API v2（环境 API v1）
 
-提供方0.5.0，库名 `HanZombieShelter`；头文件 `addons/sourcemod/scripting/include/HanZombieShelterAPI.inc`。提供只读状态、全局forward和明确授权的基地选择/安全回城，不提供切阶段、刷怪或扣料后门。HZS主体API职责保持原有边界。
+提供方0.6.0，库名 `HanZombieShelter`；头文件 `addons/sourcemod/scripting/include/HanZombieShelterAPI.inc`。提供只读状态、全局forward和明确授权的基地选择/安全回城，不提供切阶段、刷怪或扣料后门。HZS主体API职责保持原有边界。
+
+v0.6 保持总体 API v2、环境 API v1 和所有旧枚举值，末尾追加 `HZSHBuilding_Campfire=14`。基地数量包含本战役已分配的自建基地，已毁编号在新战役前不回收。`HZSH_GetBaseInfo` / `HZSH_GetBuildingInfo` 的 `alive` 表示已完成并有效存活：施工蓝图仍可查询，返回 `alive=false`，不能将“查询成功”当成基地已启用。自建基地完工后可使用现有电网、仓库和回城 API；回城在动态区域内检查落地和真人 hull，无可用位置时返回 false。篝火仅提供夜间暴露保护，不是基地或电网；现有接口不单独返回篝火燃烧阈值或施工标志，应读取相关配置，不依赖 HP=1 猜测状态。
 
 | Native | 用途 |
 | --- | --- |
@@ -15,7 +17,7 @@
 | HZSH_GetBuildingInfo | 按UID查种类、电网、等级、HP、存活/供电、耗电和有效发电 |
 | HZSH_GetPlayerMaterials | 在线玩家木、铁、铜、银、金五个材料 |
 | HZSH_GetMaterialCount / HZSH_GetMaterialId | 登记材料数量及按当前配置修订枚举稳定 ID |
-| HZSH_GetPlayerMaterialAmount / HZSH_GetBaseMaterialAmount | 按材料 ID 查询在线玩家（不要求存活）或固定基地余额 |
+| HZSH_GetPlayerMaterialAmount / HZSH_GetBaseMaterialAmount | 按材料 ID 查询在线玩家（不要求存活）或基地余额 |
 
 共16个native。旧 `HZSH_GetPlayerMaterials(client, int materials[5])` 永远恰好写五格，固定顺序 wood/iron/copper/silver/gold；新增材料通过 ID 接口查询，不得向旧数组写全部材料。新数量查询遇未知 ID、非法对象或未初始化返回 false 并写0，合法零余额返回 true/0。严格要求总体版本等于1的消费者需要调整版本检查，环境接口版本仍为1。
 
