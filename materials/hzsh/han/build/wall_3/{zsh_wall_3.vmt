@@ -1,0 +1,8 @@
+"VertexLitGeneric"
+{
+    "$basetexture" "hzsh/han/build/wall_3/{zsh_wall_3"
+    "$surfaceprop" "concrete"
+    "$alphatest" "1"
+    "$alphatestreference" "0.24"
+    "$nocull" "1"
+}

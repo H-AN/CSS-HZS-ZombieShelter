@@ -23,7 +23,9 @@
 #include "HanZombieShelter/Drops.inc"
 #include "HanZombieShelter/Management.inc"
 #include "HanZombieShelter/EntityBudget.inc"
+#include "HanZombieShelter/Preview.inc"
 #include "HanZombieShelter/Audio.inc"
+#include "HanZombieShelter/ResourceFeedback.inc"
 #include "HanZombieShelter/Power.inc"
 #include "HanZombieShelter/Restoration.inc"
 #include "HanZombieShelter/Campfires.inc"
@@ -50,6 +52,7 @@ public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 
 public void OnPluginStart()
 {
+    ResetBuildPreviewState();
     RegisterConstructionCvar();
     RegisterRepairWeaponCommands();
     LoadTranslations("HanZombieShelter.phrases");
@@ -72,6 +75,7 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    ResetBuildPreviewState();ClearConstructionSafety();
     ClearNPCDropCaches();ClearDefenseState();MarkBuildAreasDirty();
     gEpoch++;gEnabled=false;gCoreReady=false;gRoundPrepared=false;gSnapshot=false;gRollback=false;gTerminal=false;
     gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;
@@ -113,6 +117,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    StopBuildPreview(client);
     ResetBeaconClient(client);
     CancelBaseTeleportSelection(client);
     SaveClientInventory(client);

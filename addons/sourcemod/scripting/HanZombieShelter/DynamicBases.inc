@@ -81,20 +81,33 @@ void SyncDynamicBasesGeometry()
     }
 }
 
-bool BuildDynamicBase(int client,int recipe,int expectedCore=-1)
+bool DynamicBaseHasSupport(int client,const float anchor[3],bool report)
+{
+    float down[3],up[3],normal[3];up=anchor;up[2]+=4.0;down=anchor;down[2]-=16.0;
+    Handle ground=TR_TraceRayFilterEx(up,down,MASK_SOLID,RayType_EndPoint,FilterPlacement,client);
+    bool supported=TR_DidHit(ground) && !TR_StartSolid(ground) && !TR_AllSolid(ground);
+    if(supported)TR_GetPlaneNormal(ground,normal);delete ground;
+    if(!supported || normal[2]<0.7)return PlacementError(client,"BuildInvalidSurface",report);
+    return true;
+}
+
+stock bool BuildDynamicBase(int client,int recipe,int expectedCore=-1)
+{
+    if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].file!=C_Shelters)return false;
+    PlacementCandidate candidate;if(!ComputeRecipePlacementCandidate(client,recipe,candidate,true))return false;
+    return BuildDynamicBaseAtCandidate(client,recipe,expectedCore,candidate);
+}
+
+bool BuildDynamicBaseAtCandidate(int client,int recipe,int expectedCore,PlacementCandidate candidate)
 {
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].file!=C_Shelters)return false;
     if(expectedCore>=0 && expectedCore!=gCoreCount){Tell(client,"%t","BuildMenuTargetChanged");return false;}
     if(!CheckConstructionBudget(client))return false;
-    float anchor[3],origin[3],angles[3];
-    if(!PlacementForRecipe(client,recipe,anchor,origin,angles)
-        || !DynamicBasePositionAllowed(recipe,anchor,true,client))return false;
-    // Reject a wall/ceiling or unsupported point even with upright model angles.
-    float down[3],up[3],normal[3];up=anchor;up[2]+=4.0;down=anchor;down[2]-=16.0;
-    Handle ground=TR_TraceRayFilterEx(up,down,MASK_SOLID,RayType_EndPoint,FilterExcept,client);
-    bool supported=TR_DidHit(ground) && !TR_StartSolid(ground) && !TR_AllSolid(ground);
-    if(supported)TR_GetPlaneNormal(ground,normal);delete ground;
-    if(!supported || normal[2]<0.7){Tell(client,"%t","BuildInvalidSurface");return false;}
+    char candidateProfile[128],candidateModel[PLATFORM_MAX_PATH];Format(candidateProfile,sizeof(candidateProfile),"Types/%s",gRecipes[recipe].type);
+    Text(C_Shelters,candidateProfile,"model",candidateModel,sizeof(candidateModel));
+    if(!ValidatePlacementCandidate(client,candidateModel,gRecipes[recipe].meta,candidate,true)
+        || !DynamicBasePositionAllowed(recipe,candidate.anchor,true,client) || !DynamicBaseHasSupport(client,candidate.anchor,true))return false;
+    float anchor[3],origin[3],angles[3];anchor=candidate.anchor;origin=candidate.origin;angles=candidate.angles;
     if(!Spend(gRecipes[recipe].cost,client)){Tell(client,"%t","BuildPersonalMaterialsMissing");return false;}
     int c=gCoreCount;
     CoreDef core;core.dynamic=true;core.building=c;core.origin=anchor;core.buildCenter=anchor;

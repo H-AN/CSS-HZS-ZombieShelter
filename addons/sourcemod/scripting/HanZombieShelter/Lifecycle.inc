@@ -75,6 +75,7 @@ void StartNight()
     ApplyDayCvars();TrimOrdinary(NightTarget());
     gNextExposure=GetGameTime()+gExposureInterval;
     AnnouncePhrase("NightStarted",gDay,gExposureInterval,gExposureDamage);
+    if(previous!=Phase_Night)PlayGlobalInteractionSound("night_start");
     PowerTick();NotifyPhaseChanged(previous,gNightSeconds);
 }
 
@@ -119,10 +120,12 @@ void QueueOutcome(bool victory)
 
 public void ResolveOutcome(any epoch)
 {
-    if(epoch!=gEpoch || !gEnabled || gTerminal || (!gVictoryCandidate && !gFailureCandidate))return;
+    if(epoch!=gEpoch || !gEnabled || gTerminal || gPhase==Phase_Ending || (!gVictoryCandidate && !gFailureCandidate))return;
     gOutcomeQueued=false;bool victory=gVictoryCandidate;
     Phase previous=gPhase;int previousDay=gDay;
-    gPhase=Phase_Ending;gSnapshot=true;ClearGrenades();StopPowerEffects();
+    gPhase=Phase_Ending;gSnapshot=true;
+    PlayGlobalInteractionSound(victory ? "victory" : "failure");
+    ClearGrenades();StopPowerEffects();
     for(int n=0;n<MAX_NPCS;n++)
     {
         if(!gNPCs[n].used || !gNPCs[n].ready || gNPCs[n].dead)continue;

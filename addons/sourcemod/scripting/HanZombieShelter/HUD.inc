@@ -148,6 +148,18 @@ void HudRepairFeedback(int client,int building,int restoredHP)
     HudBuildingTarget(client,building);
 }
 
+void AppendLocalBasePowerHUD(int client,char[] text,int length)
+{
+    if(!LiveHuman(client))return;
+    float position[3];GetClientAbsOrigin(client,position);
+    int core=SafeCoreAt(position);
+    if(core<0)core=BuildCoreAt(position);
+    if(!BuildCoreAlive(core))return;
+    char name[64],line[160];CoreDisplayName(core,name,sizeof(name),client);
+    Format(line,sizeof(line),"%T","HUDLocalBasePower",client,name,gGridDemand[core],gGridProduction[core]);
+    StrCat(text,length,line);
+}
+
 void RenderCampaignHUD()
 {
     float now=GetGameTime();bool refreshStatus=now>=gNextHUD;
@@ -182,10 +194,12 @@ void RenderCampaignHUD()
             float seconds=gDeadline-now;if(seconds<0.0)seconds=0.0;
             char phase[32];TranslateLabel(client,gPhase==Phase_Day ? "HUDPhaseDay" : "HUDPhaseNight",phase,sizeof(phase));
             SetHudTextParams(0.64,0.06,1.2,230,240,255,255,0,0.0,0.0,0.1);
-            ShowHudText(client,HUD_CAMPAIGN,"%T","HUDCampaign",client,
+            char campaign[512];Format(campaign,sizeof(campaign),"%T","HUDCampaign",client,
                 gDay,phase,RoundToCeil(seconds),AliveCores(),gCoreCount,
                 ActiveOrdinary(),OrdinaryTarget(),bosses,gBossCount);
-            SetHudTextParams(0.64,0.18,1.2,220,225,170,255,0,0.0,0.0,0.1);
+            AppendLocalBasePowerHUD(client,campaign,sizeof(campaign));
+            ShowHudText(client,HUD_CAMPAIGN,"%s",campaign);
+            SetHudTextParams(0.64,0.22,1.2,220,225,170,255,0,0.0,0.0,0.1);
             char balances[512],entry[100];int shown;
             for(int m=0;m<gMaterialCount;m++)if(gPlayerInventory[client][m]>0)
             {

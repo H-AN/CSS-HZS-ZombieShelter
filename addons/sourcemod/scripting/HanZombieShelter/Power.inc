@@ -101,8 +101,15 @@ void RecalculatePower()
         {gBuildings[next].powered=true;gGridAllocated[core]+=gBuildings[next].powerDemand;}
         else gGridOffline[core]++;
     }
+    bool powerLost[MAX_CORES];
     for(int b=0;b<MAX_BUILDINGS;b++)
     {
+        // A fresh unpowered load is not a fault. Coalesce actual lost loads into
+        // one edge per grid, including a destroyed base's surviving loads.
+        int core=gBuildings[b].powerCore;
+        if(Running() && gPowerEnabled && wasPowered[b] && !gBuildings[b].powered
+            && BuildingOperational(b) && gBuildings[b].powerDemand>0.0 && Resolve(gBuildings[b].ref)>0
+            && core>=0 && core<gCoreCount)powerLost[core]=true;
         if(wasPowered[b]!=gBuildings[b].powered)
         {
             InvalidateDefenseCache(b);
@@ -112,6 +119,9 @@ void RecalculatePower()
         if(gBuildings[b].used && gBuildings[b].kind==Kind_Beacon)SyncBeaconMarker(b);
     }
     RefreshBuildAreas();
+    // Allocation is committed before audio and forwards. A notification that
+    // recalculates the unchanged grid sees no additional powered-to-off edge.
+    for(int c=0;c<gCoreCount;c++)if(powerLost[c])PlayCoreInteractionSound(c,"power_failure");
     for(int c=0;c<gCoreCount;c++)
         if(beforeOutput[c]!=gGridProduction[c] || beforeDemand[c]!=gGridDemand[c] || beforeAllocated[c]!=gGridAllocated[c] || beforeOffline[c]!=gGridOffline[c])NotifyPowerChanged(c);
 }

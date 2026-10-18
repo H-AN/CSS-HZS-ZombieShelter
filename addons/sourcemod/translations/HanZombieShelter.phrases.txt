@@ -1172,6 +1172,12 @@
         "en"    "Day {1} {2} | {3}s\nBases {4}/{5} | Boss {8}/{9}\nZombies {6}/{7}"
         "chi"    "第{1}天 {2} | {3}秒\n基地 {4}/{5} | Boss {8}/{9}\n丧尸 {6}/{7}"
     }
+    "HUDLocalBasePower"
+    {
+        "#format"    "{1:s},{2:.0f},{3:.0f}"
+        "en"    "\n{1} Power {2}/{3}"
+        "chi"    "\n{1} 电量 {2}/{3}"
+    }
     "HUDConstruction"
     {
         "#format"    "{1:s},{2:d},{3:d}"

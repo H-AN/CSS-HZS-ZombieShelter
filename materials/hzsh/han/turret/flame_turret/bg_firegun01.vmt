@@ -1,0 +1,8 @@
+"VertexLitGeneric"
+{
+    "$basetexture" "hzsh/han/turret/flame_turret/bg_firegun01"
+    "$surfaceprop" "metal"
+    "$alphatest" "0"
+    "$alphatestreference" "0.5"
+    "$nocull" "1"
+}

@@ -386,8 +386,9 @@ void MineWorldTick()
 
 public Action DefenseTimer(Handle timer)
 {
+    float now=GetGameTime();BuildPreviewTick(now);ConstructionSafetyTick(now);
     if(!Running() || gRebuilding || !APIAvailable())return Plugin_Continue;
-    float now=GetGameTime();int epoch=gEpoch;
+    int epoch=gEpoch;
     for(int b=0;b<MAX_BUILDINGS;b++)
     {
         if(!Running() || gRebuilding || epoch!=gEpoch)break;

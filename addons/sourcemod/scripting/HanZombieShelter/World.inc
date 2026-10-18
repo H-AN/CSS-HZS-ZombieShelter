@@ -164,6 +164,8 @@ bool SpawnBuildingBody(int index)
 
 void CleanWorld()
 {
+    ClearConstructionSafety();
+    ClearAllBuildPreviews();
     ClearDefenseState();ClearGrenades();ClearBeaconMarkers();StopPowerEffects();MarkBuildAreasDirty();
     for(int i=0;i<MAX_BUILDINGS;i++)
     {
@@ -357,10 +359,11 @@ bool RestoreSavedBuilding(int b)
     LogMessage("[Shelter] defense UID %d deferred: entity/model capacity unavailable",gBuildings[b].uid);return false;
 }
 
-public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType)
+public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType,int &weapon,float damageForce[3],float damagePosition[3])
 {
     int n=FindNode(entity);damage=0.0;
     if(n<0 || !Running() || gNodes[n].growing)return Plugin_Handled;
+    ResourceMeleeFeedback(entity,attacker,inflictor,damagePosition);
     int repair,construction,multiplier;
     if(!HeldWeaponWorkAmounts(attacker,repair,construction,multiplier,true) || multiplier<=0)return Plugin_Handled;
     // The engine has already reported a resource hit. Current weapon classname
@@ -371,7 +374,7 @@ public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &
     {Tell(attacker,"%t","PersonalBackpackFull");return Plugin_Handled;}
     gNextGather[attacker]=now+gGatherCooldown;gNodes[n].remaining--;
     HudGatherFeedback(attacker,n,amount);
-    PlayInteractionSound("gather",entity,gNodes[n].origin);
+    if(amount>0)PlayInteractionSound("gather",entity,gNodes[n].origin);
     if(gNodes[n].remaining<=0)
     {
         gNodes[n].remaining=0;gNodes[n].growing=true;gNodes[n].elapsed=0.0;gNodes[n].rerollPending=true;
@@ -398,7 +401,8 @@ public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &
         if(gBuildings[b].constructing && gBuildings[b].hp>=gBuildings[b].constructionTarget)CompleteBuildingConstruction(b,attacker);
         if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
         HudRepairFeedback(attacker,b,gBuildings[b].hp-before);
-        PlayInteractionSound("repair",entity,gBuildings[b].origin);
+        // Knife/axe already emits its own wall impact; avoid a second wall sound.
+        if(!ResourceMeleeHit(attacker,inflictor))PlayInteractionSound("repair",entity,gBuildings[b].origin);
     }
     else HudRepairFeedback(attacker,b,0);
     return Plugin_Handled; // Friendly bullets and engine prop health never own logical HP.
@@ -422,6 +426,9 @@ void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
     FenceRetaliationEvent reply;
     if(attacked)CaptureFenceRetaliation(b,attackerNPC,reply);
     if(attacked)gBuildings[b].lastAttackAt=GetGameTime();
+    bool alarm=attacked && ClaimBaseAttackAlarm(b,GetGameTime());
+    int alarmEpoch=gEpoch,alarmRef=gBuildings[b].ref;
+    float alarmOrigin[3];alarmOrigin=gBuildings[b].origin;
     gBuildings[b].hp-=damage;
     if(gBuildings[b].hp>0)
     {
@@ -442,6 +449,9 @@ void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
             if(AliveCores()==0)QueueOutcome(false);
         }
     }
+    // Emit only after damage/death has been committed. Sound hooks may re-enter;
+    // this snapshot must not adopt a reused slot or the next campaign's base.
+    if(alarm && alarmEpoch==gEpoch)PlayInteractionSound("base_alarm",Resolve(alarmRef),alarmOrigin);
     // All data, including fixed base and owner, came from the attacking event.
     // No read of b occurs here: a destroyed fence's slot may already be reused.
     ApplyFenceRetaliation(reply);
@@ -519,14 +529,8 @@ void SurfacePlacementAngles(float yaw,const float normal[3],float frame[3])
     NormalizeVector(forwardVector,forwardVector);AnglesFromForwardUp(forwardVector,up,frame);
 }
 
-bool ComputePlacement(int client,const char[] model,BuildingMetadata meta,float anchor[3],float origin[3],float angles[3],bool report)
+bool PlacementSurfaceAllowed(int hit,int surface,int client,bool report)
 {
-    if(!LiveHuman(client))return false;
-    float eye[3],direction[3],view[3],end[3];GetClientEyePosition(client,eye);GetClientEyeAngles(client,view);GetAngleVectors(view,direction,NULL_VECTOR,NULL_VECTOR);
-    for(int a=0;a<3;a++)end[a]=eye[a]+direction[a]*meta.maxDistance;
-    Handle trace=TR_TraceRayFilterEx(eye,end,MASK_SOLID,RayType_EndPoint,FilterExcept,client);
-    if(!TR_DidHit(trace) || TR_StartSolid(trace) || TR_AllSolid(trace)){delete trace;return PlacementError(client,"BuildNoSurface",report);}
-    int hit=TR_GetEntityIndex(trace);int surface=TR_GetSurfaceFlags(trace);float normal[3];TR_GetPlaneNormal(trace,normal);TR_GetEndPosition(anchor,trace);delete trace;
     if(surface&(SURF_SKY|SURF_SKY2D))return PlacementError(client,"BuildSkySurface",report);
     if(hit>0 && (hit<=MaxClients || FindNPC(hit)>=0 || (APIAvailable() && Han_IsZombie(hit))))return PlacementError(client,"BuildActorSurface",report);
     if(hit>MaxClients)
@@ -540,42 +544,140 @@ bool ComputePlacement(int client,const char[] model,BuildingMetadata meta,float 
         if(FindBuilding(hit)<0 && (movement==MOVETYPE_PUSH || movement==MOVETYPE_VPHYSICS
             || movement==MOVETYPE_FLY || movement==MOVETYPE_FLYGRAVITY || movement==MOVETYPE_STEP))return PlacementError(client,"BuildMovingSurface",report);
     }
-    for(int a=0;a<3;a++)if(!(anchor[a]>=-15000.0 && anchor[a]<=15000.0))return PlacementError(client,"BuildInvalidWorld",report);
-    if(GetVectorLength(normal)<0.5 || TR_PointOutsideWorld(anchor))return PlacementError(client,"BuildInvalidWorld",report);
-    // Only the explicit NPC/Boss creation columns protect space. Model size and
-    // human spawn candidates do not expand this anchor restriction.
-    if(ReservedBounds(anchor,anchor))return PlacementError(client,"BuildSpawnProtected",report);
-    float frame[3];frame[1]=view[1];
-    if(StrEqual(meta.placementMode,"wall"))
-    {
-        if(FloatAbs(normal[2])>0.7)return PlacementError(client,"BuildInvalidSurface",report);
-        GetVectorAngles(normal,frame);frame[2]=0.0;
-    }
-    else if(StrEqual(meta.placementMode,"surface"))
-        SurfacePlacementAngles(view[1],normal,frame);
-    ComposeModelAngles(frame,meta.angleOffset,angles);
-    WorldPoint(meta.originOffset,anchor,angles,origin);
-    for(int a=0;a<3;a++)if(!(origin[a]>=-15000.0 && origin[a]<=15000.0))return PlacementError(client,"BuildInvalidWorld",report);
-    if(TR_PointOutsideWorld(origin))return PlacementError(client,"BuildInvalidWorld",report);
-    if(!meta.allowOverlap)
-    {
-        int probe=CreateBody(model,origin,angles,"hzsh_placement_probe",true,true);
-        if(probe<0)return PlacementError(client,"BuildEntityCreationFailed",report);
-        AcceptEntityInput(probe,"DisableCollision");SetEntityRenderMode(probe,RENDER_TRANSCOLOR);SetEntityRenderColor(probe,255,255,255,0);
-        float low[3],high[3],mins[3],maxs[3];ModelWorldBounds(probe,origin,angles,low,high);
-        for(int a=0;a<3;a++){mins[a]=low[a]-origin[a];maxs[a]=high[a]-origin[a];}
-        bool clear=ClearHull(origin,mins,maxs,probe,MASK_PLAYERSOLID);RemoveEntity(probe);
-        if(!clear)return PlacementError(client,"BuildOverlapDenied",report);
-    }
     return true;
 }
 
-bool PlacementForRecipe(int client,int recipe,float anchor[3],float origin[3],float angles[3],bool report=true)
+void TransformPlacementCandidate(BuildingMetadata meta,PlacementCandidate candidate)
+{
+    float frame[3];frame[1]=candidate.yaw;
+    if(StrEqual(meta.placementMode,"wall"))
+    {
+        GetVectorAngles(candidate.normal,frame);frame[2]=0.0;
+    }
+    else if(StrEqual(meta.placementMode,"surface"))
+        SurfacePlacementAngles(candidate.yaw,candidate.normal,frame);
+    ComposeModelAngles(frame,meta.angleOffset,candidate.angles);
+    WorldPoint(meta.originOffset,candidate.anchor,candidate.angles,candidate.origin);
+}
+
+bool ValidatePlacementCandidate(int client,const char[] model,BuildingMetadata meta,PlacementCandidate candidate,bool report,bool checkSight=true)
+{
+    if(!LiveHuman(client) || !candidate.surface || candidate.epoch!=gEpoch || candidate.revision!=gConfigRevision)
+        return PlacementError(client,"BuildPreviewUnavailable",report);
+    int hit=candidate.surfaceRef==0 ? 0 : EntRefToEntIndex(candidate.surfaceRef);
+    if(hit<0 || (hit>0 && !IsValidEntity(hit)))return PlacementError(client,"BuildMenuTargetChanged",report);
+    if(!PlacementSurfaceAllowed(hit,candidate.surfaceFlags,client,report))return false;
+    for(int a=0;a<3;a++)
+    {
+        if(!(candidate.anchor[a]>=-15000.0 && candidate.anchor[a]<=15000.0)
+            || !(candidate.origin[a]>=-15000.0 && candidate.origin[a]<=15000.0)
+            || !(candidate.angles[a]>=-3600.0 && candidate.angles[a]<=3600.0)
+            || !(candidate.normal[a]>=-1.01 && candidate.normal[a]<=1.01))return PlacementError(client,"BuildInvalidWorld",report);
+    }
+    if(GetVectorLength(candidate.normal)<0.5 || TR_PointOutsideWorld(candidate.anchor) || TR_PointOutsideWorld(candidate.origin))
+        return PlacementError(client,"BuildInvalidWorld",report);
+    if(!(candidate.yaw>=-3600.0 && candidate.yaw<=3600.0))return PlacementError(client,"BuildInvalidWorld",report);
+    PlacementCandidate derived;derived=candidate;TransformPlacementCandidate(meta,derived);
+    if(GetVectorDistance(candidate.origin,derived.origin)>0.01 || GetVectorDistance(candidate.angles,derived.angles)>0.01)
+        return PlacementError(client,"BuildMenuTargetChanged",report);
+    if(ReservedBounds(candidate.anchor,candidate.anchor))return PlacementError(client,"BuildSpawnProtected",report);
+    if(StrEqual(meta.placementMode,"wall") && FloatAbs(candidate.normal[2])>0.7)
+        return PlacementError(client,"BuildInvalidSurface",report);
+    if(checkSight)
+    {
+        float eye[3],direction[3],end[3];GetClientEyePosition(client,eye);MakeVectorFromPoints(eye,candidate.anchor,direction);
+        if(GetVectorLength(direction)>meta.maxDistance+2.0)return PlacementError(client,"BuildingTooFar",report);
+        NormalizeVector(direction,direction);for(int a=0;a<3;a++)end[a]=candidate.anchor[a]+direction[a]*2.0;
+        Handle trace=TR_TraceRayFilterEx(eye,end,MASK_SOLID,RayType_EndPoint,FilterPlacement,client);
+        bool visible=TR_DidHit(trace) && !TR_StartSolid(trace) && !TR_AllSolid(trace);
+        if(visible)
+        {
+            float point[3],normal[3];TR_GetEndPosition(point,trace);TR_GetPlaneNormal(trace,normal);
+            int current=TR_GetEntityIndex(trace);
+            visible=current==hit && GetVectorDistance(point,candidate.anchor)<=1.0
+                && GetVectorDotProduct(normal,candidate.normal)>0.99;
+        }
+        delete trace;if(!visible)return PlacementError(client,"BuildMenuTargetChanged",report);
+    }
+    if(!meta.allowOverlap && !PlacementHullClear(model,candidate.origin,candidate.angles,-1))
+        return PlacementError(client,"BuildOverlapDenied",report);
+    return true;
+}
+
+bool ComputePlacementCandidate(int client,const char[] model,BuildingMetadata meta,PlacementCandidate candidate,bool report)
+{
+    PlacementCandidate empty;candidate=empty;candidate.epoch=gEpoch;candidate.revision=gConfigRevision;
+    if(!LiveHuman(client))return false;
+    float eye[3],direction[3],view[3],end[3];GetClientEyePosition(client,eye);GetClientEyeAngles(client,view);GetAngleVectors(view,direction,NULL_VECTOR,NULL_VECTOR);
+    for(int a=0;a<3;a++)end[a]=eye[a]+direction[a]*meta.maxDistance;
+    Handle trace=TR_TraceRayFilterEx(eye,end,MASK_SOLID,RayType_EndPoint,FilterPlacement,client);
+    if(!TR_DidHit(trace) || TR_StartSolid(trace) || TR_AllSolid(trace)){delete trace;return PlacementError(client,"BuildNoSurface",report);}
+    int hit=TR_GetEntityIndex(trace);candidate.surface=true;candidate.yaw=view[1];candidate.surfaceFlags=TR_GetSurfaceFlags(trace);
+    candidate.surfaceRef=hit>0 ? EntIndexToEntRef(hit) : 0;
+    TR_GetPlaneNormal(trace,candidate.normal);TR_GetEndPosition(candidate.anchor,trace);delete trace;
+    TransformPlacementCandidate(meta,candidate);
+    bool valid=ValidatePlacementCandidate(client,model,meta,candidate,report,false);
+    // Unsafe/no-surface candidates are hidden rather than left at an old point.
+    if(candidate.surfaceFlags&(SURF_SKY|SURF_SKY2D))candidate.surface=false;
+    return valid;
+}
+
+bool ComputeRecipePlacementCandidate(int client,int recipe,PlacementCandidate candidate,bool report=true)
 {
     if(recipe<0 || recipe>=gRecipeCount)return false;
     char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);
     Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
-    return ComputePlacement(client,model,gRecipes[recipe].meta,anchor,origin,angles,report);
+    return ComputePlacementCandidate(client,model,gRecipes[recipe].meta,candidate,report);
+}
+
+bool ComputePlacement(int client,const char[] model,BuildingMetadata meta,float anchor[3],float origin[3],float angles[3],bool report)
+{
+    PlacementCandidate candidate;bool valid=ComputePlacementCandidate(client,model,meta,candidate,report);
+    anchor=candidate.anchor;origin=candidate.origin;angles=candidate.angles;return valid;
+}
+
+bool PlacementForRecipe(int client,int recipe,float anchor[3],float origin[3],float angles[3],bool report=true)
+{
+    PlacementCandidate candidate;bool valid=ComputeRecipePlacementCandidate(client,recipe,candidate,report);
+    anchor=candidate.anchor;origin=candidate.origin;angles=candidate.angles;return valid;
+}
+
+bool RecipePlacementRules(int client,int recipe,PlacementCandidate candidate,int &buildCore,bool report,int budgetCredit=0)
+{
+    if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
+    int budget=2-budgetCredit;if(budget<1)budget=1;
+    if(!CanAllocateEntities(budget,true))return PlacementError(client,"BuildEntityCreationFailed",report);
+    if(!HasBaseUpgradeMaterials(gRecipes[recipe].cost,client))return PlacementError(client,"BuildPersonalMaterialsMissing",report);
+    if(gRecipes[recipe].file==C_Shelters)
+    {
+        buildCore=gCoreCount;
+        return DynamicBasePositionAllowed(recipe,candidate.anchor,report,client) && DynamicBaseHasSupport(client,candidate.anchor,report);
+    }
+    if(SummonCount()>=gSummonLimit){if(report)Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
+    if(gRecipes[recipe].kind==Kind_Light && LightCount()>=gLightLimit){if(report)Tell(client,"%t","LightLimitReached",gLightLimit);return false;}
+    int required;
+    if(gRecipes[recipe].kind==Kind_Amplifier && !CanBuildAmplifier(gRecipes[recipe].type,1,required))
+    {if(report)Tell(client,"%t","AmplifierBaseLevelRequired",required);return false;}
+    bool slot;for(int b=MAX_CORES;b<MAX_BUILDINGS;b++)if(!gBuildings[b].used || !gBuildings[b].alive){slot=true;break;}
+    if(!slot){if(report)Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
+    buildCore=gRecipes[recipe].kind==Kind_Campfire ? -1 : BuildCoreAt(candidate.anchor);
+    if(gRecipes[recipe].kind!=Kind_Campfire)
+    {
+        if(buildCore<0)
+        {
+            bool horizontal;for(int c=0;c<gCoreCount;c++)if(BuildAreaContains(c,candidate.anchor,false)){horizontal=true;break;}
+            return PlacementError(client,horizontal ? "BuildHeightOutside" : "BuildOutsideArea",report);
+        }
+        RefreshBuildAreas();if(gBuildAreas[buildCore].count>=gBuildAreas[buildCore].limit)
+        {if(report)Tell(client,"%t","BuildCoreFull",gBuildAreas[buildCore].count,gBuildAreas[buildCore].limit);return false;}
+    }
+    if(IsBaseSupportKind(gRecipes[recipe].kind))
+    {
+        int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
+        int count=gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind);
+        if(limit<1 || count>=limit){if(report)Tell(client,"%t","BuildSupportGroupLimitReached",count,limit);return false;}
+    }
+    return true;
 }
 
 // Kept for existing test helpers. Production uses the recipe-bound metadata.
@@ -585,10 +687,34 @@ stock bool Placement(int client,const char[] model,float origin[3],float angles[
     float anchor[3];return ComputePlacement(client,model,meta,anchor,origin,angles,false);
 }
 
-bool BuildRecipe(int client,int recipe,int expectedCore=-1)
+stock bool BuildRecipe(int client,int recipe,int expectedCore=-1)
+{
+    bool built=BuildRecipeTransaction(client,recipe,expectedCore);
+    if(!built && Running() && LiveHuman(client))PlayClientInteractionSound(client,"build_failed");
+    return built;
+}
+
+stock bool BuildRecipeTransaction(int client,int recipe,int expectedCore=-1)
 {
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
-    if(gRecipes[recipe].file==C_Shelters)return BuildDynamicBase(client,recipe,expectedCore);
+    PlacementCandidate candidate;if(!ComputeRecipePlacementCandidate(client,recipe,candidate,true))return false;
+    return BuildRecipeCandidateTransaction(client,recipe,expectedCore,candidate);
+}
+
+bool BuildRecipeAtCandidate(int client,int recipe,int expectedCore,PlacementCandidate candidate)
+{
+    bool built=BuildRecipeCandidateTransaction(client,recipe,expectedCore,candidate);
+    if(!built && Running() && LiveHuman(client))PlayClientInteractionSound(client,"build_failed");return built;
+}
+
+bool BuildRecipeCandidateTransaction(int client,int recipe,int expectedCore,PlacementCandidate candidate)
+{
+    if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
+    char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
+    if(!ValidatePlacementCandidate(client,model,gRecipes[recipe].meta,candidate,true))return false;
+    int buildCore=-1;if(!RecipePlacementRules(client,recipe,candidate,buildCore,true))return false;
+    if(expectedCore>=0 && buildCore!=expectedCore){Tell(client,"%t","BuildMenuTargetChanged");return false;}
+    if(gRecipes[recipe].file==C_Shelters)return BuildDynamicBaseAtCandidate(client,recipe,expectedCore,candidate);
     if(!CheckConstructionBudget(client))return false;
     if(SummonCount()>=gSummonLimit){Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
     if(gRecipes[recipe].kind==Kind_Light && LightCount()>=gLightLimit){Tell(client,"%t","LightLimitReached",gLightLimit);return false;}
@@ -597,10 +723,7 @@ bool BuildRecipe(int client,int recipe,int expectedCore=-1)
     {Tell(client,"%t","AmplifierBaseLevelRequired",required);return false;}
     int slot=-1;for(int i=MAX_CORES;i<MAX_BUILDINGS;i++)if(!gBuildings[i].used || !gBuildings[i].alive){slot=i;break;}
     if(slot<0)return false;
-    char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
-    float anchor[3],origin[3],angles[3];if(!PlacementForRecipe(client,recipe,anchor,origin,angles))return false;
-    int buildCore=BuildCoreAt(anchor);
-    if(expectedCore>=0 && buildCore!=expectedCore){Tell(client,"%t","BuildMenuTargetChanged");return false;}
+    float anchor[3],origin[3],angles[3];anchor=candidate.anchor;origin=candidate.origin;angles=candidate.angles;
     bool independent=gRecipes[recipe].kind==Kind_Campfire;
     if(independent)buildCore=-1;
     if(buildCore<0 && !independent)

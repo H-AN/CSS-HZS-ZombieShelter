@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.6.0"
+#define SHELTER_VERSION "0.7.0"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.

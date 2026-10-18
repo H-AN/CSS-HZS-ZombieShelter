@@ -9,6 +9,7 @@ char gBuildMenuRecipe[MAXPLAYERS+1][64],gBuildMenuType[MAXPLAYERS+1][64];
 
 void BeginBuildMenu(int client)
 {
+    StopBuildPreview(client);
     gBuildMenuNonce[client]++;gBuildMenuEpoch[client]=gEpoch;gBuildMenuSerial[client]=GetClientSerial(client);
     gBuildMenuRevision[client]=gConfigRevision;
 }
@@ -185,22 +186,31 @@ void AddRecipeLevelItems(Menu menu,int client,int recipe,int level)
     AddProfileLevelItems(menu,client,gRecipes[recipe].file,gRecipes[recipe].kind,profile,level,level==1);
 }
 
-void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
+void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false,bool redraw=false)
 {
     if(!LiveHuman(client) || !Running() || recipe<0 || recipe>=gRecipeCount)return;
-    BeginBuildMenu(client);gBuildMenuCategory[client]=gRecipes[recipe].kind;gBuildMenuFile[client]=gRecipes[recipe].file;
+    if(redraw && (!confirmation || !PreviewSessionValid(client) || gBuildPreviewRecipe[client]!=recipe))return;
+    if(!redraw)BeginBuildMenu(client);
+    gBuildMenuCategory[client]=gRecipes[recipe].kind;gBuildMenuFile[client]=gRecipes[recipe].file;
     strcopy(gBuildMenuRecipe[client],sizeof(gBuildMenuRecipe[]),gRecipes[recipe].id);
     strcopy(gBuildMenuType[client],sizeof(gBuildMenuType[]),gRecipes[recipe].type);
     char name[128],description[256],title[768],profile[128],line[256];TranslateLabel(client,gRecipes[recipe].label,name,sizeof(name));
     TranslateLabel(client,gRecipes[recipe].meta.description,description,sizeof(description));
     Format(profile,sizeof(profile),"Types/%s",gRecipes[recipe].type);
     Format(title,sizeof(title),"%T",confirmation ? "BuildConfirmTitle" : "BuildDetailsTitle",client,name,description,ProfileMaximumLevel(gRecipes[recipe].file,profile));
+    if(confirmation && !redraw)BeginBuildPreview(client,recipe,gBuildMenuNonce[client]);
     float anchor[3],origin[3],angles[3];gBuildMenuPreviewCore[client]=-1;
     bool outsideKind=gRecipes[recipe].kind==Kind_Campfire || gRecipes[recipe].file==C_Shelters;
-    bool previewValid=PlacementForRecipe(client,recipe,anchor,origin,angles,false);
-    if(previewValid)gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
-    if(previewValid && gRecipes[recipe].file==C_Shelters)
-    {previewValid=DynamicBasePositionAllowed(recipe,anchor,false,client);gBuildMenuPreviewCore[client]=gCoreCount;}
+    bool previewValid;
+    if(confirmation)
+    {previewValid=gBuildPreviewValid[client];gBuildMenuPreviewCore[client]=gBuildPreviewCore[client];}
+    else
+    {
+        previewValid=PlacementForRecipe(client,recipe,anchor,origin,angles,false);
+        if(previewValid)gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
+        if(previewValid && gRecipes[recipe].file==C_Shelters)
+        {previewValid=DynamicBasePositionAllowed(recipe,anchor,false,client);gBuildMenuPreviewCore[client]=gCoreCount;}
+    }
     if(outsideKind && previewValid){Format(line,sizeof(line),"%T","BuildIndependentPlacement",client);StrCat(title,sizeof(title),line);}
     else if(gBuildMenuPreviewCore[client]>=0)AppendBuildCapacityInfo(client,gBuildMenuPreviewCore[client],title,sizeof(title));
     else{Format(line,sizeof(line),"%T","BuildPreviewUnavailable",client);StrCat(title,sizeof(title),line);}
@@ -213,6 +223,10 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
     }
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
     bool enough=HasBaseUpgradeMaterials(gRecipes[recipe].cost,client);
+    // A user opening an invalid confirmation gets one private failure cue.
+    // Silent placement queries (and a future moving preview) never emit audio.
+    if(confirmation && !redraw && (!previewValid || (!outsideKind && gBuildMenuPreviewCore[client]<0) || !groupAvailable || !enough))
+        PlayClientInteractionSound(client,"build_failed");
     AddBuildAction(menu,client,recipe,confirmation ? 3 : 2,confirmation ? (groupAvailable ? "BuildConfirmPlace" : "BuildSupportQuotaFull") : "BuildOpenConfirm",
         !confirmation || (enough && groupAvailable && previewValid && (outsideKind || gBuildMenuPreviewCore[client]>=0)));
     AddBuildAction(menu,client,recipe,confirmation ? 6 : 5,confirmation ? "BuildBackDetails" : "BuildBackVariants");
@@ -235,7 +249,15 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false)
             }
         }
     }
-    menu.Display(client,45);
+    if(confirmation)
+    {
+        // Install the new handle before Display cancels the old display. Its
+        // late Cancel callback must not remove this same-session preview.
+        gBuildPreviewMenu[client]=menu;gBuildPreviewSignature[client]=BuildPreviewMenuSignature(client);
+        int remaining=RoundToCeil(gBuildPreviewDeadline[client]-GetGameTime());if(remaining<1)remaining=1;
+        if(!menu.Display(client,remaining)){StopBuildPreview(client,menu);delete menu;}
+    }
+    else menu.Display(client,45);
 }
 
 public Action BuildMenuCommand(int client,int args)
@@ -247,6 +269,7 @@ public Action BuildMenuCommand(int client,int args)
 public int BuildMenuHandler(Menu menu,MenuAction action,int client,int item)
 {
     if(action==MenuAction_End)delete menu;
+    else if(action==MenuAction_Cancel)StopBuildPreview(client,menu);
     else if(action==MenuAction_Select)
     {
         char token[192],fields[5][80];int nonce,operation,key;menu.GetItem(item,token,sizeof(token));
@@ -254,7 +277,8 @@ public int BuildMenuHandler(Menu menu,MenuAction action,int client,int item)
             && ParseLevelInteger(fields[0],nonce) && ParseLevelInteger(fields[1],operation) && ParseLevelInteger(fields[2],key)
             && nonce==gBuildMenuNonce[client] && gBuildMenuEpoch[client]==gEpoch && gBuildMenuSerial[client]==GetClientSerial(client)
             && gBuildMenuRevision[client]==gConfigRevision && operation>=0 && operation<=6;
-        if(!valid){if(LiveHuman(client))Tell(client,"%T","MenuExpired",client);return 0;}
+        if(valid && (operation==3 || operation==6) && gBuildPreviewMenu[client]!=menu)valid=false;
+        if(!valid){StopBuildPreview(client,menu);if(LiveHuman(client))Tell(client,"%T","MenuExpired",client);return 0;}
         gBuildMenuNonce[client]++; // Consume before navigation, validation failure, or payment.
         if(operation==0){if(key>=0 && key<sizeof(sBuildCategoryPhrases))ShowBuildVariants(client,view_as<BuildingKind>(key));return 0;}
         if(operation==4){ShowBuildCategories(client);return 0;}
@@ -269,7 +293,7 @@ public int BuildMenuHandler(Menu menu,MenuAction action,int client,int item)
             case 2: ShowBuildRecipeDetails(client,recipe,true);
             case 3:
             {
-                BuildRecipe(client,recipe,gBuildMenuPreviewCore[client]);ShowBuildRecipeDetails(client,recipe);
+                ConfirmBuildPreview(client,recipe,nonce);ShowBuildRecipeDetails(client,recipe);
             }
             case 5: ShowBuildVariants(client,gBuildMenuCategory[client]);
         }
@@ -375,6 +399,7 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     }
     float origin[3];GetClientAbsOrigin(client,origin);int core=SafeCoreAt(origin);
     if(core>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBaseMenu(client,core);}
+    else if(BuildCoreAt(origin)>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBuildCategories(client);}
     return Plugin_Continue;
 }
 

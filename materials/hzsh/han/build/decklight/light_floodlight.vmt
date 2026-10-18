@@ -1,0 +1,8 @@
+"VertexLitGeneric"
+{
+    "$basetexture" "hzsh/han/build/decklight/light_floodlight"
+    "$surfaceprop" "metal"
+    "$alphatest" "0"
+    "$alphatestreference" "0.5"
+    "$nocull" "1"
+}
