@@ -63,7 +63,14 @@ void HudBuildingTarget(int client,int building)
     char text[512];
     if(gBuildings[building].constructing)
     {
-        ShowHudText(client,HUD_TARGET,"%T","HUDConstruction",client,name,gBuildings[building].hp,gBuildings[building].constructionTarget);
+        char phrase[48];strcopy(phrase,sizeof(phrase),"HUDConstruction");
+        if(CanCancelUnfinishedConstruction(client,building))
+        {
+            int knife;
+            if(!HeldKnifeSlotWeapon(client,knife) || !ResourceMeleeHit(client,client))strcopy(phrase,sizeof(phrase),"HUDConstructionCancelKnife");
+            else strcopy(phrase,sizeof(phrase),BuildingInUseRange(client,building) ? "HUDConstructionCancel" : "HUDConstructionCancelFar");
+        }
+        ShowHudText(client,HUD_TARGET,"%T",phrase,client,name,gBuildings[building].hp,gBuildings[building].constructionTarget);
         return;
     }
     Format(text,sizeof(text),"%T",BuildingUnderAttack(building,GetGameTime()) ? "HUDBuildingAttacked" : "HUDBuildingTarget",client,name,
@@ -148,6 +155,20 @@ void HudRepairFeedback(int client,int building,int restoredHP)
     HudBuildingTarget(client,building);
 }
 
+void FormatBasePowerHUD(int client,int core,char[] line,int length)
+{
+    line[0]=0;
+    if(core<0 || core>=gCoreCount)return;
+    char name[64];CoreDisplayName(core,name,sizeof(name),client);
+    if(!gPowerEnabled)
+        Format(line,length,"%T","HUDPowerDisabled",client,name);
+    else if(PowerOverloadPenaltyEnabled())
+        Format(line,length,"%T",gGridDemand[core]>gGridProduction[core] ? "HUDPowerOverloaded" : "HUDPowerPenalty",
+            client,name,gGridDemand[core],gGridProduction[core]);
+    else
+        Format(line,length,"%T","HUDPowerPriority",client,name,gGridDemand[core],gGridAllocated[core],gGridProduction[core],gGridOffline[core]);
+}
+
 void AppendLocalBasePowerHUD(int client,char[] text,int length)
 {
     if(!LiveHuman(client))return;
@@ -155,8 +176,7 @@ void AppendLocalBasePowerHUD(int client,char[] text,int length)
     int core=SafeCoreAt(position);
     if(core<0)core=BuildCoreAt(position);
     if(!BuildCoreAlive(core))return;
-    char name[64],line[160];CoreDisplayName(core,name,sizeof(name),client);
-    Format(line,sizeof(line),"%T","HUDLocalBasePower",client,name,gGridDemand[core],gGridProduction[core]);
+    char line[256];FormatBasePowerHUD(client,core,line,sizeof(line));
     StrCat(text,length,line);
 }
 
@@ -195,11 +215,11 @@ void RenderCampaignHUD()
             char phase[32];TranslateLabel(client,gPhase==Phase_Day ? "HUDPhaseDay" : "HUDPhaseNight",phase,sizeof(phase));
             SetHudTextParams(0.64,0.06,1.2,230,240,255,255,0,0.0,0.0,0.1);
             char campaign[512];Format(campaign,sizeof(campaign),"%T","HUDCampaign",client,
-                gDay,phase,RoundToCeil(seconds),AliveCores(),gCoreCount,
+                gDay,phase,RoundToCeil(seconds),AliveCores(),ExistingCoreCount(),
                 ActiveOrdinary(),OrdinaryTarget(),bosses,gBossCount);
             AppendLocalBasePowerHUD(client,campaign,sizeof(campaign));
             ShowHudText(client,HUD_CAMPAIGN,"%s",campaign);
-            SetHudTextParams(0.64,0.22,1.2,220,225,170,255,0,0.0,0.0,0.1);
+            SetHudTextParams(0.64,0.28,1.2,220,225,170,255,0,0.0,0.0,0.1);
             char balances[512],entry[100];int shown;
             for(int m=0;m<gMaterialCount;m++)if(gPlayerInventory[client][m]>0)
             {

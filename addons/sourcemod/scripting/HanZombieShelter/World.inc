@@ -363,11 +363,11 @@ public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &
 {
     int n=FindNode(entity);damage=0.0;
     if(n<0 || !Running() || gNodes[n].growing)return Plugin_Handled;
+    if(!WeaponWorkHit(attacker,inflictor,damageType,weapon))return Plugin_Handled;
     ResourceMeleeFeedback(entity,attacker,inflictor,damagePosition);
     int repair,construction,multiplier;
-    if(!HeldWeaponWorkAmounts(attacker,repair,construction,multiplier,true) || multiplier<=0)return Plugin_Handled;
-    // The engine has already reported a resource hit. Current weapon classname
-    // selects the rule; neither a knife classname nor a weapon slot is required.
+    if(!HeldWeaponWorkAmounts(attacker,repair,construction,multiplier) || multiplier<=0)return Plugin_Handled;
+    // Classname rules and their knife fallback apply only after the slot/hit gate.
     float now=GetGameTime();if(now<gNextGather[attacker])return Plugin_Handled;
     int amount;
     if(!CollectGatherMaterial(attacker,gNodes[n].material,multiplier,amount))
@@ -383,14 +383,15 @@ public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &
     return Plugin_Handled;
 }
 
-public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType)
+public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &damage,int &damageType,int &weapon,float damageForce[3],float damagePosition[3])
 {
     int b=FindBuilding(entity);damage=0.0;
     if(b<0 || !gBuildings[b].alive || !Running())return Plugin_Handled;
+    if(!WeaponWorkHit(attacker,inflictor,damageType,weapon))return Plugin_Handled;
     int repairHP,constructionHP;
     if(!HeldRepairWeaponAmounts(attacker,repairHP,constructionHP))return Plugin_Handled;
     // The external weapon system owns creation, firing rate and hit generation.
-    // Every received player hit uses one absolute amount; no building cooldown.
+    // Every accepted knife-slot hit uses one absolute amount; no building cooldown.
     int repair=gBuildings[b].constructing ? constructionHP : repairHP;
     if(repair<1)return Plugin_Handled;
     if(gBuildings[b].hp<gBuildings[b].maxHP)
@@ -650,7 +651,7 @@ bool RecipePlacementRules(int client,int recipe,PlacementCandidate candidate,int
     if(!HasBaseUpgradeMaterials(gRecipes[recipe].cost,client))return PlacementError(client,"BuildPersonalMaterialsMissing",report);
     if(gRecipes[recipe].file==C_Shelters)
     {
-        buildCore=gCoreCount;
+        buildCore=NextDynamicBaseSlot();
         return DynamicBasePositionAllowed(recipe,candidate.anchor,report,client) && DynamicBaseHasSupport(client,candidate.anchor,report);
     }
     if(SummonCount()>=gSummonLimit){if(report)Tell(client,"%t","DefenseLimitReached",gSummonLimit);return false;}
@@ -709,6 +710,7 @@ bool BuildRecipeAtCandidate(int client,int recipe,int expectedCore,PlacementCand
 
 bool BuildRecipeCandidateTransaction(int client,int recipe,int expectedCore,PlacementCandidate candidate)
 {
+    if(gConstructionCancelBusy)return false;
     if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount)return false;
     char path[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"Types/%s",gRecipes[recipe].type);Text(gRecipes[recipe].file,path,"model",model,sizeof(model));
     if(!ValidatePlacementCandidate(client,model,gRecipes[recipe].meta,candidate,true))return false;

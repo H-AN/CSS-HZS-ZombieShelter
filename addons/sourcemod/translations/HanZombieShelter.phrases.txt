@@ -1178,11 +1178,104 @@
         "en"    "\n{1} Power {2}/{3}"
         "chi"    "\n{1} 电量 {2}/{3}"
     }
+    "HUDPowerPriority"
+    {
+        "#format"    "{1:s},{2:.0f},{3:.0f},{4:.0f},{5:d}"
+        "en"    "\n{1} Priority | Demand {2}\nSupplied {3}/{4} | Offline {5}"
+        "chi"    "\n{1} 优先供电 | 需求 {2}\n已供电 {3}/{4} | 停机 {5}"
+    }
+    "HUDPowerPenalty"
+    {
+        "#format"    "{1:s},{2:.0f},{3:.0f}"
+        "en"    "\n{1} Overload mode | Usage {2}/{3}"
+        "chi"    "\n{1} 过载惩罚 | 使用电量 {2}/{3}"
+    }
+    "HUDPowerOverloaded"
+    {
+        "#format"    "{1:s},{2:.0f},{3:.0f}"
+        "en"    "\n{1} Usage {2}/{3}\nOVERLOADED - all powered loads stopped"
+        "chi"    "\n{1} 使用电量 {2}/{3}\n电网过载：全部耗电设施停机"
+    }
+    "HUDPowerDisabled"
+    {
+        "#format"    "{1:s}"
+        "en"    "\n{1} Power requirements disabled"
+        "chi"    "\n{1} 电力限制已关闭"
+    }
     "HUDConstruction"
     {
         "#format"    "{1:s},{2:d},{3:d}"
-        "en"    "{1} | Construction {2}/{3}\nWeapon hit: continue building"
-        "chi"    "{1} | 建造进度 {2}/{3}\n攻击继续建造"
+        "en"    "{1} | Construction {2}/{3}\nKnife/axe hit: continue building"
+        "chi"    "{1} | 建造进度 {2}/{3}\n刀/斧攻击继续建造"
+    }
+    "HUDConstructionCancel"
+    {
+        "#format"    "{1:s},{2:d},{3:d}"
+        "en"    "{1} | Construction {2}/{3}\nKnife/axe hit: continue building\nRight click: cancel and refund materials"
+        "chi"    "{1} | 建造进度 {2}/{3}\n刀/斧攻击继续建造\n右键取消建造，返还材料"
+    }
+    "HUDConstructionCancelFar"
+    {
+        "#format"    "{1:s},{2:d},{3:d}"
+        "en"    "{1} | Construction {2}/{3}\nKnife/axe hit: continue building\nMove closer to right-click cancel and refund"
+        "chi"    "{1} | 建造进度 {2}/{3}\n刀/斧攻击继续建造\n靠近后右键取消，返还材料"
+    }
+    "HUDConstructionCancelKnife"
+    {
+        "#format"    "{1:s},{2:d},{3:d}"
+        "en"    "{1} | Construction {2}/{3}\nEquip knife/axe to continue building\nKnife/axe right click: cancel and refund"
+        "chi"    "{1} | 建造进度 {2}/{3}\n切换刀/斧继续建造\n持刀/斧右键取消，返还材料"
+    }
+    "ConstructionCancelUnavailable"
+    {
+        "en"    "Cannot cancel: aim nearby at an unfinished building you may manage."
+        "chi"    "无法取消：请近距离瞄准有权管理且尚未完工的建筑。"
+    }
+    "ConstructionCancelNoRoom"
+    {
+        "en"    "Not enough backpack space for a full refund. Construction was kept; make room and try again."
+        "chi"    "背包空间不足以全额返还，已保留施工建筑；请腾出空间后重试。"
+    }
+    "ConstructionCanceled"
+    {
+        "en"    "Construction canceled; all invested materials refunded to the owner or shared storage."
+        "chi"    "已取消建造，实际投入材料已全额退还原主或共享仓库。"
+    }
+    "BuildGroupAutonomous"
+    {
+        "en"    "Autonomous defenses"
+        "chi"    "自律防御武器"
+    }
+    "BuildGroupRestoration"
+    {
+        "en"    "Restoration facilities"
+        "chi"    "恢复类设施"
+    }
+    "BuildGroupBaseFacilities"
+    {
+        "en"    "Base facilities"
+        "chi"    "基地设施"
+    }
+    "BuildGroupLighting"
+    {
+        "en"    "Lighting facilities"
+        "chi"    "照明设施"
+    }
+    "BuildGroupDefenses"
+    {
+        "en"    "Defensive structures"
+        "chi"    "防御工事"
+    }
+    "BuildGroupTitle"
+    {
+        "#format"    "{1:s}"
+        "en"    "Build category: {1}"
+        "chi"    "建造分类：{1}"
+    }
+    "BuildBackParentGroup"
+    {
+        "en"    "Back to category"
+        "chi"    "返回所属分类"
     }
     "HUDDefenseUseHint"
     {

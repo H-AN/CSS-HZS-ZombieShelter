@@ -17,6 +17,40 @@ enum struct ShelterGrenade
 }
 ShelterGrenade gGrenades[MAX_GRENADES];
 RewardContext gGrenadeRewardContext[MAX_GRENADES];
+static const char sGrenadeExplosionDefaults[][]={"hzsh/han/explode3.wav","hzsh/han/explode4.wav","hzsh/han/explode5.wav"};
+char gGrenadeExplosionSounds[sizeof(sGrenadeExplosionDefaults)][PLATFORM_MAX_PATH];
+float gGrenadeExplosionVolume=1.0;
+
+bool LoadGrenadeExplosionSounds()
+{
+    bool found;
+    if(!StoredLevelFloat(C_Grenades,"Projectile","explosion_volume",1.0,gGrenadeExplosionVolume,found)
+        || !(gGrenadeExplosionVolume>=0.0 && gGrenadeExplosionVolume<=1.0))return ConfigFailure("grenade explosion volume must be 0..1");
+    for(int i=0;i<sizeof(gGrenadeExplosionSounds);i++)
+    {
+        char key[32],path[PLATFORM_MAX_PATH];Format(key,sizeof(key),"explosion_sound_%d",i+1);
+        Text(C_Grenades,"Projectile",key,gGrenadeExplosionSounds[i],sizeof(gGrenadeExplosionSounds[]),sGrenadeExplosionDefaults[i]);
+        TrimString(gGrenadeExplosionSounds[i]);
+        if(StrContains(gGrenadeExplosionSounds[i],"sound/")==0)
+            strcopy(gGrenadeExplosionSounds[i],sizeof(gGrenadeExplosionSounds[]),gGrenadeExplosionSounds[i][6]);
+        if(!gGrenadeExplosionSounds[i][0] || gGrenadeExplosionSounds[i][0]=='/'
+            || StrContains(gGrenadeExplosionSounds[i],"\\")>=0 || StrContains(gGrenadeExplosionSounds[i],":")>=0
+            || StrContains(gGrenadeExplosionSounds[i],"..")>=0 || strlen(gGrenadeExplosionSounds[i])>sizeof(path)-7)
+            return ConfigFailure("grenade explosion sound must be a relative sound path");
+        Format(path,sizeof(path),"sound/%s",gGrenadeExplosionSounds[i]);
+        if(!FileExists(path,true) || !PrecacheSound(gGrenadeExplosionSounds[i],true))
+        {LogError("[Shelter] Missing or invalid grenade explosion sound %s",path);return ConfigFailure("grenade explosion sound");}
+        AddFileToDownloadsTable(path);
+    }
+    return true;
+}
+
+void PlayGrenadeExplosionSound(const float position[3])
+{
+    if(gGrenadeExplosionVolume<=0.0)return;
+    int sound=GetRandomInt(0,sizeof(gGrenadeExplosionSounds)-1);
+    EmitAmbientSound(gGrenadeExplosionSounds[sound],position,SOUND_FROM_WORLD,SNDLEVEL_NORMAL,SND_NOFLAGS,gGrenadeExplosionVolume);
+}
 
 void RemoveGrenade(int p)
 {
@@ -60,12 +94,13 @@ public bool GrenadeTraceFilter(int entity,int mask,any slot)
 
 void ExplodeGrenade(int p,const float position[3])
 {
-    if(!gGrenades[p].used)return;
-    int damage=gGrenades[p].damage,epoch=gGrenades[p].epoch;float radius=gGrenades[p].radius;
+    if(p<0 || p>=MAX_GRENADES || !gGrenades[p].used)return;
+    int damage=gGrenades[p].damage,epoch=gGrenades[p].epoch;float radius=gGrenades[p].radius,expires=gGrenades[p].expires;
     RewardContext context;context=gGrenadeRewardContext[p];
     RemoveGrenade(p); // Commit before re-entrant HZS death/award callbacks.
-    if(!Running() || epoch!=gEpoch)return;
-    TE_SetupExplosion(position,gExplosionSprite,1.5,15,0,RoundToNearest(radius),damage);TE_SendToAll();
+    if(!Running() || epoch!=gEpoch || GetGameTime()>=expires)return;
+    TE_SetupExplosion(position,gExplosionSprite,1.5,15,TE_EXPLFLAG_NOSOUND,RoundToNearest(radius),damage);TE_SendToAll();
+    PlayGrenadeExplosionSound(position);
     for(int n=0;n<MAX_NPCS;n++)
     {
         if(!Running() || epoch!=gEpoch)return;

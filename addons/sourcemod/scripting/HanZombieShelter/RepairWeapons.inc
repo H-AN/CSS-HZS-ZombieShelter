@@ -1,5 +1,5 @@
 // Weapon systems own entity creation and attack timing. This module only maps
-// an existing entity's literal classname to building work and gathering yield.
+// an existing knife-slot entity's literal classname to work and gathering yield.
 #define REPAIR_WEAPON_AMOUNT_MAX 1000000
 #define REPAIR_WEAPON_CLASS_BUFFER 1024
 #define GATHER_MULTIPLIER_SCALE 1000
@@ -202,20 +202,39 @@ stock bool RepairWeaponAmountsForClass(const char[] classname,int &repair,int &c
     int gather;return WeaponWorkAmountsForClass(classname,repair,construction,gather);
 }
 
-bool HeldWeaponWorkAmounts(int client,int &repair,int &construction,int &gather,bool requireWeapon=false)
+bool HeldKnifeSlotWeapon(int client,int &weapon)
 {
-    repair=10;construction=10;gather=GATHER_MULTIPLIER_SCALE;
+    weapon=-1;
     if(!LiveHuman(client) || IsFakeClient(client) || IsClientSourceTV(client) || IsClientReplay(client))return false;
+    int active=GetEntPropEnt(client,Prop_Send,"m_hActiveWeapon");
+    if(active<=MaxClients || !IsValidEntity(active) || GetPlayerWeaponSlot(client,2)!=active)return false;
+    weapon=active;return true;
+}
+
+bool WeaponWorkHit(int client,int inflictor,int damageType,int damageWeapon=-1)
+{
+    int weapon;
+    if(!HeldKnifeSlotWeapon(client,weapon) || !ResourceMeleeHit(client,inflictor))return false;
+    // A delayed projectile cannot borrow the knife held when it finally lands.
+    // Some native knife hits leave damageWeapon unset; a supplied identity must match.
+    if(damageWeapon>0 && damageWeapon!=weapon)return false;
+    if(damageType & (DMG_BLAST|DMG_BUCKSHOT))return false;
+    // CS:S CKnife (including HWS weapon_axe and supplemental knife hits) uses
+    // BULLET|NEVERGIB, not SLASH. Plain firearm bullets must still be rejected.
+    if(damageType & DMG_BULLET)return (damageType & DMG_NEVERGIB)!=0;
+    // Keep direct generic/SLASH/CLUB custom knife hits compatible after the
+    // actual slot, CKnife template and inflictor checks above.
+    return damageType==DMG_GENERIC || (damageType & (DMG_SLASH|DMG_CLUB))!=0;
+}
+
+bool HeldWeaponWorkAmounts(int client,int &repair,int &construction,int &gather)
+{
+    repair=0;construction=0;gather=0;
+    int weapon;if(!HeldKnifeSlotWeapon(client,weapon))return false;
     char classname[REPAIR_WEAPON_CLASS_BUFFER];classname[0]=0;
-    int weapon=GetEntPropEnt(client,Prop_Send,"m_hActiveWeapon");
-    if(requireWeapon && (weapon<=MaxClients || !IsValidEntity(weapon)))return false;
-    if(weapon>MaxClients && IsValidEntity(weapon))
-    {
-        if(!GetEntityClassname(weapon,classname,sizeof(classname)) || strlen(classname)==sizeof(classname)-1)
-            classname[0]=0;
-    }
-    // Missing/unreadable active weapon also uses the knife fallback. Only an
-    // invalid/non-human actor is rejected; unknown classnames are never denied.
+    if(!GetEntityClassname(weapon,classname,sizeof(classname)) || strlen(classname)==sizeof(classname)-1)
+        classname[0]=0;
+    // Only a verified active knife-slot entity can use the classname fallback.
     return WeaponWorkAmountsForClass(classname,repair,construction,gather);
 }
 
@@ -233,7 +252,7 @@ bool LoadRepairWeapons()
         LogError("[Shelter] weapons.cfg rejected; previous weapon rules retained: %s",error);return false;
     }
     int repair,construction,gather;WeaponWorkAmountsForClass("weapon_knife",repair,construction,gather);
-    LogMessage("[Shelter] Weapon rules=%d; unknown/unreadable classname -> weapon_knife %d/%d/%d (repair/construction/gather_per_1000); builtin_knife=%d missing_file=%d",
+    LogMessage("[Shelter] Knife-slot work rules=%d; unknown/unreadable knife classname -> weapon_knife %d/%d/%d (repair/construction/gather_per_1000); builtin_knife=%d missing_file=%d",
         RepairWeaponRuleCount(),repair,construction,gather,gRepairWeaponBuiltinKnife,gRepairWeaponMissingFile);
     return true;
 }
@@ -245,7 +264,7 @@ public Action ReloadRepairWeaponsCommand(int client,int args)
     if(!LoadRepairWeapons())
     {ReplyToCommand(client,"[Shelter] weapons.cfg rejected; previous weapon rules retained.");return Plugin_Handled;}
     int repair,construction,gather;WeaponWorkAmountsForClass("weapon_knife",repair,construction,gather);
-    ReplyToCommand(client,"[Shelter] Reloaded %d weapon rules; unknown/unreadable -> weapon_knife: repair=%d construction=%d gather=%.3f; builtin_knife=%d missing_file=%d.",
+    ReplyToCommand(client,"[Shelter] Reloaded %d knife-slot work rules; unknown/unreadable knife -> weapon_knife: repair=%d construction=%d gather=%.3f; builtin_knife=%d missing_file=%d.",
         RepairWeaponRuleCount(),repair,construction,float(gather)/GATHER_MULTIPLIER_SCALE,gRepairWeaponBuiltinKnife,gRepairWeaponMissingFile);
     return Plugin_Handled;
 }

@@ -39,6 +39,7 @@
 #include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
+#include "HanZombieShelter/ConstructionInput.inc"
 #include "HanZombieShelter/Admin.inc"
 
 public Plugin myinfo={name="HZS Zombie Shelter",author="H-AN",description="External cooperative day/night shelter mode; no core source changes",version=SHELTER_VERSION,url=""};
@@ -54,6 +55,7 @@ public void OnPluginStart()
 {
     ResetBuildPreviewState();
     RegisterConstructionCvar();
+    RegisterPowerModeCvar();
     RegisterRepairWeaponCommands();
     LoadTranslations("HanZombieShelter.phrases");
     LoadTranslations("common.phrases");
@@ -109,6 +111,7 @@ void BootMode()
 
 public void OnClientPutInServer(int client)
 {
+    ResetConstructionCancelInput(client);
     ResetBeaconClient(client);
     StartClientInventory(client);
     gLastButtons[client]=0;gNextGather[client]=0.0;gNextRepair[client]=0.0;gNextUse[client]=0.0;
@@ -117,6 +120,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    ResetConstructionCancelInput(client);
     StopBuildPreview(client);
     ResetBeaconClient(client);
     CancelBaseTeleportSelection(client);

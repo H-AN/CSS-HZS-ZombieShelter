@@ -1,14 +1,37 @@
 float gGridProduction[MAX_CORES],gGridDemand[MAX_CORES],gGridAllocated[MAX_CORES];
 int gGridOffline[MAX_CORES],gLightLimit=16,gGrenadeLimit=24;
 bool gPowerEnabled=true;
+bool gPowerOverloadPenalty;
+ConVar gPowerOverloadCvar;
 float gGrenadeGravity=400.0,gGrenadeLifetime=6.0;
 char gGrenadeModel[PLATFORM_MAX_PATH];
+
+void RegisterPowerModeCvar()
+{
+    gPowerOverloadCvar=CreateConVar("sm_zsh_power_overload","-1","Power shortage mode: -1 uses power.cfg, 0 allocates by priority, 1 stops all positive loads on an overloaded base grid.",FCVAR_NOTIFY,true,-1.0,true,1.0);
+    gPowerOverloadCvar.AddChangeHook(PowerModeChanged);
+}
+
+bool PowerOverloadPenaltyEnabled()
+{
+    if(gPowerOverloadCvar!=null && gPowerOverloadCvar.IntValue>=0)return gPowerOverloadCvar.IntValue==1;
+    return gPowerOverloadPenalty;
+}
+
+public void PowerModeChanged(ConVar convar,const char[] oldValue,const char[] newValue)
+{
+    gNextHUD=0.0;
+    RecalculatePower();
+}
 
 bool LoadPowerSettings()
 {
     char enabled[16];Text(C_Power,"Rules","enabled",enabled,sizeof(enabled),"1");
     if(!StrEqual(enabled,"0") && !StrEqual(enabled,"1"))return ConfigFailure("power enabled must be 0 or 1");
-    gPowerEnabled=StrEqual(enabled,"1");bool found;
+    gPowerEnabled=StrEqual(enabled,"1");
+    char overload[16];Text(C_Power,"Rules","overload_penalty",overload,sizeof(overload),"0");
+    if(!StrEqual(overload,"0") && !StrEqual(overload,"1"))return ConfigFailure("power overload_penalty must be 0 or 1");
+    gPowerOverloadPenalty=StrEqual(overload,"1");bool found;
     if(!StoredLevelInt(C_Power,"Limits","max_lights",16,gLightLimit,found)
         || !StoredLevelInt(C_Power,"Limits","max_projectiles",24,gGrenadeLimit,found)
         || gLightLimit<1 || gLightLimit>32 || gGrenadeLimit<1 || gGrenadeLimit>32)return ConfigFailure("power light/projectile limits 1..32");
@@ -16,7 +39,8 @@ bool LoadPowerSettings()
         || !StoredLevelFloat(C_Grenades,"Projectile","lifetime_seconds",6.0,gGrenadeLifetime,found)
         || gGrenadeGravity<0.0 || gGrenadeGravity>1000.0 || gGrenadeLifetime<0.5 || gGrenadeLifetime>15.0)return ConfigFailure("grenade projectile timing/gravity");
     Text(C_Grenades,"Projectile","model",gGrenadeModel,sizeof(gGrenadeModel),"models/Items/ar2_grenade.mdl");
-    return (PrecacheModel(gGrenadeModel,true)>0) || ConfigFailure("grenade model");
+    if(PrecacheModel(gGrenadeModel,true)<=0)return ConfigFailure("grenade model");
+    return LoadGrenadeExplosionSounds();
 }
 
 void ResetPowerState()
@@ -30,6 +54,7 @@ int GridAt(const float origin[3])
     int selected=-1;float nearest=999999999.0;
     for(int c=0;c<gCoreCount;c++)
     {
+        if(IsReleasedDynamicBaseSlot(c))continue;
         float distance=GetVectorDistance(origin,gCores[c].origin,true);
         if(distance<nearest){nearest=distance;selected=c;}
     }
@@ -90,12 +115,18 @@ void RecalculatePower()
             loads[at]=b;loadCount++;
         }
     }
+    // Keep the full connected demand while stopped, so an overloaded grid
+    // cannot recover merely because its own loads were disconnected.
+    bool overloaded[MAX_CORES];
+    if(gPowerEnabled && PowerOverloadPenaltyEnabled())
+        for(int c=0;c<gCoreCount;c++)overloaded[c]=gGridDemand[c]>gGridProduction[c];
     // Full loads only. Smaller later loads may use leftover capacity. A reused
     // array slot must never jump ahead of older UIDs at the same priority.
     for(int pass=0;pass<loadCount;pass++)
     {
         int next=loads[pass];
         int core=gBuildings[next].powerCore;if(!Running() || core<0 || core>=gCoreCount)continue;
+        if(overloaded[core]){gGridOffline[core]++;continue;}
         float available=gGridProduction[core]-gGridAllocated[core];
         if(!gPowerEnabled || gBuildings[next].powerDemand<=available)
         {gBuildings[next].powered=true;gGridAllocated[core]+=gBuildings[next].powerDemand;}

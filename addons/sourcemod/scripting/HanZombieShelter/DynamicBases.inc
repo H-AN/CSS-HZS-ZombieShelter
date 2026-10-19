@@ -1,6 +1,72 @@
 // Player-created cores share the same stable core IDs, grids, inventories and
 // defeat accounting as map cores. Slots 0..MAX_CORES-1 are reserved for cores.
 int gFixedCoreCount,gDynamicBaseLimit;
+// Only explicitly canceled blueprints release a slot. Battle-destroyed bases
+// retain their identity/reservation; live core indices are never compacted.
+bool gDynamicBaseSlotReleased[MAX_CORES],gDynamicBaseSlotRetiring[MAX_CORES];
+
+bool IsReleasedDynamicBaseSlot(int core)
+{
+    return core>=0 && core<MAX_CORES && gDynamicBaseSlotReleased[core];
+}
+
+int ExistingCoreCount()
+{
+    int count;
+    for(int c=0;c<gCoreCount;c++)
+    {
+        int b=gCores[c].building;
+        if(!gDynamicBaseSlotReleased[c] && b>=0 && b<MAX_BUILDINGS && gBuildings[b].used)count++;
+    }
+    return count;
+}
+
+int ReservedDynamicBaseCount()
+{
+    int count;for(int c=gFixedCoreCount;c<gCoreCount;c++)if(!gDynamicBaseSlotReleased[c])count++;return count;
+}
+
+int NextDynamicBaseSlot()
+{
+    for(int c=gFixedCoreCount;c<gCoreCount;c++)
+        if(gDynamicBaseSlotReleased[c] && !gDynamicBaseSlotRetiring[c]
+            && !gBuildings[c].used && !gBuildings[c].alive && !gBuildings[c].constructing)return c;
+    return gCoreCount<MAX_CORES ? gCoreCount : -1;
+}
+
+bool CanReleaseUnfinishedDynamicBase(int b)
+{
+    if(b<gFixedCoreCount || b>=gCoreCount || b>=MAX_CORES || gDynamicBaseSlotReleased[b]
+        || !gCores[b].dynamic || gCores[b].building!=b || gBuildings[b].kind!=Kind_Base
+        || gBuildings[b].file!=C_Shelters || gBuildings[b].core!=b || !gBuildings[b].used
+        || !gBuildings[b].alive || !gBuildings[b].constructing)return false;
+    // A normal blueprint grants no territory. Reject any administrative or
+    // exceptional live dependents instead of orphaning their stable core IDs.
+    for(int other=0;other<MAX_BUILDINGS;other++)
+        if(other!=b && gBuildings[other].used && gBuildings[other].alive
+            && (gBuildings[other].buildCore==b || (gBuildings[other].gridAssigned && gBuildings[other].powerCore==b)))return false;
+    return true;
+}
+
+void RetireCanceledDynamicBase(int core)
+{
+    gDynamicBaseSlotReleased[core]=true;gDynamicBaseSlotRetiring[core]=true;
+    CoreDef empty;empty.dynamic=true;empty.building=core;gCores[core]=empty;
+    BuildAreaCache area;gBuildAreas[core]=area;
+    // Shared stock is drained after removal callbacks, while the released slot
+    // is still unavailable for a replacement base with a different identity.
+    MarkBuildAreasDirty();
+}
+
+void FinishCanceledDynamicBase(int core)
+{
+    for(int m=0;m<gMaterialCount;m++)
+    {
+        int amount=gBaseInventory[core][m];gBaseInventory[core][m]=0;
+        if(amount>0)DepositSharedAutomatic(core,m,amount);
+    }
+    gDynamicBaseSlotRetiring[core]=false;
+}
 
 bool LoadShelterSettings()
 {
@@ -31,6 +97,7 @@ bool LoadShelterSettings()
 
 void ResetDynamicBases()
 {
+    for(int c=0;c<MAX_CORES;c++){gDynamicBaseSlotReleased[c]=false;gDynamicBaseSlotRetiring[c]=false;}
     for(int c=gFixedCoreCount;c<MAX_CORES;c++)
     {
         CoreDef core;core.building=-1;gCores[c]=core;
@@ -44,13 +111,14 @@ void ResetDynamicBases()
 bool DynamicBasePositionAllowed(int recipe,const float anchor[3],bool report=false,int client=0)
 {
     if(recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].file!=C_Shelters)return false;
-    if(gCoreCount>=MAX_CORES || gCoreCount-gFixedCoreCount>=gDynamicBaseLimit)
+    if(NextDynamicBaseSlot()<0 || ReservedDynamicBaseCount()>=gDynamicBaseLimit)
     {if(report)Tell(client,"%t","ShelterBaseLimit",gDynamicBaseLimit);return false;}
     // Reserve the old core areas even after destruction. Dynamic blueprints
     // reserve their own square, but grant no usable territory before completion.
     RefreshBuildAreas();
     for(int c=0;c<gCoreCount;c++)
     {
+        if(gDynamicBaseSlotReleased[c])continue;
         float local[3];LocalPoint(anchor,gCores[c].origin,gCores[c].angles,local);
         for(int box=0;box<gCores[c].boxCount;box++)if(InBox(local,gCoreMins[c][box],gCoreMaxs[c][box]))
         {if(report)Tell(client,"%t","ShelterOutsideExistingBase");return false;}
@@ -100,8 +168,9 @@ stock bool BuildDynamicBase(int client,int recipe,int expectedCore=-1)
 
 bool BuildDynamicBaseAtCandidate(int client,int recipe,int expectedCore,PlacementCandidate candidate)
 {
-    if(!Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].file!=C_Shelters)return false;
-    if(expectedCore>=0 && expectedCore!=gCoreCount){Tell(client,"%t","BuildMenuTargetChanged");return false;}
+    if(gConstructionCancelBusy || !Running() || !LiveHuman(client) || recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].file!=C_Shelters)return false;
+    int c=NextDynamicBaseSlot();
+    if(c<0 || (expectedCore>=0 && expectedCore!=c)){Tell(client,"%t","BuildMenuTargetChanged");return false;}
     if(!CheckConstructionBudget(client))return false;
     char candidateProfile[128],candidateModel[PLATFORM_MAX_PATH];Format(candidateProfile,sizeof(candidateProfile),"Types/%s",gRecipes[recipe].type);
     Text(C_Shelters,candidateProfile,"model",candidateModel,sizeof(candidateModel));
@@ -109,7 +178,8 @@ bool BuildDynamicBaseAtCandidate(int client,int recipe,int expectedCore,Placemen
         || !DynamicBasePositionAllowed(recipe,candidate.anchor,true,client) || !DynamicBaseHasSupport(client,candidate.anchor,true))return false;
     float anchor[3],origin[3],angles[3];anchor=candidate.anchor;origin=candidate.origin;angles=candidate.angles;
     if(!Spend(gRecipes[recipe].cost,client)){Tell(client,"%t","BuildPersonalMaterialsMissing");return false;}
-    int c=gCoreCount;
+    bool appended=c==gCoreCount;CoreDef previousCore;previousCore=gCores[c];Building previousBuilding;previousBuilding=gBuildings[c];
+    gDynamicBaseSlotReleased[c]=false;gDynamicBaseSlotRetiring[c]=false;
     CoreDef core;core.dynamic=true;core.building=c;core.origin=anchor;core.buildCenter=anchor;
     core.angles[1]=angles[1];core.buildAngles=core.angles;
     Format(core.id,sizeof(core.id),"player_shelter_%d",gUID+1);
@@ -118,7 +188,7 @@ bool BuildDynamicBaseAtCandidate(int client,int recipe,int expectedCore,Placemen
     Text(C_Shelters,profile,"model",core.model,sizeof(core.model));
     core.buildHardLimit=Number(C_Shelters,profile,"build_limit_max",128);
     core.buildZMin=Decimal(C_Shelters,profile,"build_z_min",-128.0);core.buildZMax=Decimal(C_Shelters,profile,"build_z_max",512.0);
-    gCores[c]=core;gCoreCount++;
+    gCores[c]=core;if(appended)gCoreCount++;
     Building value;value.used=true;value.alive=true;value.kind=Kind_Base;value.uid=++gUID;value.core=c;value.buildCore=c;
     value.file=C_Shelters;value.level=1;value.ref=INVALID_ENT_REFERENCE;value.effectRef=INVALID_ENT_REFERENCE;
     value.origin=origin;value.angles=angles;value.placementAnchor=anchor;value.configRevision=gConfigRevision;value.meta=gRecipes[recipe].meta;
@@ -131,8 +201,16 @@ bool BuildDynamicBaseAtCandidate(int client,int recipe,int expectedCore,Placemen
     if(!valid)
     {
         int ref=gBuildings[c].ref;gBuildings[c].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
-        Building empty;empty.ref=INVALID_ENT_REFERENCE;gBuildings[c]=empty;
-        CoreDef emptyCore;emptyCore.building=-1;gCores[c]=emptyCore;gCoreCount--;
+        if(appended)
+        {
+            Building empty;empty.ref=INVALID_ENT_REFERENCE;gBuildings[c]=empty;
+            CoreDef emptyCore;emptyCore.building=-1;gCores[c]=emptyCore;gCoreCount--;
+        }
+        else
+        {
+            gBuildings[c]=previousBuilding;gCores[c]=previousCore;
+            gDynamicBaseSlotReleased[c]=true;gDynamicBaseSlotRetiring[c]=false;
+        }
         Refund(gRecipes[recipe].cost,client);MarkBuildAreasDirty();RecalculatePower();Tell(client,"%t","BuildEntityCreationFailed");return false;
     }
     SyncDynamicBasesGeometry();MarkBuildAreasDirty();RecalculatePower();PlayBuildingSound(c,"build");

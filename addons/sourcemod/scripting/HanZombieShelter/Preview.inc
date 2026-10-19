@@ -28,6 +28,11 @@ PlacementCandidate gBuildPreviewCandidate[MAXPLAYERS+1];
 StringMap gPlacementModelBounds;
 ArrayList gPlacementModelBoundsValues;
 
+int ActiveBuildPreviewCore(int client)
+{
+    return client>0 && client<=MaxClients && gBuildPreviewActive[client] ? gBuildPreviewCore[client] : -1;
+}
+
 bool IsBuildPreviewEntity(int entity)
 {
     return entity>MaxClients && entity<BUILD_PREVIEW_ENTITY_SLOTS && gBuildPreviewEntityOwner[entity]>0
