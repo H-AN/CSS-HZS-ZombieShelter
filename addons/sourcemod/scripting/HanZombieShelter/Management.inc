@@ -38,6 +38,7 @@ bool BuildingInUseRange(int client,int b)
 {
     if(!LiveHuman(client) || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].used || !gBuildings[b].alive)return false;
     int entity=Resolve(gBuildings[b].ref);if(entity<0)return false;
+    if(gBuildings[b].kind==Kind_Watchtower && !gBuildings[b].constructing)return WatchtowerInUseRange(client,b,false);
     return AimedEntity(client,gUseDistance)==entity;
 }
 
@@ -62,6 +63,28 @@ bool TakeBuildingOwnership(int client,int b)
         || !gBuildings[b].used || !gBuildings[b].alive || gBuildings[b].kind!=Kind_Fence
         || BuildingOwnerOnline(b)>0 || !BuildingInUseRange(client,b))return false;
     AssignBuildingOwner(b,client);return true;
+}
+
+bool CanSetBuildingLightManualState(int client,int b,bool manualOff)
+{
+    return Running() && LiveHuman(client) && !IsFakeClient(client) && !IsClientSourceTV(client) && !IsClientReplay(client)
+        && BuildingOperational(b) && gBuildings[b].kind==Kind_Light && gBuildings[b].configRevision==gConfigRevision
+        && Resolve(gBuildings[b].ref)>0 && CanManageBuilding(client,b) && gBuildings[b].lightManualOff!=manualOff;
+}
+
+bool SetBuildingLightManualState(int client,int b,bool manualOff)
+{
+    if(!CanSetBuildingLightManualState(client,b,manualOff))return false;
+    int epoch=gEpoch,revision=gConfigRevision,uid=gBuildings[b].uid,generation=gBuildings[b].generation,ref=gBuildings[b].ref,serial=GetClientSerial(client);
+    // Match the original management transaction: trace and permission checks
+    // cannot adopt a replacement body, slot, revision or client identity.
+    if(!BuildingInUseRange(client,b) || gEpoch!=epoch || gConfigRevision!=revision
+        || !CanSetBuildingLightManualState(client,b,manualOff) || GetClientSerial(client)!=serial || gBuildings[b].uid!=uid
+        || gBuildings[b].generation!=generation || gBuildings[b].ref!=ref)return false;
+    // Commit the requested state before power forwards can reenter. Enabling
+    // only restores automatic rules; RecalculatePower uses the current phase.
+    gBuildings[b].lightManualOff=manualOff;gNextHUD=0.0;RecalculatePower();
+    return true;
 }
 
 void AbandonClientBuildings(int client)
@@ -148,13 +171,15 @@ bool CancelUnfinishedConstruction(int client,int b)
     gConstructionCancelBusy=true;gBuildings[b].used=false;gBuildings[b].alive=false;gBuildings[b].constructing=false;
     gBuildings[b].hp=0;gBuildings[b].constructionTarget=0;gBuildings[b].generation++;
     gBuildings[b].ref=INVALID_ENT_REFERENCE;gBuildings[b].effectRef=INVALID_ENT_REFERENCE;
-    gBuildings[b].ownerSerial=0;gBuildings[b].ownerKey[0]=0;gBuildings[b].powered=false;
+    ClearBuildingSupportLink(b);
+    gBuildings[b].ownerSerial=0;gBuildings[b].ownerKey[0]=0;gBuildings[b].powered=false;gBuildings[b].lightManualOff=false;
     for(int m=0;m<MATERIALS;m++)gBuildings[b].invested[m]=0;
     ForgetConstructionSolid(b);InvalidateDefenseCache(b);MarkBuildAreasDirty();
     if(core>=0)RetireCanceledDynamicBase(core);
     for(int viewer=1;viewer<=MaxClients;viewer++)
         if(viewer==client || viewer==recipient || (core>=0 && ActiveBuildPreviewCore(viewer)==core))StopBuildPreview(viewer);
     RemoveBeaconMarker(b);if(effectRef!=0)RemoveOwnedRef(effectRef);RemoveOwnedRef(ref);
+    BuildingSupportParentLost(uid,ref,generation);
     PublishConstructionCancelRefund(refund,recipientSerial,recipientKey,preferredCore);
     if(core>=0)FinishCanceledDynamicBase(core);
     RecalculatePower();gConstructionCancelBusy=false;
@@ -186,10 +211,13 @@ bool DismantleBuilding(int client,int b,bool adminAction=false)
     if(recipient>0)for(int m=0;m<gMaterialCount;m++)
         if(refund[m]>maximum-gPlayerInventory[recipient][m]){Tell(client,"%t","DismantleNoRoom");return false;}
     // Commit consumption before removing the entity or publishing a refund.
-    InvalidateDefenseCache(b);MarkBuildAreasDirty();gBuildings[b].alive=false;gBuildings[b].hp=0;
+    int supportUID=gBuildings[b].uid,supportGeneration=gBuildings[b].generation;
+    InvalidateDefenseCache(b);MarkBuildAreasDirty();gBuildings[b].alive=false;gBuildings[b].hp=0;gBuildings[b].lightManualOff=false;
+    ClearBuildingSupportLink(b);
     RemoveBuildingEffect(b);
     for(int m=0;m<gMaterialCount;m++)gBuildings[b].invested[m]=0;
     int ref=gBuildings[b].ref;gBuildings[b].ref=INVALID_ENT_REFERENCE;RemoveOwnedRef(ref);
+    BuildingSupportParentLost(supportUID,ref,supportGeneration);
     if(recipient>0)Refund(refund,recipient);
     else
     {

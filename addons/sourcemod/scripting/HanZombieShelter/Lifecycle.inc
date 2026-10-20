@@ -147,7 +147,10 @@ public void ResolveOutcome(any epoch)
         ApplyDayCvars();
         RecoverBases();
         if(gDestroySummons)
+        {
+            SuspendBuildingSupports();
             for(int b=MAX_CORES;b<MAX_BUILDINGS;b++){gBuildings[b].alive=false;gBuildings[b].used=false;}
+        }
         gRollback=true;AnnouncePhrase(gDestroySummons ? "CampaignRollbackDestroy" : "CampaignRollbackRetain",gDay);
         if(!gTerminationExpected)CS_TerminateRound(3.0,CSRoundEnd_Draw,true);
     }
@@ -262,6 +265,7 @@ void ChangeCampaignMap()
 public Action WorldTick(Handle timer)
 {
     float now=GetGameTime(),elapsed=now-gPreviousTick;gPreviousTick=now;
+    BurnVisualTick(now);
     if(!gEnabled)return Plugin_Continue;
     bool previousReady=gCoreReady;gCoreReady=APIAvailable();
     if(previousReady!=gCoreReady){if(!gCoreReady){StopPowerEffects();ClearGrenades();}PublishShelterState();}
@@ -276,7 +280,7 @@ public Action WorldTick(Handle timer)
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
-    SyncDynamicBasesGeometry();ResourceTick(elapsed);CampfireTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExposureTick(now);CampaignHUD();
+    SyncDynamicBasesGeometry();ResourceTick(elapsed);CampfireTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExpansionWorldTick(now);ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)
     {
         gNextBossAudit=0.0;

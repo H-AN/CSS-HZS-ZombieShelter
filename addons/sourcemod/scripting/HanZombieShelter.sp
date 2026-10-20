@@ -24,8 +24,10 @@
 #include "HanZombieShelter/Management.inc"
 #include "HanZombieShelter/EntityBudget.inc"
 #include "HanZombieShelter/Preview.inc"
+#include "HanZombieShelter/PlacementRules.inc"
 #include "HanZombieShelter/Audio.inc"
 #include "HanZombieShelter/ResourceFeedback.inc"
+#include "HanZombieShelter/LampLighting.inc"
 #include "HanZombieShelter/Power.inc"
 #include "HanZombieShelter/Restoration.inc"
 #include "HanZombieShelter/Campfires.inc"
@@ -35,7 +37,12 @@
 #include "HanZombieShelter/World.inc"
 #include "HanZombieShelter/NPC.inc"
 #include "HanZombieShelter/Combat.inc"
+#include "HanZombieShelter/CombatBurn.inc"
+#include "HanZombieShelter/Mortars.inc"
 #include "HanZombieShelter/Grenades.inc"
+#include "HanZombieShelter/DefenseExpansion.inc"
+#include "HanZombieShelter/Watchtowers.inc"
+#include "HanZombieShelter/BuildingSupports.inc"
 #include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
@@ -77,6 +84,9 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    ClearBurnVisuals();
+    ResetLampLighting();
+    ClearExpansionState();ResetWatchtowerState();
     ResetBuildPreviewState();ClearConstructionSafety();
     ClearNPCDropCaches();ClearDefenseState();MarkBuildAreasDirty();
     gEpoch++;gEnabled=false;gCoreReady=false;gRoundPrepared=false;gSnapshot=false;gRollback=false;gTerminal=false;
@@ -105,6 +115,7 @@ void BootMode()
     if(!gEnabled)return;
     if(!gCoreReady){LogError("[Shelter] HZS natives unavailable; load HZS and reload this map before play");gEnabled=false;return;}
     if(gLeaderOffset<0){LogError("[Shelter] CHostage leader unavailable; mode cannot consume the core target");gEnabled=false;return;}
+    InitializeLampLighting();
     LoadHanData();LoadInteractionSounds();OverrideCorePool();OverrideServerPolicy();PrepareRound();
     PrintToServer("[Shelter] configuration loaded map=%s cores=%d resources=%d bosses=%d native_pool=%d",gMap,gCoreCount,gNodeCount,gBossCount,gNativePoolSize);
 }
@@ -113,6 +124,8 @@ public void OnClientPutInServer(int client)
 {
     ResetConstructionCancelInput(client);
     ResetBeaconClient(client);
+    ResetWatchtowerClient(client);
+    ResetDefenseMenuClient(client);
     StartClientInventory(client);
     gLastButtons[client]=0;gNextGather[client]=0.0;gNextRepair[client]=0.0;gNextUse[client]=0.0;
     SDKHook(client,SDKHook_OnTakeDamage,HumanDamageHook);
@@ -123,6 +136,8 @@ public void OnClientDisconnect(int client)
     ResetConstructionCancelInput(client);
     StopBuildPreview(client);
     ResetBeaconClient(client);
+    ResetWatchtowerClient(client);
+    ResetDefenseMenuClient(client);
     CancelBaseTeleportSelection(client);
     SaveClientInventory(client);
     if(!gEnabled || !APIAvailable())return;
@@ -141,6 +156,7 @@ public void OnClientAuthorized(int client,const char[] auth)
 
 public void OnEntityDestroyed(int entity)
 {
+    OnBurnVisualEntityDestroyed(entity);
     if(entity<=MaxClients || entity>=sizeof(gNPCBinding))return;
     int npc=gNPCBinding[entity]-1;
     if(npc>=0 && gNPCs[npc].used && gNPCs[npc].ref==gNPCBindingRef[entity])
@@ -157,8 +173,13 @@ public void OnEntityDestroyed(int entity)
         int b=binding-1;
         if(gBuildings[b].ref==gWorldBindingRef[entity])
         {
+            int supportUID=gBuildings[b].uid,supportRef=gBuildings[b].ref,supportGeneration=gBuildings[b].generation;
             gBuildings[b].ref=INVALID_ENT_REFERENCE;
-            if(!gRebuilding && Running())DamageBuilding(b,gBuildings[b].hp);
+            if(!gRebuilding && Running())
+            {
+                DamageBuilding(b,gBuildings[b].hp);
+                BuildingSupportParentLost(supportUID,supportRef,supportGeneration);
+            }
         }
     }
     else if(binding<0)
@@ -185,19 +206,20 @@ public void OnMapEnd()
 {
     CancelAllBaseTeleportSelections();
     ClearNPCDropCaches();
-    gEnabled=false;gEpoch++;CleanWorld();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;PublishShelterState();
+    gEnabled=false;gEpoch++;CleanWorld();ReleaseLampLighting();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;PublishShelterState();
 }
 
 public void OnPluginEnd()
 {
+    ClearBurnVisuals();
     CancelAllBaseTeleportSelections();
     ClearNPCDropCaches();
     gEpoch++;
     if(gCoreReady && APIAvailable())for(int i=0;i<MAX_NPCS;i++)if(gNPCs[i].used)RestoreNPCOnUnload(i);
-    gEnabled=false;CleanWorld();PublishShelterState();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gProjectileTimer;delete gDefenseTimer;delete gSharedOverflow;
+    gEnabled=false;CleanWorld();ReleaseLampLighting();PublishShelterState();RestoreCorePool();RestoreServerPolicy();ReleaseConfigs();delete gHanData;delete gTick;delete gProjectileTimer;delete gDefenseTimer;delete gSharedOverflow;
 }
 
 public void OnLibraryRemoved(const char[] name)
 {
-    if(!APIAvailable()){gCoreReady=false;StopPowerEffects();ClearGrenades();PublishShelterState();}
+    if(!APIAvailable()){gCoreReady=false;ClearBurnVisuals();StopPowerEffects();ClearGrenades();ClearExpansionState();ResetWatchtowerState();PublishShelterState();}
 }

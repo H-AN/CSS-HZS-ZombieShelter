@@ -62,6 +62,7 @@ void BindNPC(int entity)
         break;
     }
     gNPCs[slot]=npc;gNextTargetFallback[slot]=0.0;
+    ExpansionClearNPCFreeze(slot);
     ClearNPCRewardContext(slot);CacheNPCDrops(slot,name);
     if(entity<sizeof(gNPCBinding)){gNPCBinding[entity]=slot+1;gNPCBindingRef[entity]=npc.ref;}
     ReadNPCAnimations(slot,name);
@@ -96,6 +97,7 @@ public void NPCReady(any value)
     gNPCs[n].moveType=GetEntityMoveType(entity);
     GetEntPropVector(entity,Prop_Data,"m_vecOrigin",gNPCs[n].originalOrigin);GetEntPropVector(entity,Prop_Data,"m_angRotation",gNPCs[n].originalAngles);
     SDKHook(entity,SDKHook_ThinkPost,NPCThinkPost);
+    SDKHook(entity,SDKHook_Think,ExpansionNPCThinkPre);
     int boss=gNPCs[n].boss;
     ParkNPC(n);
     if(boss>=0)
@@ -124,6 +126,8 @@ void FreezeNPC(int n)
 void ParkNPC(int n)
 {
     int entity=Resolve(gNPCs[n].ref);if(entity<0 || !gNPCs[n].ready || gNPCs[n].dead)return;
+    ExpansionClearNPCFreeze(n,true);
+    ClearNPCBurnVisual(n);
     gNPCs[n].active=false;gNPCs[n].paused=true;gNPCs[n].burnUntil=0.0;gNPCs[n].attackingUID=0;
     FreezeNPC(n);Colors(n,false);SetEntProp(entity,Prop_Data,"m_takedamage",0,1);
     SetEntProp(entity,Prop_Send,"m_usSolidFlags",gNPCs[n].solidFlags|4);
@@ -138,6 +142,7 @@ void RestoreNPCBody(int n)
     SetEntProp(entity,Prop_Data,"m_takedamage",gNPCs[n].takeDamage,1);Colors(n,true);
     Han_UnlockZombie(entity);Han_SetCustomAnimationEx(entity,gNPCs[n].idle,0.01);
     SetEntityMoveType(entity,MOVETYPE_STEP);gNPCs[n].paused=false;
+    MaintainExpansionFreeze(n,GetGameTime());
 }
 
 public Action BossPosition(Handle timer,DataPack pack)
@@ -201,7 +206,12 @@ void StopBuildingAttack(int n)
 {
     if(!gNPCs[n].attackingUID)return;
     int entity=Resolve(gNPCs[n].ref);gNPCs[n].attackingUID=0;
-    if(entity>0){Han_SetCustomAnimationEx(entity,gNPCs[n].idle,0.01);SetEntityMoveType(entity,MOVETYPE_STEP);}
+    if(entity>0)
+    {
+        if(ExpansionNPCFrozen(n,GetGameTime()) || ExpansionNPCProtected(n))
+        {if(ExpansionNPCFrozen(n,GetGameTime()))MaintainExpansionFreeze(n,GetGameTime());else FreezeNPC(n);}
+        else {Han_SetCustomAnimationEx(entity,gNPCs[n].idle,0.01);SetEntityMoveType(entity,MOVETYPE_STEP);}
+    }
 }
 
 void NPCTick(float now)
@@ -239,6 +249,8 @@ void NPCTick(float now)
             DamageBurningNPC(i);
             if(gNPCs[i].dead || Resolve(gNPCs[i].ref)<0)continue;
         }
+        MaintainExpansionFreeze(i,now);
+        if(ExpansionNPCFrozen(i,now))continue;
         // Keep valid native targets. Only an active NPC without one receives a
         // short fallback lock; parking, dormant Bosses and wall attacks are excluded.
         int target=gLeaderOffset>=0 ? GetEntDataEnt2(entity,gLeaderOffset) : 0;
@@ -298,7 +310,8 @@ public void NPCThinkPost(int entity)
 {
     int n=FindNPC(entity);if(n<0 || gNPCs[n].dead || !gNPCs[n].ready)return;
     int boss=gNPCs[n].boss;
-    if(!gNPCs[n].active || !Running() || (boss>=0 && !gBosses[boss].awakened) || gNPCs[n].attackingUID)
+    MaintainExpansionFreeze(n,GetGameTime());
+    if(!gNPCs[n].active || !Running() || (boss>=0 && !gBosses[boss].awakened) || gNPCs[n].attackingUID || ExpansionNPCFrozen(n,GetGameTime()))
     {
         SetEntityMoveType(entity,MOVETYPE_NONE);TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,view_as<float>({0.0,0.0,0.0}));
         if(gLeaderOffset>=0 && (!gNPCs[n].active || !Running() || (boss>=0 && !gBosses[boss].awakened)))SetEntDataEnt2(entity,gLeaderOffset,entity);
@@ -320,6 +333,8 @@ public void Han_OnZombieDeath(int zombie,int killer)
     bool actualDeath=gNPCs[n].active && Running();
     // Consume once before rewards/forward re-entry and before the final Boss ends play.
     gNPCs[n].dead=true;gNPCs[n].settled=true;gNPCs[n].active=false;gNPCs[n].burnUntil=0.0;
+    ClearNPCBurnVisual(n);
+    ExpansionClearNPCFreeze(n);
     if(!actualDeath)return;
     if(!gNPCs[n].publicName[0])
     {
@@ -349,6 +364,7 @@ void RestoreNPCOnUnload(int n)
 {
     int entity=Resolve(gNPCs[n].ref);if(entity<0 || !gNPCs[n].ready || gNPCs[n].dead)return;
     SDKUnhook(entity,SDKHook_ThinkPost,NPCThinkPost);
+    SDKUnhook(entity,SDKHook_Think,ExpansionNPCThinkPre);ExpansionClearNPCFreeze(n);
     if(gNPCs[n].paused)
     {
         float position[3],angles[3];

@@ -37,6 +37,9 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Armor: TranslateLabel(client,"BuildArmorName",name,length);
         case Kind_Beacon: TranslateLabel(client,"BuildBeaconName",name,length);
         case Kind_Campfire: TranslateLabel(client,"BuildCampfireName",name,length);
+        case Kind_Tesla: strcopy(name,length,"Tesla Coil");
+        case Kind_Plasma: strcopy(name,length,"Ion Cannon");
+        case Kind_Watchtower: strcopy(name,length,"Watchtower");
     }
 }
 
@@ -82,8 +85,8 @@ void HudBuildingTarget(int client,int building)
     {Format(line,sizeof(line),"%T","HUDTargetGeneratorCompact",client,GeneratorOutput(building),gBuildings[building].powerOutput);StrCat(text,sizeof(text),line);}
     else if(gBuildings[building].powerDemand>0.0 || SupportMenuKind(gBuildings[building].kind))
     {
-        char state[48];TranslateLabel(client,BuildingPowered(building) ? "PowerOnline" : "PowerOffline",state,sizeof(state));
-        Format(line,sizeof(line),"%T","HUDTargetPowerCompact",client,state,gBuildings[building].powerDemand);StrCat(text,sizeof(text),line);
+        char state[48],stateKey[64];BuildingPowerStateLabel(building,stateKey,sizeof(stateKey));TranslateLabel(client,stateKey,state,sizeof(state));
+        Format(line,sizeof(line),"%T","HUDTargetPowerCompact",client,state,EffectiveBuildingPowerDemand(building));StrCat(text,sizeof(text),line);
     }
     BuildingKind kind=gBuildings[building].kind;
     if(SupportMenuKind(kind) && kind!=Kind_Beacon)

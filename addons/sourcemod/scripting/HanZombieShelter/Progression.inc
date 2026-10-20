@@ -235,6 +235,31 @@ bool CanBuildAmplifier(const char[] type,int level,int &requiredLevel)
     return AmplifierLevelInfo(type,level,requiredLevel,bonuses) && ProgressionBaseLevel()>=requiredLevel;
 }
 
+// The same campaign-wide level used by existing progression. Missing fields
+// default to 1 so every pre-0.7.2 recipe retains its original availability.
+bool ProfileBaseLevelAllowed(ConfigFile file,const char[] profile,int level,int &required)
+{
+    required=1;
+    if(!ReadLevelInt(file,profile,level,"minimum_base_level",1,required))return false;
+    return ProgressionBaseLevel()>=required;
+}
+
+bool RecipeBaseLevelAllowed(int recipe,int &required)
+{
+    required=1;if(recipe<0 || recipe>=gRecipeCount)return false;
+    if(gRecipes[recipe].kind==Kind_Amplifier)return CanBuildAmplifier(gRecipes[recipe].type,1,required);
+    char profile[128];Format(profile,sizeof(profile),"Types/%s",gRecipes[recipe].type);
+    return ProfileBaseLevelAllowed(gRecipes[recipe].file,profile,1,required);
+}
+
+bool BuildingBaseLevelAllowed(int building,int level,int &required)
+{
+    required=1;if(building<0 || building>=MAX_BUILDINGS || !gBuildings[building].used)return false;
+    if(gBuildings[building].kind==Kind_Amplifier)return CanBuildAmplifier(gBuildings[building].type,level,required);
+    char profile[128];BuildingProfilePath(building,profile,sizeof(profile));
+    return ProfileBaseLevelAllowed(gBuildings[building].file,profile,level,required);
+}
+
 int ProgressionChannel(bool defense,bool boss)
 {
     return (defense ? 2 : 0)+(boss ? 1 : 0);

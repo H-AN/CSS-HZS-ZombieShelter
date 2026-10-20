@@ -1,6 +1,8 @@
 # HanZombieShelter API v2（环境 API v1）
 
-提供方0.6.0，库名 `HanZombieShelter`；头文件 `addons/sourcemod/scripting/include/HanZombieShelterAPI.inc`。提供只读状态、全局forward和明确授权的基地选择/安全回城，不提供切阶段、刷怪或扣料后门。HZS主体API职责保持原有边界。
+提供方0.7.2，库名 `HanZombieShelter`；头文件 `addons/sourcemod/scripting/include/HanZombieShelterAPI.inc`。提供只读状态、全局forward和明确授权的基地选择/安全回城，不提供切阶段、刷怪或扣料后门。HZS主体API职责保持原有边界。
+
+v0.7.2保持API v2与环境API v1，保留全部旧枚举值，在末尾追加 `HZSHBuilding_Tesla=15`、`HZSHBuilding_Plasma=16`、`HZSHBuilding_Watchtower=17`。没有新增HZS主体接口；新增设施继续通过既有BuildingInfo查询。瞭望塔上下塔属于外部插件自身的E菜单事务，不是新增公开传送native。自建基地的配置安全候选仍是坐标数据，不分配对应的出生点实体。
 
 v0.6 保持总体 API v2、环境 API v1 和所有旧枚举值，末尾追加 `HZSHBuilding_Campfire=14`。基地数量包含本战役已分配的自建基地，已毁编号在新战役前不回收。`HZSH_GetBaseInfo` / `HZSH_GetBuildingInfo` 的 `alive` 表示已完成并有效存活：施工蓝图仍可查询，返回 `alive=false`，不能将“查询成功”当成基地已启用。自建基地完工后可使用现有电网、仓库和回城 API；回城在动态区域内检查落地和真人 hull，无可用位置时返回 false。篝火仅提供夜间暴露保护，不是基地或电网；现有接口不单独返回篝火燃烧阈值或施工标志，应读取相关配置，不依赖 HP=1 猜测状态。
 

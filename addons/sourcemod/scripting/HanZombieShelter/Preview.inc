@@ -176,6 +176,7 @@ void UpdateBuildPreview(int client,float now)
                 gBuildPreviewEntityOwner[entity]=client;gBuildPreviewEntityRef[entity]=ref;
                 gBuildPreviewEntityGeneration[entity]=gBuildPreviewGeneration[client];
                 if(HasEntProp(entity,Prop_Send,"m_nSkin"))SetEntProp(entity,Prop_Send,"m_nSkin",gRecipes[recipe].meta.skin);
+                if(HasEntProp(entity,Prop_Send,"m_nBody"))SetEntProp(entity,Prop_Send,"m_nBody",gRecipes[recipe].meta.body);
             }
         }
     }

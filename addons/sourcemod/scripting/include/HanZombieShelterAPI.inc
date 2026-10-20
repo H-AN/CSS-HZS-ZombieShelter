@@ -9,7 +9,8 @@ enum HZSHPhase { HZSHPhase_Waiting, HZSHPhase_Day, HZSHPhase_Night, HZSHPhase_En
 enum HZSHEnvironmentPhase { HZSHEnvironment_Day, HZSHEnvironment_Night }
 enum HZSHBuildingKind { HZSHBuilding_Base, HZSHBuilding_Turret, HZSHBuilding_Flame, HZSHBuilding_Fence,
     HZSHBuilding_Mine, HZSHBuilding_Amplifier, HZSHBuilding_Generator, HZSHBuilding_Light, HZSHBuilding_Grenade, HZSHBuilding_Expander,
-    HZSHBuilding_AutoRepair, HZSHBuilding_Heal, HZSHBuilding_Armor, HZSHBuilding_Beacon, HZSHBuilding_Campfire }
+    HZSHBuilding_AutoRepair, HZSHBuilding_Heal, HZSHBuilding_Armor, HZSHBuilding_Beacon, HZSHBuilding_Campfire,
+    HZSHBuilding_Tesla, HZSHBuilding_Plasma, HZSHBuilding_Watchtower }
 
 native int HZSH_GetAPIVersion();
 native int HZSH_GetEnvironmentAPIVersion();
@@ -37,6 +38,7 @@ native bool HZSH_ShowBaseTeleportMenu(int client, Function onSelected, any conte
 native bool HZSH_GetBasePower(int core, float &production, float &demand, float &allocated, int &offline);
 // Stable building UIDs are scoped to a provider/map session, never entity indices.
 // alive means completed and not destroyed; a blueprint is queryable but alive=false.
+// powerRequired is the current effective load; lamps report zero outside night or while manually off.
 native bool HZSH_GetBuildingInfo(int uid, HZSHBuildingKind &kind, int &core, int &level,
     int &hp, int &maxHP, bool &alive, bool &powered, float &powerRequired, float &powerOutput);
 native bool HZSH_GetPlayerMaterials(int client, int materials[5]);

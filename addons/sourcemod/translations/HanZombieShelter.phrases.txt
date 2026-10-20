@@ -1654,6 +1654,46 @@
         "en"    "Powered"
         "chi"    "供电正常"
     }
+    "PowerLightDayOff"
+    {
+        "en"    "Daytime - automatic light off"
+        "chi"    "白天自动关灯"
+    }
+    "PowerLightInactive"
+    {
+        "en"    "Light inactive"
+        "chi"    "灯光未启用"
+    }
+    "PowerLightManualOff"
+    {
+        "en"    "Manually switched off"
+        "chi"    "已手动关闭"
+    }
+    "LightManualSwitchOff"
+    {
+        "en"    "Switch light off"
+        "chi"    "手动关闭灯光"
+    }
+    "LightManualSwitchOn"
+    {
+        "en"    "Enable automatic day/night lighting"
+        "chi"    "开启灯光（恢复昼夜自动）"
+    }
+    "LightManualClosed"
+    {
+        "en"    "Light manually off; no power is used until enabled again."
+        "chi"    "灯光已手动关闭，再次开启前不耗电。"
+    }
+    "LightManualAutomatic"
+    {
+        "en"    "Automatic lighting restored: off by day, powered at night."
+        "chi"    "已恢复昼夜自动：白天关闭，夜间按供电开启。"
+    }
+    "LightManualSwitchFailed"
+    {
+        "en"    "Light state changed or action unavailable; reopen its menu."
+        "chi"    "灯具状态已变化或无法操作，请重新打开菜单。"
+    }
     "RecipeBeacon"
     {
         "en"    "Base beacon"
@@ -1671,8 +1711,28 @@
     }
     "RecipeFence"
     {
-        "en"    "Defensive structure"
-        "chi"    "防御工事"
+        "en"    "Wooden stake barbed wire"
+        "chi"    "木桩铁丝网"
+    }
+    "BuildStatPlasmaFieldDamage"
+    {
+        "en" "Residual field damage per pulse"
+        "chi" "残留能量场每次伤害"
+    }
+    "BuildStatPlasmaFieldDuration"
+    {
+        "en" "Residual field duration (s)"
+        "chi" "残留能量场持续秒数"
+    }
+    "BuildStatPlasmaFieldRadius"
+    {
+        "en" "Residual field radius"
+        "chi" "残留能量场半径"
+    }
+    "BuildStatPlasmaFieldInterval"
+    {
+        "en" "Residual field pulse interval (s)"
+        "chi" "残留能量场伤害间隔秒数"
     }
     "RecipeFlame"
     {
@@ -1681,13 +1741,28 @@
     }
     "RecipeGenerator"
     {
-        "en"    "Generator"
-        "chi"    "发电机"
+        "en"    "Small generator"
+        "chi"    "小型发电机"
     }
     "RecipeGrenade"
     {
         "en"    "Grenade turret"
         "chi"    "榴弹炮塔"
+    }
+    "BuildMortarName"
+    {
+        "en" "Mortar"
+        "chi" "迫击炮"
+    }
+    "RecipeMortar"
+    {
+        "en" "High-arc mortar"
+        "chi" "迫击炮"
+    }
+    "MortarDescription"
+    {
+        "en" "High-arc shell with a white trail. Greater blast damage and radius, with a longer firing interval."
+        "chi" "高抛炮弹、白色拖尾；爆炸伤害与范围更高，发射间隔更长。"
     }
     "RecipeLamp"
     {
@@ -1701,8 +1776,8 @@
     }
     "RecipeShelter"
     {
-        "en"    "Build a new shelter base"
-        "chi"    "建立新庇护所基地"
+        "en"    "Basic player shelter"
+        "chi"    "初级自建基地"
     }
     "RecipeTurretBasic"
     {
@@ -1727,8 +1802,33 @@
     }
     "ShelterDescription"
     {
-        "en"    "Establish a new square base outside existing territory. It counts only after construction completes."
-        "chi"    "在现有基地外开辟方形基地，施工完成后才计入存活基地。"
+        "en"    "Choose the position freely. Do not overlap zombies. It counts as a base after construction completes."
+        "chi"    "自由选择基地位置，不得与丧尸重叠；施工完成后才计入存活基地。"
+    }
+    "ShelterNPCOverlap"
+    {
+        "en"    "This shelter would overlap a zombie or Boss. Choose another position."
+        "chi"    "基地范围与丧尸或Boss重叠，请调整位置后再建造。"
+    }
+    "WatchtowerTravelUnavailable"
+    {
+        "en"    "This tower is currently unavailable. Check your position, completion and power."
+        "chi"    "瞭望塔当前不可用，请重新确认位置、完工状态与供电。"
+    }
+    "WatchtowerLandingBlocked"
+    {
+        "en"    "The destination is occupied or lacks reliable support. Travel is temporarily unavailable."
+        "chi"    "目标落点被占用或没有可靠支撑，暂不能传送。"
+    }
+    "WatchtowerTopOccupied"
+    {
+        "en"    "Other buildings occupy the tower platform. You cannot travel up."
+        "chi"    "塔顶已经被其他建筑物占据，无法上塔。"
+    }
+    "WatchtowerTravelChanged"
+    {
+        "en"    "The tower or player changed. This travel was cancelled."
+        "chi"    "塔或玩家状态已变化，本次传送已取消。"
     }
     "ShelterOutsideExistingBase"
     {
@@ -1751,5 +1851,67 @@
     {
         "en"    "Your backpack lacks upgrade materials. Withdraw supplies from a base warehouse."
         "chi"    "个人升级材料不足, 可从基地共享仓库取出物资."
+    }
+    "BuildStructureName"
+    {
+        "en"    "Structures"
+        "chi"    "建筑物"
+    }
+    "BuildTeslaName"
+    {
+        "en"    "Tesla coils"
+        "chi"    "电击线圈"
+    }
+    "BuildPlasmaName"
+    {
+        "en"    "Plasma turrets"
+        "chi"    "离子炮"
+    }
+    "BuildWatchtowerName"
+    {
+        "en"    "Watchtowers"
+        "chi"    "瞭望塔"
+    }
+    "FacilityBaseLevelRequired"
+    {
+        "#format"    "{1:d}"
+        "en"    "Requires a living base of level {1} or above."
+        "chi"    "需要有效基地等级至少 {1}。"
+    }
+    "BuildVariantBaseLocked"
+    {
+        "#format"    "{1:s},{2:d}"
+        "en"    "{1} [requires base level {2}]"
+        "chi"    "{1}〔需要基地等级 {2}〕"
+    }
+    "WatchtowerTravelUp"
+    {
+        "en"    "Travel to the tower platform"
+        "chi"    "传送到塔上"
+    }
+    "WatchtowerTravelDown"
+    {
+        "en"    "Travel to the ground"
+        "chi"    "传送到地面"
+    }
+    "WatchtowerTravelUpSuccess"
+    {
+        "en"    "Arrived on the tower platform."
+        "chi"    "已到达瞭望塔平台。"
+    }
+    "WatchtowerTravelDownSuccess"
+    {
+        "en"    "Arrived on the ground."
+        "chi"    "已到达瞭望塔旁地面。"
+    }
+    "WatchtowerTravelFailed"
+    {
+        "en"    "Tower travel failed: the tower, access or landing space changed. Your position is preserved."
+        "chi"    "无法传送：塔状态、使用权限或落点空间已变化，保留原位置。"
+    }
+    "WatchtowerCooldown"
+    {
+        "en"    "Wait briefly before using tower travel again."
+        "chi"    "请稍后再使用瞭望塔传送。"
     }
 }

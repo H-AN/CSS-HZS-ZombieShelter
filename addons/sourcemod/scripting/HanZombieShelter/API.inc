@@ -204,7 +204,7 @@ public int NativeShelterBuilding(Handle plugin,int params)
     SetNativeCellRef(2,gBuildings[b].kind);SetNativeCellRef(3,gBuildings[b].kind==Kind_Base ? gBuildings[b].core : gBuildings[b].powerCore);
     SetNativeCellRef(4,gBuildings[b].level);SetNativeCellRef(5,gBuildings[b].hp);SetNativeCellRef(6,gBuildings[b].maxHP);
     SetNativeCellRef(7,BuildingOperational(b));SetNativeCellRef(8,BuildingPowered(b));
-    SetNativeCellRef(9,view_as<int>(gBuildings[b].powerDemand));SetNativeCellRef(10,view_as<int>(GeneratorOutput(b)));return true;
+    SetNativeCellRef(9,view_as<int>(EffectiveBuildingPowerDemand(b)));SetNativeCellRef(10,view_as<int>(GeneratorOutput(b)));return true;
 }
 public int NativeShelterMaterials(Handle plugin,int params)
 {

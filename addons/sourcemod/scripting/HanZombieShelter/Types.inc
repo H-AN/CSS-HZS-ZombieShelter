@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.7.1"
+#define SHELTER_VERSION "0.7.2"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
@@ -12,9 +12,9 @@
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
 enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander,
-    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire }
+    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire, Kind_Tesla, Kind_Plasma, Kind_Watchtower }
 enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops,
-    C_Repair, C_Heal, C_Armor, C_Beacons, C_Campfires, C_Shelters, C_Count }
+    C_Repair, C_Heal, C_Armor, C_Beacons, C_Campfires, C_Shelters, C_Tesla, C_Plasma, C_Watchtowers, C_Count }
 
 // Reward identity is independent of the living client required by the HZS
 // damage API. Delayed hits retain this snapshot after a facility is removed.
@@ -103,6 +103,7 @@ enum struct BuildingMetadata
     char description[256];
     int render[4];
     int skin;
+    int body;
     char placementMode[16];
     float originOffset[3];
     float angleOffset[3];
@@ -117,6 +118,14 @@ enum struct BuildingMetadata
     char pulseSound[PLATFORM_MAX_PATH];
 }
 
+enum struct BuildingSupportIdentity
+{
+    int uid;
+    int ref;
+    int generation;
+    int epoch;
+}
+
 enum struct Building
 {
     bool used;
@@ -126,6 +135,9 @@ enum struct Building
     BuildingKind kind;
     int uid;
     int generation;
+    int supportUID; // Logical parent survives a world rebuild; never an array slot.
+    int supportRef; // Current exact parent body only, invalidated during cleanup.
+    int supportGeneration;
     int core;
     int buildCore;
     int configRevision;
@@ -173,6 +185,7 @@ enum struct Building
     float powerDemand;
     int powerPriority;
     int effectRef;
+    bool lightManualOff; // False for a new value/slot: automatic day/night lighting.
     float lightRadius;
     int lightBrightness;
     float projectileSpeed;

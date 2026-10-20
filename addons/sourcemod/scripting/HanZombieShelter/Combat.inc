@@ -59,6 +59,7 @@ void TraceDefenseShot(int b,float now,int target)
 
 void ClearNPCRewardContext(int n)
 {
+    ClearNPCBurnVisual(n);
     RewardContext empty;gBurnRewardContext[n]=empty;gBurnRewardNPCRef[n]=INVALID_ENT_REFERENCE;
     gNPCs[n].burnUntil=0.0;
 }
@@ -195,6 +196,23 @@ void DamageBurningNPC(int n)
     DamageNPCWithContext(n,gNPCs[n].burnDamage,gBurnRewardContext[n]);
 }
 
+// Shared by the original flame cone and one-shot burning traps. The captured
+// owner survives source removal; a recycled NPC never inherits this burn.
+void ApplyNPCBurn(int n,float now,float duration,int damage,float interval,RewardContext context)
+{
+    if(!Running() || !DefenseTarget(n) || !context.valid || context.epoch!=gEpoch
+        || duration<=0.0 || damage<1 || interval<0.1)return;
+    bool burning=gBurnRewardNPCRef[n]==gNPCs[n].ref && gNPCs[n].burnUntil>now;
+    float until=now+duration;if(!burning || until>gNPCs[n].burnUntil)gNPCs[n].burnUntil=until;
+    if(!burning || damage>=gNPCs[n].burnDamage)
+    {
+        gNPCs[n].burnDamage=damage;gNPCs[n].burnInterval=interval;gNPCs[n].burnClientSerial=context.ownerSerial;
+        gBurnRewardContext[n]=context;gBurnRewardNPCRef[n]=gNPCs[n].ref;
+    }
+    if(!burning)gNPCs[n].nextBurn=now+interval;
+    SyncNPCBurnVisual(n,now,true);
+}
+
 void InvalidateDefenseCache(int b)
 {
     gBuildings[b].targetRef=INVALID_ENT_REFERENCE;gBuildings[b].targetEpoch=0;
@@ -328,18 +346,8 @@ void TurretFire(int b,float now)
         Beam(muzzle,point,true);DamageNPCWithContext(n,RoundToNearest(gBuildings[b].damage),burnContext);
         if(epoch!=gEpoch || !Running() || !gBuildings[b].used || !gBuildings[b].alive
             || gBuildings[b].uid!=uid || gBuildings[b].ref!=sourceRef)return;
-        if(gNPCs[n].ref==victimRef && !gNPCs[n].dead && gBuildings[b].burnDuration>0.0)
-        {
-            bool burning=gNPCs[n].burnUntil>now;
-            float until=now+gBuildings[b].burnDuration;if(until>gNPCs[n].burnUntil)gNPCs[n].burnUntil=until;
-            if(!burning || gBuildings[b].burnDamage>=gNPCs[n].burnDamage)
-            {
-                gNPCs[n].burnDamage=gBuildings[b].burnDamage;gNPCs[n].burnInterval=gBuildings[b].burnInterval;
-                gNPCs[n].burnClientSerial=burnContext.ownerSerial;
-                gBurnRewardContext[n]=burnContext;gBurnRewardNPCRef[n]=victimRef;
-            }
-            if(!burning)gNPCs[n].nextBurn=now+gBuildings[b].burnInterval;
-        }
+        if(gNPCs[n].ref==victimRef && !gNPCs[n].dead)
+            ApplyNPCBurn(n,now,gBuildings[b].burnDuration,gBuildings[b].burnDamage,gBuildings[b].burnInterval,burnContext);
     }
 }
 
@@ -347,28 +355,39 @@ void MineTick(int b)
 {
     if(!BuildingPowered(b))return;
     int body=Resolve(gBuildings[b].ref);if(body<0)return;
+    int effect=ExpansionMineMode(b);bool legacy=ExpansionLegacyMine(b);
+    float trigger=ExpansionMineTrigger(b);
     float source[3];source=gBuildings[b].origin;source[2]+=20.0;
     bool triggered=false;
     for(int n=0;n<MAX_NPCS;n++)
     {
-        if(!DefenseTarget(n,true))continue;
+        if(!DefenseTarget(n,legacy))continue;
         int entity=Resolve(gNPCs[n].ref);float p[3];EntityCenter(entity,p);
-        if(GetVectorDistance(source,p)<80.0 && LineClear(source,p,body,entity)){triggered=true;break;}
+        if(GetVectorDistance(source,p)<trigger && LineClear(source,p,body,entity)){triggered=true;break;}
     }
     if(!triggered)return;
     // Consumption is committed before re-entrant native damage/death callbacks.
     RewardContext context;CaptureBuildingReward(b,context);
+    float radius=gBuildings[b].range;int damage=RoundToNearest(gBuildings[b].damage);
+    float burnDuration=gBuildings[b].burnDuration,burnInterval=gBuildings[b].burnInterval,freezeDuration=ExpansionMineFreezeDuration(b);
+    int burnDamage=gBuildings[b].burnDamage;
     gBuildings[b].alive=false;gBuildings[b].hp=0;InvalidateDefenseCache(b);
     MarkBuildAreasDirty();RecalculatePower(); // A consumed mine releases its logical quota exactly once.
-    float radius=gBuildings[b].range;int damage=RoundToNearest(gBuildings[b].damage);
     int color[4]={255,170,40,255};TE_SetupBeamRingPoint(source,10.0,radius*2.0,gBeamSprite,0,0,0,0.35,12.0,0.0,color,0,0);TE_SendToAll();
+    float now=GetGameTime();
     for(int n=0;n<MAX_NPCS;n++)
     {
-        if(!Running() || context.epoch!=gEpoch)return;
-        if(!DefenseTarget(n,true))continue;
+        if(!Running() || context.epoch!=gEpoch)break;
+        if(!DefenseTarget(n,legacy))continue;
         int entity=Resolve(gNPCs[n].ref);float p[3];EntityCenter(entity,p);
-        if(GetVectorDistance(source,p)<=radius && LineClear(source,p,body,entity))DamageNPCWithContext(n,damage,context);
+        if(GetVectorDistance(source,p)>radius || !LineClear(source,p,body,entity))continue;
+        int npcRef=gNPCs[n].ref;
+        if(effect!=2 && damage>0)DamageNPCWithContext(n,damage,context);
+        if(gNPCs[n].ref!=npcRef || gNPCs[n].dead || !Running() || context.epoch!=gEpoch)continue;
+        if(effect==1)ApplyNPCBurn(n,now,burnDuration,burnDamage,burnInterval,context);
+        else if(effect==2)ApplyExpansionFreeze(n,freezeDuration,now,true);
     }
+    if(effect==2 && Running() && context.epoch==gEpoch)ExpansionFreezeBurst(source,radius);
     if(gBuildings[b].uid==context.sourceUID && gBuildings[b].ref==context.sourceRef)
         gBuildings[b].ref=INVALID_ENT_REFERENCE;
     RemoveOwnedRef(context.sourceRef);
@@ -395,6 +414,7 @@ public Action DefenseTimer(Handle timer)
         if(!gBuildings[b].used || !gBuildings[b].alive || now+0.00001<gBuildings[b].nextFire)continue;
         if(gBuildings[b].kind==Kind_Turret || gBuildings[b].kind==Kind_Flame)TurretFire(b,now);
         else if(gBuildings[b].kind==Kind_Grenade)GrenadeFire(b,now);
+        else if(gBuildings[b].kind==Kind_Tesla || gBuildings[b].kind==Kind_Plasma)ExpansionDefenseTick(b,now);
     }
     return Plugin_Continue;
 }

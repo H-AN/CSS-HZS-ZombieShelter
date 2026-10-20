@@ -73,12 +73,30 @@ float GeneratorOutput(int b)
 bool BuildingPowered(int b)
 {
     return Running() && BuildingOperational(b)
+        && (gBuildings[b].kind!=Kind_Light || (!gBuildings[b].lightManualOff && LampNightPowerActive()))
         && Resolve(gBuildings[b].ref)>0 && BuildCoreAlive(gBuildings[b].powerCore)
         && (!gPowerEnabled || gBuildings[b].powerDemand<=0.0 || gBuildings[b].powered);
 }
 
+float EffectiveBuildingPowerDemand(int b)
+{
+    if(b<0 || b>=MAX_BUILDINGS)return 0.0;
+    if(gBuildings[b].kind==Kind_Light && (gBuildings[b].lightManualOff || !LampNightPowerActive()))return 0.0;
+    return gBuildings[b].powerDemand;
+}
+
+void BuildingPowerStateLabel(int b,char[] label,int length)
+{
+    if(gBuildings[b].kind==Kind_Light && gBuildings[b].lightManualOff)
+        strcopy(label,length,"PowerLightManualOff");
+    else if(gBuildings[b].kind==Kind_Light && !LampNightPowerActive())
+        strcopy(label,length,Running() && gPhase==Phase_Day ? "PowerLightDayOff" : "PowerLightInactive");
+    else strcopy(label,length,BuildingPowered(b) ? "PowerOnline" : "PowerOffline");
+}
+
 void RecalculatePower()
 {
+    bool lampsActive=LampNightPowerActive();
     float beforeOutput[MAX_CORES],beforeDemand[MAX_CORES],beforeAllocated[MAX_CORES];int beforeOffline[MAX_CORES];
     for(int c=0;c<gCoreCount;c++)
     {
@@ -96,6 +114,9 @@ void RecalculatePower()
         {gBuildings[b].powerCore=gBuildings[b].kind==Kind_Base ? gBuildings[b].core : GridAt(gBuildings[b].origin);gBuildings[b].gridAssigned=true;}
         int core=gBuildings[b].powerCore;
         if(!Running() || core<0 || core>=gCoreCount)continue;
+        // Preserve the configured level demand, but sleeping daytime lamps do
+        // not enter total demand, priority allocation, overload or outage counts.
+        if(gBuildings[b].kind==Kind_Light && (!lampsActive || gBuildings[b].lightManualOff))continue;
         gGridProduction[core]+=GeneratorOutput(b);
         gGridDemand[core]+=gBuildings[b].powerDemand;
         // A destroyed base disconnects its entire grid, including free loads
@@ -140,6 +161,7 @@ void RecalculatePower()
         int core=gBuildings[b].powerCore;
         if(Running() && gPowerEnabled && wasPowered[b] && !gBuildings[b].powered
             && BuildingOperational(b) && gBuildings[b].powerDemand>0.0 && Resolve(gBuildings[b].ref)>0
+            && (gBuildings[b].kind!=Kind_Light || (lampsActive && !gBuildings[b].lightManualOff))
             && core>=0 && core<gCoreCount)powerLost[core]=true;
         if(wasPowered[b]!=gBuildings[b].powered)
         {
@@ -174,7 +196,11 @@ bool CreateBuildingLight(int b)
     int body=Resolve(gBuildings[b].ref);if(body<0 || !CanAllocateEntities(1,true))return false;
     int light=CreateEntityByName("light_dynamic");if(light<0)return false;
     DispatchKeyValue(light,"_light","255 235 200 255");DispatchKeyValue(light,"brightness","2");
-    DispatchKeyValue(light,"style","0");DispatchKeyValue(light,"inner_cone","0");DispatchKeyValue(light,"cone","0");
+    // A style conflict leaves an owned off entity, preserving the building and
+    // allowing explicit diagnosis without borrowing environment/HZS styles.
+    if(LampLightingReady())
+    {char style[16];IntToString(gLampStyleIndex,style,sizeof(style));DispatchKeyValue(light,"style",style);}
+    DispatchKeyValue(light,"_inner_cone","0");DispatchKeyValue(light,"_cone","0");
     DispatchKeyValueFloat(light,"distance",gBuildings[b].lightRadius);
     if(!DispatchSpawn(light) || !CanAllocateEntities(1,true)){RemoveEntity(light);return false;}
     SetVariantString("!activator");AcceptEntityInput(light,"SetParent",body);
@@ -229,7 +255,7 @@ void AppendGridInfo(int client,int core,char[] title,int length)
 
 void AppendBuildingPowerInfo(int client,int b,int level,char[] title,int length)
 {
-    char line[192],profile[128],state[64];BuildingProfilePath(b,profile,sizeof(profile));
+    char line[192],profile[128],state[64],stateLabel[64];BuildingProfilePath(b,profile,sizeof(profile));
     if(gBuildings[b].kind==Kind_Generator)
     {
         float output;ReadLevelFloat(gBuildings[b].file,profile,level,"power_output",0.0,output);
@@ -238,8 +264,8 @@ void AppendBuildingPowerInfo(int client,int b,int level,char[] title,int length)
     else if(gBuildings[b].powerDemand>0.0 || gBuildings[b].kind==Kind_Light)
     {
         float demand;ReadLevelFloat(gBuildings[b].file,profile,level,"power_required",0.0,demand);
-        TranslateLabel(client,BuildingPowered(b) ? "PowerOnline" : "PowerOffline",state,sizeof(state));
-        Format(line,sizeof(line),"%T","ConsumerPowerInfo",client,state,gBuildings[b].powerDemand,demand);StrCat(title,length,line);
+        BuildingPowerStateLabel(b,stateLabel,sizeof(stateLabel));TranslateLabel(client,stateLabel,state,sizeof(state));
+        Format(line,sizeof(line),"%T","ConsumerPowerInfo",client,state,EffectiveBuildingPowerDemand(b),demand);StrCat(title,length,line);
     }
     AppendGridInfo(client,gBuildings[b].powerCore,title,length);
 }

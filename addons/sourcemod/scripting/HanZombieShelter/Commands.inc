@@ -1,13 +1,14 @@
-static const char sBuildCategoryPhrases[][]={"BuildShelterName","HUDTurretName","HUDFlameName","HUDFenceName","HUDMineName",
+static const char sBuildCategoryPhrases[][]={"BuildShelterName","HUDTurretName","HUDFlameName","BuildStructureName","HUDMineName",
     "HUDAmplifierName","HUDGeneratorName","HUDLightName","HUDGrenadeName","BuildExpanderName",
-    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName","BuildCampfireName"};
+    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName","BuildCampfireName","BuildTeslaName","BuildPlasmaName","BuildWatchtowerName","BuildMortarName"};
+#define BUILD_CATEGORY_MORTAR view_as<BuildingKind>(18)
 enum BuildMenuGroup { BuildGroup_Shelter, BuildGroup_Autonomous, BuildGroup_Restoration, BuildGroup_BaseFacilities,
     BuildGroup_Lighting, BuildGroup_Defenses, BuildGroup_Campfire, BuildGroup_Count }
 enum BuildMenuView { BuildView_Closed, BuildView_Root, BuildView_Group, BuildView_Variants, BuildView_Details, BuildView_Confirm }
 static const char sBuildGroupPhrases[][]={"BuildShelterName","BuildGroupAutonomous","BuildGroupRestoration","BuildGroupBaseFacilities",
     "BuildGroupLighting","BuildGroupDefenses","BuildCampfireName"};
-static const BuildingKind sBuildCategoryOrder[]={Kind_Base,Kind_Turret,Kind_Flame,Kind_Grenade,Kind_Heal,Kind_AutoRepair,Kind_Armor,
-    Kind_Expander,Kind_Beacon,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Fence,Kind_Mine,Kind_Campfire};
+static const BuildingKind sBuildCategoryOrder[]={Kind_Base,Kind_Turret,Kind_Flame,Kind_Grenade,BUILD_CATEGORY_MORTAR,Kind_Tesla,Kind_Plasma,Kind_Heal,Kind_AutoRepair,Kind_Armor,
+    Kind_Expander,Kind_Beacon,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Fence,Kind_Mine,Kind_Watchtower,Kind_Campfire};
 int gBuildMenuNonce[MAXPLAYERS+1],gBuildMenuEpoch[MAXPLAYERS+1],gBuildMenuSerial[MAXPLAYERS+1],gBuildMenuRevision[MAXPLAYERS+1];
 BuildMenuGroup gBuildMenuGroup[MAXPLAYERS+1];
 BuildMenuView gBuildMenuView[MAXPLAYERS+1];
@@ -30,11 +31,11 @@ BuildMenuGroup BuildGroupForKind(BuildingKind kind)
     switch(kind)
     {
         case Kind_Base:return BuildGroup_Shelter;
-        case Kind_Turret,Kind_Flame,Kind_Grenade:return BuildGroup_Autonomous;
+        case Kind_Turret,Kind_Flame,Kind_Grenade,BUILD_CATEGORY_MORTAR,Kind_Tesla,Kind_Plasma:return BuildGroup_Autonomous;
         case Kind_Heal,Kind_AutoRepair,Kind_Armor:return BuildGroup_Restoration;
         case Kind_Expander,Kind_Beacon,Kind_Amplifier,Kind_Generator:return BuildGroup_BaseFacilities;
         case Kind_Light:return BuildGroup_Lighting;
-        case Kind_Fence,Kind_Mine:return BuildGroup_Defenses;
+        case Kind_Fence,Kind_Mine,Kind_Watchtower:return BuildGroup_Defenses;
         case Kind_Campfire:return BuildGroup_Campfire;
     }
     return BuildGroup_Count;
@@ -42,8 +43,16 @@ BuildMenuGroup BuildGroupForKind(BuildingKind kind)
 
 bool BuildCategoryAvailable(BuildingKind category)
 {
-    for(int r=0;r<gRecipeCount;r++)if(gRecipes[r].kind==category)return true;
+    for(int r=0;r<gRecipeCount;r++)if(RecipeBuildCategory(r)==category)return true;
     return false;
+}
+
+BuildingKind RecipeBuildCategory(int recipe)
+{
+    if(recipe<0 || recipe>=gRecipeCount)return view_as<BuildingKind>(-1);
+    if(gRecipes[recipe].kind==Kind_Grenade
+        && MortarTrajectory(gRecipes[recipe].file,gRecipes[recipe].type))return BUILD_CATEGORY_MORTAR;
+    return gRecipes[recipe].kind;
 }
 
 bool BuildGroupAvailable(BuildMenuGroup group)
@@ -156,10 +165,12 @@ Menu CreateBuildVariantsMenu(int client,BuildingKind category)
     char title[256],categoryName[128];TranslateLabel(client,sBuildCategoryPhrases[category],categoryName,sizeof(categoryName));
     Format(title,sizeof(title),"%T","BuildVariantTitle",client,categoryName);
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
-    for(int r=0;r<gRecipeCount;r++)if(gRecipes[r].kind==category)
+    for(int r=0;r<gRecipeCount;r++)if(RecipeBuildCategory(r)==category)
     {
         char label[192],name[128];TranslateLabel(client,gRecipes[r].label,name,sizeof(name));
-        Format(label,sizeof(label),"%T",HasBaseUpgradeMaterials(gRecipes[r].cost,client) ? "BuildVariantAvailable" : "BuildVariantNeedsMaterials",client,name);
+        int required;
+        if(!RecipeBaseLevelAllowed(r,required))Format(label,sizeof(label),"%T","BuildVariantBaseLocked",client,name,required);
+        else Format(label,sizeof(label),"%T",HasBaseUpgradeMaterials(gRecipes[r].cost,client) ? "BuildVariantAvailable" : "BuildVariantNeedsMaterials",client,name);
         AddBuildMenuItem(menu,client,1,view_as<int>(gRecipes[r].file),gRecipes[r].id,label);
     }
     int parent=BuildVariantParentOperation(category);
@@ -218,17 +229,24 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
     else Format(line,sizeof(line),"%T","BuildLevelMaxHP",client,level,hp);
     menu.AddItem("",line,ITEMDRAW_DISABLED);
     float value;
-    if(kind==Kind_Turret || kind==Kind_Flame || kind==Kind_Grenade || kind==Kind_Mine)
+    if(kind==Kind_Turret || kind==Kind_Flame || kind==Kind_Grenade || kind==Kind_Mine || kind==Kind_Tesla || kind==Kind_Plasma)
     {
         ReadLevelFloat(file,profile,level,"damage",0.0,value);AddRecipeStat(menu,client,"BuildStatDamage",value);
         ReadLevelFloat(file,profile,level,"range",0.0,value);AddRecipeStat(menu,client,"BuildStatRange",value);
         if(kind!=Kind_Mine){ReadLevelFloat(file,profile,level,"fire_interval",0.5,value);AddRecipeStat(menu,client,"BuildStatInterval",value);}
     }
-    if(kind==Kind_Grenade || kind==Kind_Mine)
+    if(kind==Kind_Grenade || kind==Kind_Mine || kind==Kind_Plasma)
     {ReadLevelFloat(file,profile,level,"blast_radius",180.0,value);AddRecipeStat(menu,client,"BuildStatBlastRadius",value);}
     if(kind==Kind_Mine){TranslateLabel(client,"BuildMineSingleUse",line,sizeof(line));menu.AddItem("",line,ITEMDRAW_DISABLED);}
-    if(kind==Kind_Grenade)
+    if(kind==Kind_Grenade || kind==Kind_Plasma)
     {ReadLevelFloat(file,profile,level,"projectile_speed",900.0,value);AddRecipeStat(menu,client,"BuildStatProjectileSpeed",value);}
+    if(kind==Kind_Plasma)
+    {
+        ReadLevelFloat(file,profile,level,"field_damage",0.0,value);AddRecipeStat(menu,client,"BuildStatPlasmaFieldDamage",value);
+        ReadLevelFloat(file,profile,level,"field_duration",0.0,value);AddRecipeStat(menu,client,"BuildStatPlasmaFieldDuration",value);
+        ReadLevelFloat(file,profile,level,"field_radius",96.0,value);AddRecipeStat(menu,client,"BuildStatPlasmaFieldRadius",value);
+        ReadLevelFloat(file,profile,level,"field_interval",0.5,value);AddRecipeStat(menu,client,"BuildStatPlasmaFieldInterval",value);
+    }
     if(kind==Kind_Flame)
     {
         ReadLevelFloat(file,profile,level,"cone_half_angle_degrees",30.0,value);AddRecipeStat(menu,client,"BuildStatCone",value);
@@ -289,8 +307,9 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
         static const char fields[][]={"player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus"};
         static const char labels[][]={"BuildStatPlayerOrdinary","BuildStatPlayerBoss","BuildStatDefenseOrdinary","BuildStatDefenseBoss"};
         for(int f=0;f<4;f++){ReadLevelFloat(file,profile,level,fields[f],0.0,value);AddRecipeStat(menu,client,labels[f],value*100.0);}
-        int required;ReadLevelInt(file,profile,level,"minimum_base_level",1,required);AddRecipeStat(menu,client,"BuildStatBaseLevel",float(required));
     }
+    int required;ReadLevelInt(file,profile,level,"minimum_base_level",1,required);
+    if(required>1 || kind==Kind_Amplifier)AddRecipeStat(menu,client,"BuildStatBaseLevel",float(required));
 }
 
 void AddRecipeLevelItems(Menu menu,int client,int recipe,int level)
@@ -304,7 +323,7 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false,bool r
     if(!LiveHuman(client) || !Running() || recipe<0 || recipe>=gRecipeCount)return;
     if(redraw && (!confirmation || !PreviewSessionValid(client) || gBuildPreviewRecipe[client]!=recipe))return;
     if(!redraw)BeginBuildMenu(client);
-    gBuildMenuCategory[client]=gRecipes[recipe].kind;gBuildMenuFile[client]=gRecipes[recipe].file;
+    gBuildMenuCategory[client]=RecipeBuildCategory(recipe);gBuildMenuFile[client]=gRecipes[recipe].file;
     gBuildMenuGroup[client]=BuildGroupForKind(gRecipes[recipe].kind);
     gBuildMenuView[client]=confirmation ? BuildView_Confirm : BuildView_Details;
     strcopy(gBuildMenuRecipe[client],sizeof(gBuildMenuRecipe[]),gRecipes[recipe].id);
@@ -314,15 +333,16 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false,bool r
     Format(profile,sizeof(profile),"Types/%s",gRecipes[recipe].type);
     Format(title,sizeof(title),"%T",confirmation ? "BuildConfirmTitle" : "BuildDetailsTitle",client,name,description,ProfileMaximumLevel(gRecipes[recipe].file,profile));
     if(confirmation && !redraw)BeginBuildPreview(client,recipe,gBuildMenuNonce[client]);
-    float anchor[3],origin[3],angles[3];gBuildMenuPreviewCore[client]=-1;
+    float anchor[3];gBuildMenuPreviewCore[client]=-1;
     bool outsideKind=gRecipes[recipe].kind==Kind_Campfire || gRecipes[recipe].file==C_Shelters;
     bool previewValid;
     if(confirmation)
     {previewValid=gBuildPreviewValid[client];gBuildMenuPreviewCore[client]=gBuildPreviewCore[client];}
     else
     {
-        previewValid=PlacementForRecipe(client,recipe,anchor,origin,angles,false);
-        if(previewValid)gBuildMenuPreviewCore[client]=BuildCoreAt(anchor);
+        PlacementCandidate candidate;previewValid=ComputeRecipePlacementCandidate(client,recipe,candidate,false);
+        anchor=candidate.anchor;
+        if(previewValid)gBuildMenuPreviewCore[client]=RecipeBuildCoreAt(recipe,candidate);
         if(previewValid && gRecipes[recipe].file==C_Shelters)
         {previewValid=DynamicBasePositionAllowed(recipe,anchor,false,client);gBuildMenuPreviewCore[client]=NextDynamicBaseSlot();}
     }
@@ -338,12 +358,18 @@ void ShowBuildRecipeDetails(int client,int recipe,bool confirmation=false,bool r
     }
     Menu menu=new Menu(BuildMenuHandler);menu.SetTitle("%s",title);
     bool enough=HasBaseUpgradeMaterials(gRecipes[recipe].cost,client);
+    int requiredBase;bool unlocked=RecipeBaseLevelAllowed(recipe,requiredBase);
+    if(!unlocked)
+    {
+        char locked[192];Format(locked,sizeof(locked),"%T","FacilityBaseLevelRequired",client,requiredBase);
+        menu.AddItem("",locked,ITEMDRAW_DISABLED);
+    }
     // A user opening an invalid confirmation gets one private failure cue.
     // Silent placement queries (and a future moving preview) never emit audio.
-    if(confirmation && !redraw && (!previewValid || (!outsideKind && gBuildMenuPreviewCore[client]<0) || !groupAvailable || !enough))
+    if(confirmation && !redraw && (!previewValid || (!outsideKind && gBuildMenuPreviewCore[client]<0) || !groupAvailable || !enough || !unlocked))
         PlayClientInteractionSound(client,"build_failed");
     AddBuildAction(menu,client,recipe,confirmation ? 3 : 2,confirmation ? (groupAvailable ? "BuildConfirmPlace" : "BuildSupportQuotaFull") : "BuildOpenConfirm",
-        !confirmation || (enough && groupAvailable && previewValid && (outsideKind || gBuildMenuPreviewCore[client]>=0)));
+        unlocked && (!confirmation || (enough && groupAvailable && previewValid && (outsideKind || gBuildMenuPreviewCore[client]>=0))));
     AddBuildAction(menu,client,recipe,confirmation ? 6 : 5,confirmation ? "BuildBackDetails" : "BuildBackVariants");
     AddRecipeCostItems(menu,client,gRecipes[recipe].cost);
     if(!confirmation)
@@ -410,7 +436,7 @@ public int BuildMenuHandler(Menu menu,MenuAction action,int client,int item)
         if(operation==7 || operation==8){ShowBuildGroup(client,view_as<BuildMenuGroup>(key));return 0;}
         int recipe=key>=0 && key<view_as<int>(C_Count) ? FindRecipeByID(view_as<ConfigFile>(key),fields[3]) : -1;
         if(recipe<0){Tell(client,"%T","MenuExpired",client);return 0;}
-        if(operation==1 && (gRecipes[recipe].kind!=gBuildMenuCategory[client] || BuildGroupForKind(gRecipes[recipe].kind)!=gBuildMenuGroup[client]))
+        if(operation==1 && (RecipeBuildCategory(recipe)!=gBuildMenuCategory[client] || BuildGroupForKind(gRecipes[recipe].kind)!=gBuildMenuGroup[client]))
         {Tell(client,"%T","MenuExpired",client);return 0;}
         if(operation!=1 && (gBuildMenuFile[client]!=gRecipes[recipe].file || !StrEqual(gBuildMenuRecipe[client],gRecipes[recipe].id)
             || !StrEqual(gBuildMenuType[client],gRecipes[recipe].type)))
@@ -529,6 +555,14 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     {
         gNextUse[client]=GetGameTime()+gUseCooldown;ShowAdminBuildingMenu(client,b,true);return Plugin_Continue;
     }
+    // A completed tower can be selected from its own ground circle even when
+    // its visible body is beyond ordinary close facility interaction distance.
+    int aimedTower=WatchtowerAimedBuilding(client);
+    if(aimedTower>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowDefenseMenu(client,aimedTower);return Plugin_Continue;}
+    // A real platform beneath the feet is a tower-only interaction source.
+    // Explicitly aimed facilities above already retained their old priority.
+    int tower=WatchtowerUnderPlayer(client);
+    if(tower>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowDefenseMenu(client,tower);return Plugin_Continue;}
     float origin[3];GetClientAbsOrigin(client,origin);int core=SafeCoreAt(origin);
     if(core>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBaseMenu(client,core);}
     else if(BuildCoreAt(origin)>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBuildCategories(client);}
@@ -536,6 +570,30 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
 }
 
 int gDefenseMenuNonce[MAXPLAYERS+1];
+Menu gDefenseMenuHandle[MAXPLAYERS+1];
+
+void ResetDefenseMenuClient(int client)
+{
+    gDefenseMenuNonce[client]++;gDefenseMenuHandle[client]=null;
+}
+
+bool WatchtowerMenuRefreshCurrent(int client,int nonce)
+{
+    return client>0 && client<=MaxClients && gDefenseMenuNonce[client]==nonce
+        && gDefenseMenuHandle[client]==null && GetClientMenu(client)==MenuSource_None;
+}
+
+void EndDefenseMenu(Menu menu)
+{
+    for(int client=1;client<=MaxClients;client++)
+        if(gDefenseMenuHandle[client]==menu)ResetDefenseMenuClient(client);
+    delete menu;
+}
+
+bool DefenseMenuCurrent(Menu menu,int client)
+{
+    return client>0 && client<=MaxClients && gDefenseMenuHandle[client]==menu;
+}
 
 bool CanViewDefense(int client,int building)
 {
@@ -546,8 +604,8 @@ bool CanViewDefense(int client,int building)
 
 void DefenseMenuToken(int client,int building,int operation,char[] token,int length)
 {
-    Format(token,length,"%d:%d:%d:%d:%d:%d:%d:%d:%d",gEpoch,GetClientSerial(client),gDefenseMenuNonce[client],
-        building,gBuildings[building].uid,gBuildings[building].level,operation,gBuildings[building].generation,gConfigRevision);
+    Format(token,length,"%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",gEpoch,GetClientSerial(client),gDefenseMenuNonce[client],
+        building,gBuildings[building].uid,gBuildings[building].level,operation,gBuildings[building].generation,gConfigRevision,gBuildings[building].ref);
 }
 
 bool FenceRotationContinuationOperation(int operation)
@@ -557,22 +615,48 @@ bool FenceRotationContinuationOperation(int operation)
     return (operation>=8 && operation<=11) || (operation>=13 && operation<=15);
 }
 
+// Engine EntRefs use every signed 32-bit cell value; level/config integers
+// intentionally retain their smaller economic bound. Accumulate negatively so
+// INT_MIN is accepted without ever negating it or overflowing an intermediate.
+bool ParseDefenseEntityRefToken(const char[] text,int &value)
+{
+    int length=strlen(text),start;bool negative;
+    if(length<1)return false;
+    if(text[0]=='-'){negative=true;start=1;}
+    if(length==start || length-start>10)return false;
+    int limit=negative ? (-2147483647-1) : -2147483647;
+    int minimumBeforeMultiply=limit/10,result;
+    for(int i=start;i<length;i++)
+    {
+        if(text[i]<'0' || text[i]>'9')return false;
+        int digit=text[i]-'0';
+        if(result<minimumBeforeMultiply)return false;
+        result*=10;
+        if(result<limit+digit)return false;
+        result-=digit;
+    }
+    value=negative ? result : -result;return true;
+}
+
 bool ValidateDefenseMenuToken(int client,const char[] token,int &building,int &operation,bool requireAim=true)
 {
-    char fields[10][24];int values[9];if(ExplodeString(token,":",fields,10,24)!=9 || !LiveHuman(client) || !Running())return false;
+    char fields[11][24];int values[10];if(ExplodeString(token,":",fields,11,24)!=10 || !LiveHuman(client) || !Running())return false;
     for(int i=0;i<9;i++)if(!ParseLevelInteger(fields[i],values[i]))return false;
+    if(!ParseDefenseEntityRefToken(fields[9],values[9]))return false;
     if(values[0]!=gEpoch || values[1]!=GetClientSerial(client) || values[2]!=gDefenseMenuNonce[client] || values[8]!=gConfigRevision)return false;
     building=values[3];operation=values[6];
     if(!DefenseMenuBuildingAvailable(client,building) || (requireAim && !(FenceRotationContinuationOperation(operation)
         ? FenceRotationInRange(client,building) : BuildingInUseRange(client,building)))
         || gBuildings[building].uid!=values[4] || gBuildings[building].generation!=values[7]
-        || gBuildings[building].level!=values[5] || operation<0 || operation>16)return false;
+        || gBuildings[building].level!=values[5] || gBuildings[building].ref!=values[9] || operation<0 || operation>20)return false;
     if((operation==2 || operation==3 || operation==4) && !CanManageBuilding(client,building))return false;
     if(operation==5 && !IsShelterAdmin(client))return false;
     if(((operation>=6 && operation<=11) || (operation>=13 && operation<=15))
         && (!CanContinueFenceRotationMenu(client,building) || !CanManageBuilding(client,building)))return false;
     if(operation==12 && (gBuildings[building].kind!=Kind_Fence || BuildingOwnerOnline(building)>0 || IsFakeClient(client)))return false;
     if(operation==16 && (gBuildings[building].kind!=Kind_Beacon || IsFakeClient(client)))return false;
+    if((operation==17 || operation==18) && (gBuildings[building].kind!=Kind_Watchtower || !WatchtowerActor(client)))return false;
+    if((operation==19 || operation==20) && !CanSetBuildingLightManualState(client,building,operation==19))return false;
     gDefenseMenuNonce[client]++;return true;
 }
 
@@ -643,14 +727,16 @@ void ShowFenceRotationMenu(int client,int building,int axis)
     Menu menu=new Menu(FenceRotationMenuHandler);menu.SetTitle("%s",title);
     AddDefenseMenuItem(menu,client,building,axis==0 ? 8 : 10,"DefenseRotatePlus");
     AddDefenseMenuItem(menu,client,building,axis==0 ? 9 : 11,"DefenseRotateMinus");
-    AddDefenseMenuItem(menu,client,building,13,"DefenseBack");menu.Display(client,MENU_TIME_FOREVER);
+    AddDefenseMenuItem(menu,client,building,13,"DefenseBack");gDefenseMenuHandle[client]=menu;menu.Display(client,MENU_TIME_FOREVER);
 }
 
 public int FenceRotationMenuHandler(Menu menu,MenuAction action,int client,int item)
 {
-    if(action==MenuAction_End)delete menu;
+    if(action==MenuAction_End)EndDefenseMenu(menu);
+    else if(action==MenuAction_Cancel){if(DefenseMenuCurrent(menu,client))ResetDefenseMenuClient(client);}
     else if(action==MenuAction_Select)
     {
+        if(!DefenseMenuCurrent(menu,client))return 0;
         char token[128];int building,operation;menu.GetItem(item,token,sizeof(token));
         if(!ValidateDefenseMenuToken(client,token,building,operation))
         {
@@ -708,6 +794,17 @@ void ShowDefenseMenu(int client,int building,bool rotationContinuation=false)
     Menu menu=new Menu(DefenseMenuHandler);menu.SetTitle("%s",title);
     int cost[MATERIALS],nextHP;bool upgrade=ReadBaseUpgrade(building,cost,nextHP);
     AddDefenseMenuItem(menu,client,building,1,upgrade ? "DefenseUpgradeView" : "DefenseUpgradeUnavailable",upgrade);
+    if(gBuildings[building].kind==Kind_Light && BuildingOperational(building))
+    {
+        bool manualOff=!gBuildings[building].lightManualOff;
+        AddDefenseMenuItem(menu,client,building,manualOff ? 19 : 20,manualOff ? "LightManualSwitchOff" : "LightManualSwitchOn",
+            CanSetBuildingLightManualState(client,building,manualOff));
+    }
+    if(gBuildings[building].kind==Kind_Watchtower)
+    {
+        bool down=WatchtowerOnPlatform(client,building);
+        AddDefenseMenuItem(menu,client,building,down ? 18 : 17,down ? "WatchtowerTravelDown" : "WatchtowerTravelUp",WatchtowerTravelAllowed(client,building,down));
+    }
     AddDefenseMenuItem(menu,client,building,3,"DefenseDismantleView",manage);
     if(BuildingRotationKind(gBuildings[building].kind))
     {
@@ -719,7 +816,7 @@ void ShowDefenseMenu(int client,int building,bool rotationContinuation=false)
     if(IsShelterAdmin(client))AddDefenseMenuItem(menu,client,building,5,"AdminBuildingControls");
     char profile[128];BuildingProfilePath(building,profile,sizeof(profile));
     AddProfileLevelItems(menu,client,gBuildings[building].file,gBuildings[building].kind,profile,gBuildings[building].level);
-    menu.Display(client,30);
+    gDefenseMenuHandle[client]=menu;menu.Display(client,30);
 }
 
 void ShowDefenseUpgradeMenu(int client,int building)
@@ -732,10 +829,9 @@ void ShowDefenseUpgradeMenu(int client,int building)
         gBuildings[building].level+1,gBuildings[building].maxHP,nextHP);
     AppendBuildingPowerInfo(client,building,gBuildings[building].level+1,title,sizeof(title));
     AppendBuildingCapacityInfo(client,building,title,sizeof(title),gBuildings[building].level+1);
-    bool progression=true;int required;
-    if(gBuildings[building].kind==Kind_Amplifier)
+    int required;bool progression=BuildingBaseLevelAllowed(building,gBuildings[building].level+1,required);
+    if(required>1 || !progression)
     {
-        progression=CanBuildAmplifier(gBuildings[building].type,gBuildings[building].level+1,required);
         Format(line,sizeof(line),"%T","DefenseBaseRequirement",client,ProgressionBaseLevel(),required);StrCat(title,sizeof(title),line);
     }
     Menu menu=new Menu(DefenseMenuHandler);menu.SetTitle("%s",title);
@@ -743,7 +839,7 @@ void ShowDefenseUpgradeMenu(int client,int building)
     AddDefenseMenuItem(menu,client,building,2,!manage ? "DefenseViewOnly" : (!progression ? "DefenseBaseLevelLocked" : (enough ? "MenuUpgradeConfirm" : "MenuUpgradeInsufficient")),manage && enough && progression);
     AddDefenseMenuItem(menu,client,building,0,"DefenseBack");AddRecipeCostItems(menu,client,cost);
     char profile[128];BuildingProfilePath(building,profile,sizeof(profile));
-    AddProfileLevelItems(menu,client,gBuildings[building].file,gBuildings[building].kind,profile,gBuildings[building].level+1);menu.Display(client,30);
+    AddProfileLevelItems(menu,client,gBuildings[building].file,gBuildings[building].kind,profile,gBuildings[building].level+1);gDefenseMenuHandle[client]=menu;menu.Display(client,30);
 }
 
 void ShowDefenseDismantleMenu(int client,int building)
@@ -761,14 +857,16 @@ void ShowDefenseDismantleMenu(int client,int building)
         char material[64];TranslateLabel(client,gMaterials[m].label,material,sizeof(material));
         Format(line,sizeof(line),"%T","DefenseRefundLine",client,material,refund[m]);menu.AddItem("",line,ITEMDRAW_DISABLED);
     }
-    menu.Display(client,30);
+    gDefenseMenuHandle[client]=menu;menu.Display(client,30);
 }
 
 public int DefenseMenuHandler(Menu menu,MenuAction action,int client,int item)
 {
-    if(action==MenuAction_End)delete menu;
+    if(action==MenuAction_End)EndDefenseMenu(menu);
+    else if(action==MenuAction_Cancel){if(DefenseMenuCurrent(menu,client))ResetDefenseMenuClient(client);}
     else if(action==MenuAction_Select)
     {
+        if(!DefenseMenuCurrent(menu,client))return 0;
         char token[128];int building,operation;menu.GetItem(item,token,sizeof(token));
         if(!ValidateDefenseMenuToken(client,token,building,operation))
         {
@@ -799,6 +897,21 @@ public int DefenseMenuHandler(Menu menu,MenuAction action,int client,int item)
             case 14: ShowFenceRotationMenu(client,building,0);
             case 15: ShowFenceRotationMenu(client,building,1);
             case 16: ShowBeaconMenu(client,building);
+            case 17,18:
+            {
+                ResetDefenseMenuClient(client);
+                QueueWatchtowerMenuRefresh(client,building,gDefenseMenuNonce[client]);
+                bool down=operation==18;
+                if(TryWatchtowerTravel(client,building,down))Tell(client,"%t",down ? "WatchtowerTravelDownSuccess" : "WatchtowerTravelUpSuccess");
+                else ReportWatchtowerTravelFailure(client);
+            }
+            case 19,20:
+            {
+                bool manualOff=operation==19;
+                bool changed=SetBuildingLightManualState(client,building,manualOff);
+                Tell(client,"%t",changed ? (manualOff ? "LightManualClosed" : "LightManualAutomatic") : "LightManualSwitchFailed");
+                ShowDefenseMenu(client,building);
+            }
             case 12:
             {
                 Tell(client,"%T",TakeBuildingOwnership(client,building) ? "DefenseClaimed" : "DefenseClaimFailed",client);
