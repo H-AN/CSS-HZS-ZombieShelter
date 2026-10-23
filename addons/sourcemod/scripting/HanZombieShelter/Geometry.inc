@@ -174,8 +174,39 @@ bool BoxesOverlap(const float amin[3],const float amax[3],const float bmin[3],co
     return true;
 }
 
+bool ModelVisualScaleValid(float scale)
+{
+    // Ordered bounds also reject NaN and infinities.
+    return scale>=0.01 && scale<=16.0;
+}
+
+bool ApplyModelVisualScale(int entity,const char[] model,float scale,bool activatePhysics=false)
+{
+    if(entity<=MaxClients || !IsValidEntity(entity) || !ModelVisualScaleValid(scale)
+        || !HasEntProp(entity,Prop_Send,"m_flModelScale"))return false;
+    bool hasGroup=HasEntProp(entity,Prop_Send,"m_CollisionGroup");
+    int previousGroup=hasGroup ? GetEntProp(entity,Prop_Send,"m_CollisionGroup") : 0;
+    // Match the verified resource-node ordering: SetModel refreshes collision
+    // bounds from the already-set scale, rather than leaving full-size bounds.
+    SetEntPropFloat(entity,Prop_Send,"m_flModelScale",scale);
+    SetEntityModel(entity,model);
+    char value[64];Format(value,sizeof(value),"%.6f 0 0",scale);
+    SetVariantString(value);bool accepted=AcceptEntityInput(entity,"SetModelScale");
+    if(accepted && activatePhysics)
+    {
+        // The real-engine probe established this ordering for physics props:
+        // Activate rebuilds the scaled PHY, then SetModel restores canonical
+        // collision bounds times scale once (Activate alone scales them twice).
+        ActivateEntity(entity);SetEntityModel(entity,model);
+    }
+    if(hasGroup)SetEntityCollisionGroup(entity,previousGroup);
+    return accepted;
+}
+
 void ModelWorldBounds(int entity,const float origin[3],const float angles[3],float mins[3],float maxs[3])
 {
+    // These are the entity's current collision bounds after model refresh.
+    // They already include model scale; multiplying again would shrink twice.
     float low[3],high[3];GetEntPropVector(entity,Prop_Send,"m_vecMins",low);GetEntPropVector(entity,Prop_Send,"m_vecMaxs",high);
     for(int a=0;a<3;a++){mins[a]=99999.0;maxs[a]=-99999.0;}
     for(int corner=0;corner<8;corner++)

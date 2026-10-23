@@ -64,6 +64,30 @@ int RestorationDelta(int current,int maximum,int amount)
     int missing=maximum-current;return amount<missing ? amount : missing;
 }
 
+// Shared capped recovery; effects remain the responsibility of the source.
+int RestorationArmorLimit(int client){return SkillsArmorLimit(client);}
+
+int RestorationRestoreHealth(int client,int amount)
+{
+    if(!LiveHuman(client))return 0;
+    int health=GetClientHealth(client),delta=RestorationDelta(health,RestorationHealthLimit(client),amount);
+    if(delta>0)SetEntityHealth(client,health+delta);return delta;
+}
+
+int RestorationRestoreArmor(int client,int amount)
+{
+    if(!LiveHuman(client))return 0;
+    int armor=GetEntProp(client,Prop_Send,"m_ArmorValue"),delta=RestorationDelta(armor,RestorationArmorLimit(client),amount);
+    if(delta>0)SetEntProp(client,Prop_Send,"m_ArmorValue",armor+delta);return delta;
+}
+
+int RestorationRestoreBuilding(int building,int amount)
+{
+    if(!BuildingOperational(building) || Resolve(gBuildings[building].ref)<0)return 0;
+    int delta=RestorationDelta(gBuildings[building].hp,gBuildings[building].maxHP,amount);
+    if(delta>0)gBuildings[building].hp+=delta;return delta;
+}
+
 bool RestorationRepairTarget(int station,int target)
 {
     return station>=0 && station<MAX_BUILDINGS && BuildingOperational(target) && gBuildings[target].kind!=Kind_Campfire
@@ -115,9 +139,9 @@ int RestorationPulse(int b)
         for(int target=0;target<MAX_BUILDINGS;target++)
         {
             if(!RestorationRepairTarget(b,target))continue;
-            int delta=RestorationDelta(gBuildings[target].hp,gBuildings[target].maxHP,amount);
+            int delta=RestorationRestoreBuilding(target,amount);
             if(delta<1)continue;
-            gBuildings[target].hp+=delta;targets++;
+            targets++;
             if(gBuildings[target].kind==Kind_Generator)powerChanged=true;
         }
     }
@@ -126,15 +150,15 @@ int RestorationPulse(int b)
         if(!RestorationHuman(client,core))continue;
         if(gBuildings[b].kind==Kind_Heal)
         {
-            int health=GetClientHealth(client),delta=RestorationDelta(health,RestorationHealthLimit(client),amount);
+            int delta=RestorationRestoreHealth(client,amount);
             if(delta<1)continue;
-            SetEntityHealth(client,health+delta);targets++;
+            targets++;
         }
         else
         {
-            int armor=GetEntProp(client,Prop_Send,"m_ArmorValue"),delta=RestorationDelta(armor,100,amount);
+            int delta=RestorationRestoreArmor(client,amount);
             if(delta<1)continue;
-            SetEntProp(client,Prop_Send,"m_ArmorValue",armor+delta);targets++;
+            targets++;
         }
     }
     if(targets>0)EmitRestorationPulse(b,targets);

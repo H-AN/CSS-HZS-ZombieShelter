@@ -616,13 +616,13 @@
     }
     "BuildStatDecayAmount"
     {
-        "en"    "Durability decay"
-        "chi"    "每次耐久消耗"
+        "en"    "Fuel consumed per tick"
+        "chi"    "每次燃料消耗"
     }
     "BuildStatDecayInterval"
     {
         "en"    "Decay interval (seconds)"
-        "chi"    "耐久消耗间隔（秒）"
+        "chi"    "燃料消耗间隔（秒）"
     }
     "BuildStatDefenseBoss"
     {
@@ -814,8 +814,8 @@
     }
     "CampfireDescription"
     {
-        "en"    "Temporary night shelter. Weapon hits repair it to keep it burning."
-        "chi"    "临时夜间庇护，攻击修复以维持篝火。"
+        "en"    "Night shelter with independent durability and wood fuel. Left click repairs, right click refuels."
+        "chi"    "耐久与木材燃料独立：左键修复耐久，右键消耗木材补充燃料。"
     }
     "CmdDayUsage"
     {
@@ -1908,6 +1908,121 @@
     {
         "en"    "Tower travel failed: the tower, access or landing space changed. Your position is preserved."
         "chi"    "无法传送：塔状态、使用权限或落点空间已变化，保留原位置。"
+    }
+    "BuildStatFuelCapacity"
+    {
+        "en" "Fuel capacity"
+        "chi" "燃料上限"
+    }
+    "BuildStatFuelGain"
+    {
+        "en" "Fuel gained per wood"
+        "chi" "每木材可补充燃料"
+    }
+    "BuildStatFuelCost"
+    {
+        "en" "Wood per payment"
+        "chi" "每次添柴消耗木材"
+    }
+    "CampfireFuelFull"
+    {
+        "en" "Fuel is full. No wood was spent."
+        "chi" "篝火燃料已满，未消耗木材。"
+    }
+    "CampfireFuelNeedsWood"
+    {
+        "#format" "{1:d}"
+        "en" "Requires {1} wood to add fuel."
+        "chi" "需要木材燃料才能增加燃料值，每次需要 {1} 木材。"
+    }
+    "CampfireFueled"
+    {
+        "#format" "{1:d},{2:d},{3:d},{4:d}"
+        "en" "Added {1} fuel ({2}/{3}), spent {4} wood."
+        "chi" "已补充 {1} 燃料（{2}/{3}），消耗 {4} 木材。"
+    }
+    "AdminSkillPoints"
+    {
+        "en" "Manage skill points"
+        "chi" "技能点管理"
+    }
+    "AdminSkillPlayersTitle"
+    {
+        "en" "Online player skill points"
+        "chi" "在线玩家技能点"
+    }
+    "AdminSkillPlayerEntry"
+    {
+        "#format" "{1:s},{2:d}"
+        "en" "{1}: {2} available points"
+        "chi" "{1}：可用 {2} 点"
+    }
+    "AdminSkillPlayerTitle"
+    {
+        "#format" "{1:s},{2:d},{3:d},{4:d},{5:d}"
+        "en" "{1}\nAvailable {2}, earned {3}\nAdmin adjustment {4}, spent {5}"
+        "chi" "{1}\n可用 {2}，生存累计 {3}\n管理员调整 {4}，已投入 {5}"
+    }
+    "AdminSkillAdd1"
+    {
+        "en" "Add 1 point"
+        "chi" "增加 1 点"
+    }
+    "AdminSkillAdd10"
+    {
+        "en" "Add 10 points"
+        "chi" "增加 10 点"
+    }
+    "AdminSkillAdd100"
+    {
+        "en" "Add 100 points"
+        "chi" "增加 100 点"
+    }
+    "AdminSkillRemove1"
+    {
+        "en" "Remove 1 unused point"
+        "chi" "减少 1 未用点数"
+    }
+    "AdminSkillRemove10"
+    {
+        "en" "Remove 10 unused points"
+        "chi" "减少 10 未用点数"
+    }
+    "AdminSkillRemove100"
+    {
+        "en" "Remove 100 unused points"
+        "chi" "减少 100 未用点数"
+    }
+    "AdminSkillCustomAdd"
+    {
+        "en" "Add a custom amount"
+        "chi" "自定义增加点数"
+    }
+    "AdminSkillCustomRemove"
+    {
+        "en" "Remove a custom amount"
+        "chi" "自定义减少点数"
+    }
+    "AdminSkillCustomInput"
+    {
+        "en" "Within 30 seconds enter sm_zsh_admin_value <positive integer>."
+        "chi" "30秒内输入 sm_zsh_admin_value <正整数>，按已选方向调整技能点。"
+    }
+    "AdminSkillChanged"
+    {
+        "#format" "{1:d},{2:d}"
+        "en" "Applied {1} points; balance {2}."
+        "chi" "实际调整 {1} 点；当前可用 {2} 点。"
+    }
+    "AdminSkillNoPlayers"
+    {
+        "en" "No authorized online players."
+        "chi" "没有身份已验证的在线玩家。"
+    }
+    "CampaignRescueVictory"
+    {
+        "en"    "You survived the final night. Army rescue has arrived!"
+        "chi"    "你们熬过了最后一夜，军队救援已抵达！"
     }
     "WatchtowerCooldown"
     {

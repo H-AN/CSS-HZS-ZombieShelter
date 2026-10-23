@@ -1,4 +1,68 @@
+## 2026-10-23 扩大器原生动画及781资源：最新接手入口
+
+- 先读[进度10](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/10_扩大器原生动画模型与资源包.md)与`native_expander_update/reports/final_session.json`、`verification_summary.json`。正式主SMX `59218e6e94f1df6bf12b1eb26075fee894a6d4aa05ed91b710a194bf44aa1e3f`，48来源0错0警告，四份一致；128文件包SHA `3b1f7de8f09d956dbe4148bc3d7506443b30f091640336db7670d81d75975ebd`。
+- 用户明确反对OnGameFrame外观旋转，现Types/Config/World/Lifecycle四源仅删除旧回调、旋转队列和rotation_speed_degrees_per_second，无timer/RequestFrame替代。两扩大器新路径models/hzsh/han/build/range_expander.mdl，idle原生601帧/30fps/20秒，root底座固定、上部rotor转动；实体angles固定。旧.8实际可见尺寸与脚点烘焙，runtime model_scale1.0、offset0，删除两档旧ground/curve补偿，Downloads各6件；只有repo/live两份expanders.cfg变化。通用model_scale仍缺省1、.01..16与其他脚点规则保持；原dynamic非1 PHY限制未扩修。
+- 静态源码73/0、真实场景外层16/0和最终原生续测外层20/0分开。场景2次与续测4次显式nativecheck各12/0，不再与外层叠加；客户端照片另审，cycle或离散图不保证所有渲染帧连续。保护/供给/白天延长/显式完工或重建属于诊断，不称多人负载。空文件/非KV审计工具中止已修，不当产品失败。旧09的4Hz/逐帧、碰撞、悬空、粗瞄报告均保留历史。
+- 新完整静态包`2026年10月23日资源`共781件=旧773+原生模型6+原图标2，LATEST已按资源审计更新；旧_02与原8Vox缺件保持，六迫击炮仍随增量。新模型复用内置orrery纹理，无新VMT/VTF，用户提供原六件保持。HZS/API/gamedata/其他4SMX及其他玩法数值不动。
+- 用户要求的可复现制作说明在[旋转建筑模型制作与贴地移植指南](D:/github/git/css/CSS-HZS-ZombieShelter/docs/旋转建筑模型制作与贴地移植指南.md)、[模型源README](D:/gmod昼夜求生资源/文档/制作计划/v0.8.0/native_expander_update/model_source/README.md)及[随源同版指南](D:/gmod昼夜求生资源/文档/制作计划/v0.8.0/native_expander_update/model_source/制作与贴地指南.md)。包含本轮实际建模／脚点／静态PHY／StudioMDL／验证命令，不只是交接概述；输入格式限制及本例特殊系数不可泛化。文档补项未改变model_build源清单、模型或报告。
+- 最新采样2026-10-23T16:28:27.379852+08:00 server20928/controller23500/原client15452，唯一27169沙漠服，ready/kept_running=true，5正式插件/1真人0BOT/god0/takedamage2、助手已清、停怪恢复0、窗口最小化、SM错误/动画报警0。继续留服与普通客户端，只读核对并保留自然变化，不按旧PID/快照复位，不quit/disconnect或启停demo。BOT/失败补丁/换图边界保持。
+
+## 2026-10-23 设施模型、可配置尺寸与信标透视：前轮09历史入口
+
+- 先读[D:/进度09](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/09_设施模型颜色尺寸与信标恢复.md)及`model_polish_update/reports/final_session.json`。最终主SMX `2deff5bab4ac079a4f00cf35310dbba1e54f2d8544d43d7a6a415cb5d6b11d7a`，48源0错0警告，四份一致；122文件包SHA `1a6ee4a565af5a860fbac2bfbe36169f6062ee4e34af2f295a4f1fc781c1b479`。
+- 两扩大器model_scale0.8，rotation_speed_degrees_per_second18，每服务器帧按实际间隔更新，仅遍历登记旋转实体队列；旧05轮0.25秒／4Hz旋转保留历史。增伤器保持0.3，旋转缺省0。通用尺寸缺省1，范围.01..16；Placement/model_ground_z与model_ground_curve_z默认0，localZ=offset.z-(ground*s+curve*s*(s-1))，普通curve0仍线性。扩大器ground=-63.9872694/curve=-44.1278944，.8计算抬高44.1293524，不硬码模型路径。原offset/功能范围/附件/塔坐标为独立配置，固定地图基地默认1。
+- 医疗低白高绿、护甲低白高蓝、substation维修低白高橙黄；Radio idle原生旋转。旧wh_frame两live缺件恢复并随包，正常供电门禁不变；用户已确认地图墙透视，接受基地墙遮挡，原Marker保留，Construction normal／sort实验不交付。最终06缩放29/0、配置/缓存/碰撞63/0、信标12/0、逐帧旋转19/0分别记录；先前23/1、0.3/0.5悬空与夹具失败保留，不冒充多人压力或透视像素全通过。
+- 最终48生产输入、批准改变7源（含Lifecycle）／6cfg，Construction/Beacon保持。原生dynamic非1实际PHY有限制，信标/Tesla仍1旧路径；本轮不加代理实体或动画序列替代，单骨可见形状与PHY尺度不完全一致，不把贴地校准扩大成全部视觉碰撞一致。
+- 最新采样2026-10-23T15:56:07.709177+08:00 server16516/controller20328/原client15452，唯一27169沙漠服，ready/kept_running=true，5正式插件/1真人0BOT/god0/takedamage2，助手补给保护建筑清理，官方停怪恢复0、窗口最小化、SM错误/动画报警0。继续保留服务端与客户端，先只读核对，不按快照复位，不quit/disconnect或代启停demo。其余HZS/API/gamedata/BOT/失败补丁/换图边界保持。
+
 # 本项目必须记住的现场约束
+
+## 2026-10-23 v0.8.0 黑夜免疫成功提示音：最新入口
+
+- 用户追加免疫成功时仅本人播放CS:S内置player/bhit_helmet-1.wav，并在看到当前129投入/2500管理调整后明确批准“现在结束当前局并应用新版”。已按该授权新开唯一正式会话，原普通Steam客户端15452保留。先读进度v0.8.0 README与08、制作immunity_sound_update/reports/final_session.json及verification_summary.json；旧07及各轮包/失败保留历史。
+- 生产仅Audio.inc与Lifecycle.inc变：LoadInteractionSounds每图PrecacheSound内置sample，不加下载和cfg；ExposureTick现有免疫成功分支单次PlaySkillsImmunitySound再continue，helper ready/LiveHuman/非Fake守卫后EmitSoundToClient本人、AUTO/NONE/音量1。概率及纯判定不动，失败/安全基地/有效篝火/未到期等原门禁无声，声音不可用不取消免疫。
+- 新正式SMX SHAce278a5c5153c69d8730069ab4b3c7ee1c9b86f528a83ba67c4edc5606fe5b74，48输入0错0警告，build/repo/live/delivery一致；100文件ZIP SHAcae5c24b12fcc08fbc9c6321f7bf47e77a7fc569f16ac389893b314c0ed8053c。所有旧cfg字节不变，HZS/API/gamedata/其他4SMX/773资源/LATEST/六模型保持。
+- 私有exact函数32/0包括两个虚拟玩家；真实引擎8/0使用提取的ExposureTick/helper、虚拟位置/安全/概率/HP及真实SDK单播，SoundHook确证sample一次/recipient1/目标userid2。不是生产默认40%自然统计、真实多人或人耳听觉确认。早期离线探针编译失败/弃用警告保留；最后探针0错0警告，全部助手卸载删除。正式preflight JPEG已view_image确认原生页面无遮挡。
+- 12:36正式采样server13256/controller4612/原client15452，唯一192.168.0.102:27169/zsh_desert_han_dn，passed/ready/kept_running=true，5正式插件1真人0BOT、god0/takedamage2、当前SM错误0/动画0、停怪恢复0、窗口最小化。默认每天2/常规20/重力9及快捷E继续在；本轮新局未加材料/技能/保护/建筑，当前自然状态不得按旧PID或快照再清空。零BOT/FakeClient、失败补丁停用、HZS不改、不扩换图修复、每次客户端最小化关页面JPEG门禁继续有效。
+
+## 2026-10-23 v0.8.0 范围外E与新默认正式启用：最新入口
+
+- 用户明确要求“不用保留当前，服务器应用新数据”，已授权结束旧局；旧默认轮“不要重启／保留旧余额”是该授权前的历史。先读进度v0.8.0的README和07，以及制作`quick_menu_update/reports/final_session.json`、`verification_summary.json`。正式新进程已实际配置2／有效2／override-1，常规20级、重力9级；全部数值仍由skills.cfg配置，本轮没有修改任何旧cfg。
+- 非基地和非建造范围E打开两项快捷菜单：建造菜单（复用!build）和角色技能菜单（ShowSkills -1）。瞄准施工物／设施／塔／信标、基地与红圈原E优先，按住E不重复弹；nonce／serial／epoch／配置和技能会话revision／当前Menu句柄／实时区域复核，旧Cancel/End不能清新页面。仅Commands.inc和主sp新增生产逻辑。
+- 新正式主SMX SHA0040f7eb5d923df54d4d3159d1f1406be3246493c447d265bd52200a66c14bed，48生产输入、0错0警告，诊断原始来源与正式／四份SMX一致。私有87/0、真人菜单和实际篝火施工28/0、真实逐级新默认33/0分别记录。受控day15预算30，speed20约1.8、gravity9到.1、HP一级+5，封顶拒买不扣点；不是自然15天、AI战斗或多人平衡成绩。旧移速格式显示79.9%属浮点展示精度，实际属性1.799999近似1.8，不伪称图像显示80.0%。
+- 前轮13项后截图label中止、二轮24/1错误瞄准木节点、预览等待期间Exposure死亡等证据保留；god/takedamage和官方停怪不屏蔽夜间Exposure。后续修正可见空地方向并快速操作，全28/0；不因此改生产伤害或用补丁掩盖测试保护边界。16张完整JPEG已view_image审阅，正式四图原生页面无遮挡。
+- 12:13正式采样唯一192.168.0.102:27169／zsh_desert_han_dn，server16660/controller20580/原普通client15452；passed/ready/kept_running=true、5正式插件1真人0BOT、god0/takedamage2/move2、SM错误0/动画0、助手SMX已卸载删除，官方hzs_stopzombie恢复0，服务器最小化。正式fresh清除诊断技能、材料、保护和测试建筑，当时13技能0／earned2／spent0／balance2／adjustment0，个人七项与两基地0；之后先只读核对并保留自然收益和用户操作，不按旧PID／状态再复位。继续留服务器与普通客户端。
+- 947基线仅批准两源和repo/live主SMX变化，所有旧配置字节保持；HZS15源／3API／其他4SMX／gamedata／773资源／LATEST／六模型保持。100文件新ZIP quick_menu_update/v0.8.0_outdoor_quick_menu_update.zip SHA9102ea7cb81cd1f9f3f6999a86000f3f759689bfe1ca7b5450984a88230f379a，46项交付核验通过。旧包／报告保留；零BOT/FakeClient、失败补丁永久停用、不修运行换图崩溃、每次最小化关原生页JPEG门禁、非战斗停怪结束恢复0等边界持续有效。
+
+## 2026-10-23 v0.8.0 默认平衡配置与重力实测：最新入口
+
+- 用户已确认新发布默认：daily2、12常规技能max20/cost1，gravitymax9/amount.1，其余gather.05、repair/construct5、speed.04、immunity.02/cap.40、medic/logistics2、artisan10、selfheal/selfarmor2、maxhp/maxarmor5；原恢复范围256／周期60/30保持。仅skills.cfg可编辑默认，不硬编码到源码；用户特别要求测试后同步进度。先读进度v0.8.0的06及制作`balance_defaults_update/reports/verification_summary.json`、`final_session.json`，旧04/05和各轮旧包保留。
+- 用户一度认为sv_gravity800对应个人.8，后明确授权现场对照后接受实测：同一真人raw0/SetEntityGravity1.0/.8各3跳，1.0与原值相同、.8更高更久，世界800全程未改。报告在`gravity_probe_20261023/reports/measurement_01.json`。个人1.0每级减.1需9级到.1，真实外部.8基准已有算法自动只允许7级。不要再把800直接等同SetEntityGravity.8，不硬设个人起点.8。
+- 新配置95/0/0私有回归实际通过（真实现场文件Import+生产解析器/纯公式/虚拟未绑定账号），覆盖60点满3项20级、21拒绝不扣、重力9、服主自定义level/cost/amount/daily/interval/radius。不是新数值20级真人战斗/多人平衡通过；旧真人功能证据及本轮9跳分开记录。
+- 本轮947基线仅repo/live两份skills.cfg各改27叶，其他文件/48生产来源/正式SMX保持c27fe538be0b54d930437f371c81fc605d8dd63ef64dbe1b41e31d6f29fd2d78。新100文件ZIP `balance_defaults_update/v0.8.0_default_balance_update.zip` SHA8d05b520126cf6e50773aa5895a2fdc4215c4f1918adc5bac36b4320b15bd0f6，含新版cfg与说明；原HZS/API/gamedata/其他4SMX/773资源/LATEST/六模型边界保持。
+- **当前局保留旧已载入技能配置，新默认下个地图会话/正常新进程生效。** 没重启/换图/重载/调天或重置用户库存账号。11:23只读采样原server12712/controller18288/client15452、唯一27169沙漠、5正式插件1真人0BOT、god0/takedamage2、用户木549铁41铜117银41/其余0、技能余额102/调整100/投入0保持；技能configured1/effective1/-1是当前图锁定的正常旧状态，别误判部署失败再清空局面。继续留服与普通客户端，后续先只读核对实际状态。
+
+## 2026-10-23 v0.8.0 篝火燃料与技能点增项：最新入口
+
+- 本轮三项追加需求已实施测试、正式部署及留服。先读进度v0.8.0的README、04、05及制作目录`fuel_points_update/reports/final_session.json`、`verification_summary.json`。下方c0ea/47来源/默认5级是首版历史，旧报告保留。
+- 最新正式主SMX SHA256 `c27fe538be0b54d930437f371c81fc605d8dd63ef64dbe1b41e31d6f29fd2d78`，48生产来源，0错0警告，诊断/正式来源及build/repo/live/newdelivery一致。100文件增量ZIP SHA `8a2610aa3b8c2f15a7e383a1d464c5f3a2833cd1854932d0ca3e3c13e2b82f8c`，父旧交付不覆盖。
+- 正式09:10采样及09:16只读复核server12712/controller18288/原普通client15452，唯一27169沙漠图、5正式插件、1真人0BOT、running1、god0/takedamage2/move2；助手SMX全移除，官方停怪恢复0，窗口最小化，正式SM错误0/动画报警0。继续留服与客户端，不按采样PID/库存重置自然状态。
+- 篝火HP200/300/400和范围160/192/224保留；燃料独立60/90/120，每秒扣1。刀/斧左键维修，右键新按下消耗个人木材添柴，默认每1木+10；59补60仍付完整1木，满不收费，缺木提示，0失效。新完工满燃料、升级保留实际剩余不免费填满；按类型/等级/Growth配置fuel_capacity/fuel_per_wood/fuel_wood_cost，未新增模型或配方。未完工右键仍取消，枪械不添柴。
+- 13项配置max10，实际gravity0.1/免疫10%限制有效可买等级，默认免疫5，其余通常10，原每级贡献保持。`sm_zsh_skill_points_per_day -1/0/n`跟配置/暂停未来/覆盖未来新最高日，先按旧rate结清当前日，历史不重算，旧日不重发。最高日历史额度+个人管理调整-实际投入；同图Steam身份保留，不跨换图/重载/重启。
+- 管理员`sm_zsh_admin`新增技能点管理，在线玩家列表、±1/10/100及自定义输入；用户明确超扣最多清空未用点数，已学技能保留，洗点不撤销管理员调整。校验账号/serial/revision/map/config/nonce及当前菜单句柄；死在线目标可选，实际只测一个真人自己账号，勿扩称多人目标已测。
+- 最新私有燃料70/0（旧67/0保留）、账本73/0/0、管理员76/0；真人每日首9项通过后翻译SMC单行解析失败已改多行，02脚本错误旧额度预期保留，续轮23/0。真人火堆15/0包含实际施工、59→60收费、满/缺木、左修右补/按住/枪械/自然扣至0重燃、E2/3升级。保护/受控fuel/HP/deadline与自然等待分开，不称正常AI或多人压力。最终正式客户端菜单JPEG已看。
+- 原946基线仅19已有文件批准变化，campfires/skills仅新燃料叶和13max按叶合并，其余旧现场配置字节保持；这两cfg仓库/live叶值相同，注释可不同。HZS15源/3API/其他4SMX/gamedata/773资源/LATEST/六模型保持。零BOT、失败补丁停用、本地换图边界与每次最小化/关原生页/JPEG门禁、非战斗停怪/结束恢复0继续有效。
+
+## 2026-10-23 v0.8.0 玩家技能与生存目标：最新入口
+
+- 用户已明确授权按 `D:/gmod昼夜求生资源/文档/制作计划/v0.8.0` 制作并测试；原计划“待审／未实施”是历史状态。先读 `D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/README.md`、`03_最终交付与留服.md` 和制作目录的 `reports/final_session.json`、`verification_summary.json`。本轮启动前确认服务器／客户端均不存在，询问后用户明确授权按旧入口启动。
+- 正式 v0.8.0 主 SMX 为 `c0ea1c18318aeea7bc574b9baf5c273ca00ae5cd8f61a480d9ba35e9d1f22147`，47生产输入、0错0警告，build/repo/live/delivery一致。唯一27169沙漠服、普通Steam客户端继续保留；08:04正式采样server7292/client15452，后续只读核实，不按历史PID重置。最终5正式插件、1真人0BOT、god0/takedamage2、助手SMX全移除，官方hzs_stopzombie恢复0、窗口最小化。
+- 13项技能在同一Shelter插件，入口基地E／sm_zsh_skills。skills.cfg按图固定；最高生存天数累计预算，真实Steam身份同图内存保留，不跨换图／插件重载／进程重启。现场Auth64原生转换失败，已验证Steam2与账户号一致后转规范64，不使用serial或未经验证身份替代。默认个人重力raw0是Source未设置哨兵：零级保留raw0，有技能以有效1计算，卸载还原raw0。
+- 默认每项5级／每级1点，目标30天；Campaign/rollback_days=0，survival_day_limit=30。第30夜自然到期救援或全部必需Boss完成胜利，目标0关闭按天救援且累计额度无硬上限。普通怪仅对人直接近战增加按天倍率，Boss和建筑公式不叠加。保留浮点交引擎，实测第30天20原伤变26.999998092，实际HP损失26；不偷加取整／epsilon来伪造27HP结果。
+- 私有技能66/0/0、菜单73/0、生命周期伤害134/0分别记录。真人13项逐次购买、52/102生命、2/102护甲、102双上限、移速1.01／重力0.98、自恢复与50/20/5洗点有证据；首轮26/1和续轮7/0分开。实际篝火1HP施工至完工，木节点五次采集共101；工匠为显式诊断脉冲，不冒充60秒自然周期。战斗是现有真实NPC＋真人直接SDK伤害Hook，不是AI自主攻击；救援缩短为诊断3秒并截获换图调度，不扩修已知本地换图崩溃。
+- 本轮仅一名真人；真实多人双向光环／持续负载、完整死亡重连出生补量未另实测，不能以私有模拟成绩冒充。旧失败与异常截图保留。最终JPEG首次副本取早截断，已从同一Steam原文件完整复制并查看 `_stable.jpg`；截图助手现强制JPEG结束标记和稳定大小后复制，依据final_visual_capture.json。
+- 旧配置仅精确修改rollback_days、增加目标与12个伤害叶，另增skills.cfg；HZS15源、3API、其余4SMX、gamedata、773资源／LATEST与六迫击炮模型保持。增量包93文件SHA `c6e29ceb24b4c2da6f9f54480a29ef1e5762be8892621a79b4d2638cc7e6cabc`，仍依赖v0.7.2增量与完整 `_02`773文件和原8Vox缺件说明。
+- 原BOT／FakeClient／失败补丁／运行换图边界不变；每次客户端前最小化、关闭原生页面、看JPEG；非战斗先官方停怪，战斗／留服恢复；实际建造先给足并读回授权测试材料。现场不清楚立即问，不能盲找或盲做。
 
 ## 真人测试必须先关闭遮挡页面（用户重复强调，2026-10-20）
 

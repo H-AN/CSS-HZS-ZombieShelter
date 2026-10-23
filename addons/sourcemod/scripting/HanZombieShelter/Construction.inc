@@ -120,6 +120,7 @@ void CompleteBuildingConstruction(int b,int client=0)
     if(!gBuildings[b].constructing)return;
     gBuildings[b].hp=gBuildings[b].constructionTarget;
     gBuildings[b].constructing=false;
+    if(gBuildings[b].kind==Kind_Campfire)CampfireConstructionCompleted(b);
     gBuildings[b].nextFire=GetGameTime()+gBuildings[b].interval;
     gBuildings[b].nextRestore=GetGameTime()+gBuildings[b].restoreInterval;
     SyncConstructionVisual(b);InvalidateDefenseCache(b);MarkBuildAreasDirty();RecalculatePower();

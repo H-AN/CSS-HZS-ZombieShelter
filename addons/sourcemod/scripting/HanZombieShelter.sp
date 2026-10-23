@@ -30,6 +30,7 @@
 #include "HanZombieShelter/LampLighting.inc"
 #include "HanZombieShelter/Power.inc"
 #include "HanZombieShelter/Restoration.inc"
+#include "HanZombieShelter/Skills.inc"
 #include "HanZombieShelter/Campfires.inc"
 #include "HanZombieShelter/DynamicBases.inc"
 #include "HanZombieShelter/Beacon.inc"
@@ -46,6 +47,7 @@
 #include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
+#include "HanZombieShelter/SkillsMenu.inc"
 #include "HanZombieShelter/ConstructionInput.inc"
 #include "HanZombieShelter/Admin.inc"
 
@@ -63,14 +65,19 @@ public void OnPluginStart()
     ResetBuildPreviewState();
     RegisterConstructionCvar();
     RegisterPowerModeCvar();
+    RegisterSkillsBudgetCvar();
     RegisterRepairWeaponCommands();
     LoadTranslations("HanZombieShelter.phrases");
     LoadTranslations("common.phrases");
     InitializeShelterForwards();
     ResetInventories();
     HookEvent("round_start",RoundStart);HookEvent("round_end",RoundEnd);HookEvent("player_spawn",PlayerSpawn);
+    HookEvent("round_start",QuickMenuRoundReset);HookEvent("round_end",QuickMenuRoundReset);
+    HookEvent("player_spawn",QuickMenuPlayerReset);HookEvent("player_death",QuickMenuPlayerReset);
     RegConsoleCmd("sm_build",BuildMenuCommand);RegConsoleCmd("sm_materials",MaterialsCommand);
     RegConsoleCmd("sm_zsh_status",StatusCommand);
+    RegConsoleCmd("sm_zsh_skills",SkillsCommand);
+    RegAdminCmd("sm_zsh_skills_status",SkillsStatusCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_phase",PhaseCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_day",DayCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_grant",GrantCommand,ADMFLAG_ROOT);RegAdminCmd("sm_zsh_fail",FailCommand,ADMFLAG_ROOT);
     RegAdminCmd("sm_zsh_reload",ReloadCommand,ADMFLAG_ROOT);
@@ -84,13 +91,16 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    ResetAllQuickMenus();
+    ResetCampfireFuelState();
+    SkillsMapStart();
     ClearBurnVisuals();
     ResetLampLighting();
     ClearExpansionState();ResetWatchtowerState();
     ResetBuildPreviewState();ClearConstructionSafety();
     ClearNPCDropCaches();ClearDefenseState();MarkBuildAreasDirty();
     gEpoch++;gEnabled=false;gCoreReady=false;gRoundPrepared=false;gSnapshot=false;gRollback=false;gTerminal=false;
-    gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;
+    gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;gVictoryReason=Victory_None;
     ResetInventories();
     for(int i=0;i<MAX_BUILDINGS;i++){gBuildings[i].used=false;gBuildings[i].alive=false;gBuildings[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
@@ -113,15 +123,19 @@ void BootMode()
     if(gSnapshot)return; // One immutable configuration revision per campaign.
     gEnabled=LoadConfigs();gCoreReady=APIAvailable();
     if(!gEnabled)return;
+    if(!SkillsLoadConfig()){gEnabled=false;return;}
     if(!gCoreReady){LogError("[Shelter] HZS natives unavailable; load HZS and reload this map before play");gEnabled=false;return;}
     if(gLeaderOffset<0){LogError("[Shelter] CHostage leader unavailable; mode cannot consume the core target");gEnabled=false;return;}
     InitializeLampLighting();
     LoadHanData();LoadInteractionSounds();OverrideCorePool();OverrideServerPolicy();PrepareRound();
+    for(int client=1;client<=MaxClients;client++)if(IsClientInGame(client))SkillsBindClient(client);
     PrintToServer("[Shelter] configuration loaded map=%s cores=%d resources=%d bosses=%d native_pool=%d",gMap,gCoreCount,gNodeCount,gBossCount,gNativePoolSize);
 }
 
 public void OnClientPutInServer(int client)
 {
+    ResetQuickMenu(client);
+    ResetSkillMenu(client);SkillsBindClient(client);
     ResetConstructionCancelInput(client);
     ResetBeaconClient(client);
     ResetWatchtowerClient(client);
@@ -133,6 +147,8 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    ResetQuickMenu(client);
+    ResetSkillMenu(client);SkillsDisconnectClient(client);
     ResetConstructionCancelInput(client);
     StopBuildPreview(client);
     ResetBeaconClient(client);
@@ -151,7 +167,7 @@ public void OnClientDisconnect(int client)
 
 public void OnClientAuthorized(int client,const char[] auth)
 {
-    if(IsClientInGame(client))BindClientInventory(client);
+    if(IsClientInGame(client)){BindClientInventory(client);SkillsBindClient(client);}
 }
 
 public void OnEntityDestroyed(int entity)
@@ -204,6 +220,8 @@ public void CleanOrphan(any ref)
 
 public void OnMapEnd()
 {
+    ResetAllQuickMenus();
+    SkillsMapEnd();
     CancelAllBaseTeleportSelections();
     ClearNPCDropCaches();
     gEnabled=false;gEpoch++;CleanWorld();ReleaseLampLighting();RestoreCorePool();RestoreServerPolicy();gRoundPrepared=false;PublishShelterState();
@@ -211,6 +229,8 @@ public void OnMapEnd()
 
 public void OnPluginEnd()
 {
+    ResetAllQuickMenus();
+    SkillsUnload();
     ClearBurnVisuals();
     CancelAllBaseTeleportSelections();
     ClearNPCDropCaches();

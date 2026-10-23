@@ -4,9 +4,13 @@ char gInteractionSounds[sizeof(sSoundKeys)][PLATFORM_MAX_PATH];
 float gInteractionVolumes[sizeof(sSoundKeys)],gWallSoundNext[MAX_BUILDINGS];
 float gBaseAlarmCooldown=15.0,gBaseAlarmNext[MAX_CORES];
 int gBaseAlarmEpoch[MAX_CORES],gBaseAlarmUID[MAX_CORES];
+static const char sSkillsImmunitySound[]="player/bhit_helmet-1.wav";
+bool gSkillsImmunitySoundReady;
 
 void LoadInteractionSounds()
 {
+    gSkillsImmunitySoundReady=PrecacheSound(sSkillsImmunitySound,true);
+    if(!gSkillsImmunitySoundReady)LogError("[Shelter] Could not precache built-in immunity sound %s",sSkillsImmunitySound);
     for(int b=0;b<MAX_BUILDINGS;b++)gWallSoundNext[b]=0.0;
     for(int c=0;c<MAX_CORES;c++){gBaseAlarmEpoch[c]=0;gBaseAlarmUID[c]=0;gBaseAlarmNext[c]=0.0;}
     gBaseAlarmCooldown=Decimal(C_Sounds,"base_alarm","cooldown_seconds",15.0);
@@ -25,6 +29,12 @@ void LoadInteractionSounds()
         }
         if(Number(C_Sounds,sSoundKeys[i],"download",0))AddFileToDownloadsTable(path);
     }
+}
+
+void PlaySkillsImmunitySound(int client)
+{
+    if(!gSkillsImmunitySoundReady || !LiveHuman(client) || IsFakeClient(client))return;
+    EmitSoundToClient(client,sSkillsImmunitySound,SOUND_FROM_PLAYER,SNDCHAN_AUTO,SNDLEVEL_NONE,SND_NOFLAGS,SNDVOL_NORMAL);
 }
 
 int InteractionSoundIndex(const char[] action)

@@ -104,6 +104,9 @@ bool LoadConfigs()
     gDirectLoss=StrEqual(policy,"lose_and_change_map");
     gRollbackDays=Number(C_Lifecycle,"Campaign","rollback_days",1);
     gMinimumDay=Number(C_Lifecycle,"Campaign","minimum_day",1);
+    char survivalLimit[64];Text(C_Lifecycle,"Campaign","survival_day_limit",survivalLimit,sizeof(survivalLimit),"30");
+    if(strlen(survivalLimit)>=sizeof(survivalLimit)-1 || !ParseSurvivalDayLimit(survivalLimit,gSurvivalDayLimit))
+        return ConfigFailure("lifecycle.cfg/Campaign/survival_day_limit: expected integer 0..2147483647");
     gRecoveryFraction=Decimal(C_Lifecycle,"BaseRecovery","upgraded_hp_fraction",0.5);
     gOutcomeSeconds=Decimal(C_Lifecycle,"Outcome","display_seconds",8.0);
     if(gRecoveryFraction<=0.0 || gRecoveryFraction>=1.0 || gOutcomeSeconds<1.0 || gRollbackDays<0 || gMinimumDay<1)return ConfigFailure("failure/recovery ranges");
@@ -370,6 +373,10 @@ bool ReadBuildingMetadata(ConfigFile file,const char[] profile,BuildingKind kind
     }
     int alpha=Number(file,profile,"render_alpha",255);meta.render[3]=alpha<0 ? 0 : (alpha>255 ? 255 : alpha);
     meta.skin=Number(file,profile,"skin",0);
+    Text(file,profile,"idle_animation",meta.idleAnimation,sizeof(meta.idleAnimation));
+    bool scaleFound;
+    if(!StoredLevelFloat(file,profile,"model_scale",1.0,meta.modelScale,scaleFound)
+        || meta.modelScale<0.01 || meta.modelScale>16.0)return false;
     bool bodyFound;
     if(!StoredLevelInt(file,profile,"body",0,meta.body,bodyFound) || meta.body<0 || meta.body>255)return false;
     if(meta.skin<0 || meta.skin>255)
@@ -382,6 +389,11 @@ bool ReadBuildingMetadata(ConfigFile file,const char[] profile,BuildingKind kind
     if(!StrEqual(meta.placementMode,"upright") && !StrEqual(meta.placementMode,"surface") && !StrEqual(meta.placementMode,"wall"))return false;
     meta.allowOverlap=Number(file,path,"allow_overlap",1)!=0;
     meta.maxDistance=Decimal(file,path,"max_distance",512.0);
+    bool groundFound;
+    if(!StoredLevelFloat(file,path,"model_ground_z",0.0,meta.modelGroundZ,groundFound)
+        || meta.modelGroundZ < -15000.0 || meta.modelGroundZ > 15000.0)return false;
+    if(!StoredLevelFloat(file,path,"model_ground_curve_z",0.0,meta.modelGroundCurveZ,groundFound)
+        || meta.modelGroundCurveZ < -15000.0 || meta.modelGroundCurveZ > 15000.0)return false;
     if(!(meta.maxDistance>=16.0 && meta.maxDistance<=4096.0)
         || !ReadMetadataVector(file,path,"origin_offset",meta.originOffset)
         || !ReadMetadataVector(file,path,"angle_offset",meta.angleOffset))return false;
@@ -479,6 +491,13 @@ bool ValidateDayRanges()
         float hpCap=gCfg[C_Days].GetFloat("hp_multiplier_cap",10.0);
         if(extra<0 || extra>gPopulationLimit || cap<target || cap>gPopulationLimit
             || !(hp>0.0 && hp<=1000.0) || !(hpExtra>=0.0 && hpExtra<=1000.0) || !(hpCap>=hp && hpCap<=1000.0))return ConfigFailure("day growth/caps");
+        float playerBase,playerExtra,playerCap;
+        if(!ReadDayPlayerDamageField("raider_player_damage_multiplier",1.0,playerBase)
+            || !ReadDayPlayerDamageField("extra_player_damage_multiplier_per_day",0.0,playerExtra)
+            || !ReadDayPlayerDamageField("player_damage_multiplier_cap",1.0,playerCap))return false;
+        if(!(playerBase>0.0))return DayPlayerDamageFailure("raider_player_damage_multiplier","must be positive");
+        if(!(playerExtra>=0.0))return DayPlayerDamageFailure("extra_player_damage_multiplier_per_day","must be nonnegative");
+        if(!(playerCap>=playerBase))return DayPlayerDamageFailure("player_damage_multiplier_cap","must be at least raider_player_damage_multiplier");
         if(gCfg[C_Days].GetFloat("raider_hp_multiplier",1.0)<=0.0 || gCfg[C_Days].GetFloat("spawn_interval_seconds",1.0)<0.25
             || gCfg[C_Days].GetFloat("day_spawn_interval_seconds",2.0)<0.25 || gCfg[C_Days].GetNum("spawn_batch",2)<1
             || gCfg[C_Days].GetNum("day_spawn_batch",2)<1)return ConfigFailure("day growth/timing");
@@ -557,4 +576,53 @@ float HPScale()
     float scale=gCfg[C_Days].GetFloat("raider_hp_multiplier",1.0)
         +float(gDay-gCfg[C_Days].GetNum("from_day"))*gCfg[C_Days].GetFloat("extra_hp_multiplier_per_day",0.0);
     float cap=gCfg[C_Days].GetFloat("hp_multiplier_cap",10.0);return scale>cap ? cap : scale;
+}
+
+bool ParseSurvivalDayLimit(const char[] token,int &value)
+{
+    // Do not let GetNum/StringToInt wrap an overflowing positive campaign goal.
+    if(!token[0])return false;
+    int result;
+    for(int i=0;token[i];i++)
+    {
+        if(token[i]<'0' || token[i]>'9')return false;
+        int digit=token[i]-'0';
+        if(result>214748364 || (result==214748364 && digit>7))return false;
+        result=result*10+digit;
+    }
+    value=result;return true;
+}
+
+bool ReadDayPlayerDamageField(const char[] key,float fallback,float &value)
+{
+    KeyValues stage=gCfg[C_Days];value=fallback;
+    if(stage.GetDataType(key)==KvData_None)return true;
+    char token[128];stage.GetString(key,token,sizeof(token));
+    if(token[0] && strlen(token)<sizeof(token)-1 && StringToFloatEx(token,value)==strlen(token)
+        && (view_as<int>(value)&0x7f800000)!=0x7f800000)return true;
+    return DayPlayerDamageFailure(key,"expected finite decimal");
+}
+
+bool DayPlayerDamageFailure(const char[] key,const char[] detail)
+{
+    char name[64],message[256];gCfg[C_Days].GetSectionName(name,sizeof(name));
+    Format(message,sizeof(message),"days.cfg/Stages/%s/%s: %s",name,key,detail);
+    return ConfigFailure(message);
+}
+
+float DayPlayerDamageScale(float base,float extra,float cap,int elapsed)
+{
+    // Compare before multiplying so an extreme valid day cannot overflow.
+    if(extra<=0.0 || elapsed<=0 || base>=cap)return base>cap ? cap : base;
+    float remaining=cap-base;
+    if(extra>=remaining/float(elapsed))return cap;
+    float scale=base+float(elapsed)*extra;return scale>cap ? cap : scale;
+}
+
+float PlayerDamageScale()
+{
+    if(!SelectDay())return 1.0;
+    return DayPlayerDamageScale(gCfg[C_Days].GetFloat("raider_player_damage_multiplier",1.0),
+        gCfg[C_Days].GetFloat("extra_player_damage_multiplier_per_day",0.0),
+        gCfg[C_Days].GetFloat("player_damage_multiplier_cap",1.0),gDay-gCfg[C_Days].GetNum("from_day"));
 }

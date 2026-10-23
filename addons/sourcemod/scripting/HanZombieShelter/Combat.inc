@@ -423,7 +423,8 @@ public Action HumanDamageHook(int victim,int &attacker,int &inflictor,float &dam
 {
     if(!gEnabled)return Plugin_Continue;
     int n=FindNPC(attacker);
-    if(n>=0 && (!Running() || !gNPCs[n].active || gNPCs[n].attackingUID
+    if(n>=0 && (!Running() || !gNPCs[n].active || !gNPCs[n].ready || gNPCs[n].dead || gNPCs[n].settled
+        || gNPCs[n].paused || gNPCs[n].registrationEpoch!=gEpoch || gNPCs[n].attackingUID
         || (gNPCs[n].boss>=0 && !gBosses[gNPCs[n].boss].awakened)))
     {damage=0.0;return Plugin_Handled;}
     if(n>=0 && LiveHuman(victim))
@@ -434,5 +435,16 @@ public Action HumanDamageHook(int victim,int &attacker,int &inflictor,float &dam
     }
     if(LiveHuman(victim) && attacker>0 && attacker<=MaxClients && attacker!=victim && IsClientInGame(attacker))
     {damage=0.0;return Plugin_Handled;}
+    // HZS native melee calls TakeDamage(target,zombie,zombie,...,DMG_SLASH).
+    // Indirect projectiles, Bosses, world/PVP and Exposure keep their own rules.
+    if(n>=0 && LiveHuman(victim) && gNPCs[n].boss<0 && inflictor==attacker && damageType==DMG_SLASH
+        && Resolve(gNPCs[n].ref)==attacker && GetEntProp(attacker,Prop_Data,"m_iHealth")>0
+        && damage>0.0 && (view_as<int>(damage)&0x7f800000)!=0x7f800000)
+    {
+        float scaled=damage*PlayerDamageScale();
+        if((view_as<int>(scaled)&0x7f800000)==0x7f800000)
+        {LogError("[Shelter] Ordinary player damage overflow at day %d; original strike retained",gDay);return Plugin_Continue;}
+        if(scaled!=damage){damage=scaled;return Plugin_Changed;}
+    }
     return Plugin_Continue;
 }

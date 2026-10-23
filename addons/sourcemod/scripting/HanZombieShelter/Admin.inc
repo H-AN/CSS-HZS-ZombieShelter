@@ -5,11 +5,13 @@ enum AdminMenuAction
     Admin_PlayerMaterials=20, Admin_PlayerAmounts, Admin_SetPlayer, Admin_ChangePlayer,
     Admin_Building=30, Admin_BuildingConfirm, Admin_BuildingApply,
     Admin_CustomBase=40, Admin_CustomPlayer,
-    Admin_TravelList=50, Admin_Travel
+    Admin_TravelList=50, Admin_Travel,
+    Admin_SkillPlayers=60, Admin_SkillPlayer, Admin_SkillChange, Admin_SkillCustomAdd, Admin_SkillCustomRemove, Admin_SkillCustomApply
 }
 
-enum AdminTokenField { AT_Epoch, AT_Client, AT_Nonce, AT_Action, AT_Subject, AT_Identity, AT_Revision, AT_Material, AT_Value, AT_Nearby, AT_Count }
+enum AdminTokenField { AT_Epoch, AT_Client, AT_Nonce, AT_Action, AT_Subject, AT_Identity, AT_Revision, AT_Material, AT_Value, AT_Nearby, AT_Config, AT_Count }
 int gAdminMenuNonce[MAXPLAYERS+1];
+Menu gAdminCurrentMenu[MAXPLAYERS+1];
 char gAdminPendingToken[MAXPLAYERS+1][256];
 float gAdminPendingUntil[MAXPLAYERS+1];
 
@@ -97,8 +99,45 @@ bool AdminOnlinePlayer(int serial)
 void AdminToken(int client,AdminMenuAction operation,char[] token,int length,int subject=-1,int identity=0,
     int revision=0,int material=-1,int value=0,bool nearby=false)
 {
-    Format(token,length,"%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",gEpoch,GetClientSerial(client),gAdminMenuNonce[client],
-        operation,subject,identity,revision,material,value,nearby);
+    Format(token,length,"%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",gEpoch,GetClientSerial(client),gAdminMenuNonce[client],
+        operation,subject,identity,revision,material,value,nearby,gConfigRevision);
+}
+
+// Bind points quotes to the verified account, its revision, map session and
+// current skill rules as well as the ordinary actor serial/round/menu identity.
+void AdminSkillToken(int client,AdminMenuAction operation,int target,char[] token,int length,int value=0)
+{
+    Format(token,length,"%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",gEpoch,GetClientSerial(client),gAdminMenuNonce[client],
+        operation,GetClientSerial(target),SkillsAccountIndex(target),SkillsAccountRevision(target),
+        gSkillsMapSession,value,gSkillsConfigRevision,gConfigRevision);
+}
+
+bool AdminSkillTarget(int serial,int account,int revision,int session,int rules)
+{
+    if(!gSkillsEnabled || !gSkillsConfigReady || gTerminal || session!=gSkillsMapSession || rules!=gSkillsConfigRevision
+        || !AdminOnlinePlayer(serial))return false;
+    int target=GetClientFromSerial(serial);
+    return SkillsIdentity(target) && SkillsAccountIndex(target)==account && SkillsAccountRevision(target)==revision;
+}
+
+void AdminDisplayMenu(Menu menu,int client)
+{
+    // Set before Display: the replaced menu can synchronously receive Cancel.
+    // Its later Cancel/End must never clear the new menu or pending input.
+    gAdminPendingToken[client][0]=0;gAdminPendingUntil[client]=0.0;
+    gAdminCurrentMenu[client]=menu;menu.Display(client,30);
+}
+
+bool AdminCurrentMenu(int client,Menu menu)
+{
+    return client>0 && client<=MaxClients && menu!=null && gAdminCurrentMenu[client]==menu;
+}
+
+void AdminCloseMenu(int client,Menu menu)
+{
+    if(!AdminCurrentMenu(client,menu))return;
+    gAdminCurrentMenu[client]=null;gAdminMenuNonce[client]++;
+    gAdminPendingToken[client][0]=0;gAdminPendingUntil[client]=0.0;
 }
 
 bool ValidateAdminToken(int client,const char[] token,int fields[AT_Count])
@@ -106,12 +145,21 @@ bool ValidateAdminToken(int client,const char[] token,int fields[AT_Count])
     if(!AdminActor(client))return false;
     char parts[view_as<int>(AT_Count)+1][24];if(ExplodeString(token,":",parts,view_as<int>(AT_Count)+1,24)!=view_as<int>(AT_Count))return false;
     for(int i=0;i<view_as<int>(AT_Count);i++)if(!ParseLevelInteger(parts[i],fields[i],true))return false;
-    if(fields[AT_Epoch]!=gEpoch || fields[AT_Client]!=GetClientSerial(client) || fields[AT_Nonce]!=gAdminMenuNonce[client])return false;
+    if(fields[AT_Epoch]!=gEpoch || fields[AT_Client]!=GetClientSerial(client) || fields[AT_Nonce]!=gAdminMenuNonce[client]
+        || fields[AT_Config]!=gConfigRevision)return false;
     int action=fields[AT_Action],subject=fields[AT_Subject];bool base,player,building,material;
     switch(view_as<AdminMenuAction>(action))
     {
         case Admin_Home,Admin_ResetConfirm,Admin_Reset,Admin_BaseList,Admin_PlayerList,Admin_BuildingList: {}
         case Admin_TravelList: {if(fields[AT_Revision]!=gConfigRevision)return false;}
+        case Admin_SkillPlayers: {if(!gSkillsEnabled || !gSkillsConfigReady || gTerminal)return false;}
+        case Admin_SkillPlayer,Admin_SkillChange,Admin_SkillCustomAdd,Admin_SkillCustomRemove,Admin_SkillCustomApply:
+        {
+            if(!AdminSkillTarget(subject,fields[AT_Identity],fields[AT_Revision],fields[AT_Material],fields[AT_Nearby]))return false;
+            if(action==view_as<int>(Admin_SkillChange) && fields[AT_Value]!=1 && fields[AT_Value]!=10 && fields[AT_Value]!=100
+                && fields[AT_Value]!=-1 && fields[AT_Value]!=-10 && fields[AT_Value]!=-100)return false;
+            if(action==view_as<int>(Admin_SkillCustomApply) && fields[AT_Value]!=1 && fields[AT_Value]!=-1)return false;
+        }
         case Admin_Travel:
         {
             if(fields[AT_Revision]!=gConfigRevision || !TravelBaseAlive(subject)
@@ -170,8 +218,9 @@ void ShowShelterAdminMenu(int client)
     AdminAdd(menu,client,Admin_ResetConfirm,"AdminResetDay",-1,0,gDay);
     AdminAdd(menu,client,Admin_BaseList,"AdminBaseSupplies");
     AdminAdd(menu,client,Admin_PlayerList,"AdminPlayerSupplies");
+    AdminAdd(menu,client,Admin_SkillPlayers,"AdminSkillPoints",-1,0,0,-1,0,false,gSkillsEnabled && gSkillsConfigReady && !gTerminal);
     AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");
-    AdminAdd(menu,client,Admin_TravelList,"AdminTravelMenu",-1,0,gConfigRevision);menu.Display(client,30);
+    AdminAdd(menu,client,Admin_TravelList,"AdminTravelMenu",-1,0,gConfigRevision);AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminTravelMenu(int client)
@@ -186,7 +235,7 @@ void ShowAdminTravelMenu(int client)
         AdminToken(client,Admin_Travel,token,sizeof(token),core,gBuildings[gCores[core].building].uid,gConfigRevision);menu.AddItem(token,label);count++;
     }
     if(count==0){char text[128];TranslateLabel(client,"AdminTravelNoBases",text,sizeof(text));menu.AddItem("",text,ITEMDRAW_DISABLED);}
-    AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminResetMenu(int client)
@@ -194,7 +243,7 @@ void ShowAdminResetMenu(int client)
     if(!AdminActor(client))return;
     gAdminMenuNonce[client]++;char title[256];Format(title,sizeof(title),"%T","AdminResetTitle",client,gDay);
     Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
-    AdminAdd(menu,client,Admin_Reset,"AdminConfirmReset",-1,0,gDay);AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Reset,"AdminConfirmReset",-1,0,gDay);AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminBaseList(int client)
@@ -208,7 +257,7 @@ void ShowAdminBaseList(int client)
         char token[256],name[64];CoreDisplayName(core,name,sizeof(name),client);
         AdminToken(client,Admin_BaseMaterials,token,sizeof(token),core,gBuildings[b].uid,gBuildings[b].level);menu.AddItem(token,name);
     }
-    AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminPlayerList(int client)
@@ -222,7 +271,73 @@ void ShowAdminPlayerList(int client)
         char token[256],name[MAX_NAME_LENGTH];GetClientName(target,name,sizeof(name));
         AdminToken(client,Admin_PlayerMaterials,token,sizeof(token),GetClientSerial(target));menu.AddItem(token,name);
     }
-    AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
+}
+
+void ShowAdminSkillPlayers(int client)
+{
+    if(!AdminActor(client) || !gSkillsEnabled || !gSkillsConfigReady || gTerminal)return;
+    SkillsObserveDay();gAdminMenuNonce[client]++;
+    char title[192];TranslateLabel(client,"AdminSkillPlayersTitle",title,sizeof(title));
+    Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);int count;
+    for(int target=1;target<=MaxClients;target++)
+    {
+        // A dead connected human still has an account to administer. Never
+        // replace verified Steam identity with a slot, serial or fake client.
+        if(!SkillsIdentity(target))continue;
+        char token[256],name[MAX_NAME_LENGTH],line[192];GetClientName(target,name,sizeof(name));
+        Format(line,sizeof(line),"%T","AdminSkillPlayerEntry",client,name,SkillsBalance(target));
+        AdminSkillToken(client,Admin_SkillPlayer,target,token,sizeof(token));menu.AddItem(token,line);count++;
+    }
+    if(count==0){char line[128];TranslateLabel(client,"AdminSkillNoPlayers",line,sizeof(line));menu.AddItem("",line,ITEMDRAW_DISABLED);}
+    AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
+}
+
+void AdminSkillAdd(Menu menu,int client,int target,AdminMenuAction action,const char[] phrase,int value=0)
+{
+    char token[256],line[192];AdminSkillToken(client,action,target,token,sizeof(token),value);
+    TranslateLabel(client,phrase,line,sizeof(line));menu.AddItem(token,line);
+}
+
+void ShowAdminSkillPlayer(int client,int serial)
+{
+    if(!AdminActor(client) || !AdminOnlinePlayer(serial))return;
+    int target=GetClientFromSerial(serial);SkillsObserveDay();
+    if(!SkillsIdentity(target) || !gSkillsEnabled || !gSkillsConfigReady || gTerminal)return;
+    gAdminMenuNonce[client]++;
+    char name[MAX_NAME_LENGTH],title[512];GetClientName(target,name,sizeof(name));
+    Format(title,sizeof(title),"%T","AdminSkillPlayerTitle",client,name,SkillsBalance(target),SkillsEarnedQuota(),
+        SkillsAdminAdjustment(target),SkillsSpent(target));
+    Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillAdd1",1);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillAdd10",10);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillAdd100",100);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillRemove1",-1);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillRemove10",-10);
+    AdminSkillAdd(menu,client,target,Admin_SkillChange,"AdminSkillRemove100",-100);
+    AdminSkillAdd(menu,client,target,Admin_SkillCustomAdd,"AdminSkillCustomAdd");
+    AdminSkillAdd(menu,client,target,Admin_SkillCustomRemove,"AdminSkillCustomRemove");
+    AdminAdd(menu,client,Admin_SkillPlayers,"AdminBack");AdminDisplayMenu(menu,client);
+}
+
+void ApplyAdminSkillChange(int client,int fields[AT_Count],int delta)
+{
+    if(!AdminActor(client) || !AdminSkillTarget(fields[AT_Subject],fields[AT_Identity],fields[AT_Revision],
+        fields[AT_Material],fields[AT_Nearby]))return;
+    int target=GetClientFromSerial(fields[AT_Subject]),actual;
+    if(!SkillsAdminAdjust(client,target,delta,fields[AT_Identity],fields[AT_Revision],actual))
+        Tell(client,"%T","AdminMutationRejected",client);
+    else HudFeedback(client,"%T","AdminSkillChanged",client,actual,SkillsBalance(target));
+    ShowAdminSkillPlayer(client,fields[AT_Subject]);
+}
+
+void BeginAdminSkillCustom(int client,int fields[AT_Count],bool add)
+{
+    if(!AdminActor(client) || !AdminSkillTarget(fields[AT_Subject],fields[AT_Identity],fields[AT_Revision],
+        fields[AT_Material],fields[AT_Nearby]))return;
+    int target=GetClientFromSerial(fields[AT_Subject]);
+    AdminSkillToken(client,Admin_SkillCustomApply,target,gAdminPendingToken[client],sizeof(gAdminPendingToken[]),add ? 1 : -1);
+    gAdminPendingUntil[client]=GetGameTime()+30.0;Tell(client,"%T","AdminSkillCustomInput",client);
 }
 
 void ShowAdminMaterialList(int client,int subject,bool base)
@@ -246,7 +361,7 @@ void ShowAdminMaterialList(int client,int subject,bool base)
         Format(line,sizeof(line),"%T","AdminMaterialCount",client,label,count);
         AdminToken(client,base ? Admin_BaseAmounts : Admin_PlayerAmounts,token,sizeof(token),subject,identity,revision,m);menu.AddItem(token,line);
     }
-    AdminAdd(menu,client,base ? Admin_BaseList : Admin_PlayerList,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,base ? Admin_BaseList : Admin_PlayerList,"AdminBack");AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminAmounts(int client,int subject,int material,bool base)
@@ -269,7 +384,7 @@ void ShowAdminAmounts(int client,int subject,int material,bool base)
     AdminAdd(menu,client,base ? Admin_ChangeBase : Admin_ChangePlayer,"AdminRemove100",subject,identity,revision,material,-100);
     AdminAdd(menu,client,base ? Admin_SetBase : Admin_SetPlayer,"AdminSetZero",subject,identity,revision,material,0);
     AdminAdd(menu,client,base ? Admin_CustomBase : Admin_CustomPlayer,"AdminSetCustom",subject,identity,revision,material);
-    AdminAdd(menu,client,base ? Admin_BaseMaterials : Admin_PlayerMaterials,"AdminBack",subject,identity,revision);menu.Display(client,30);
+    AdminAdd(menu,client,base ? Admin_BaseMaterials : Admin_PlayerMaterials,"AdminBack",subject,identity,revision);AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminBuildingList(int client)
@@ -284,7 +399,7 @@ void ShowAdminBuildingList(int client)
         Format(line,sizeof(line),"%T","AdminBuildingEntry",client,name,gBuildings[b].uid,gBuildings[b].level);
         AdminToken(client,Admin_Building,token,sizeof(token),b,gBuildings[b].uid,gBuildings[b].level);menu.AddItem(token,line);
     }
-    AdminAdd(menu,client,Admin_Home,"AdminBack");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Home,"AdminBack");AdminDisplayMenu(menu,client);
 }
 
 bool AdminBuildingAvailable(int client,int b,bool nearby)
@@ -305,7 +420,7 @@ void ShowAdminBuildingMenu(int client,int b,bool nearby)
     AdminAdd(menu,client,Admin_BuildingConfirm,"AdminLevelUp",b,gBuildings[b].uid,gBuildings[b].level,-1,gBuildings[b].level+1,nearby,canUpgrade);
     AdminAdd(menu,client,Admin_BuildingConfirm,"AdminLevelDown",b,gBuildings[b].uid,gBuildings[b].level,-1,gBuildings[b].level-1,nearby,!gBuildings[b].constructing && gBuildings[b].level>1);
     AdminAdd(menu,client,Admin_BuildingConfirm,"AdminDestroyBuilding",b,gBuildings[b].uid,gBuildings[b].level,-1,0,nearby);
-    AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");menu.Display(client,30);
+    AdminAdd(menu,client,Admin_BuildingList,"AdminAllBuildings");AdminDisplayMenu(menu,client);
 }
 
 void ShowAdminBuildingConfirm(int client,int b,int nextLevel,bool nearby)
@@ -318,7 +433,7 @@ void ShowAdminBuildingConfirm(int client,int b,int nextLevel,bool nearby)
     else Format(title,sizeof(title),"%T","AdminLevelTitle",client,name,gBuildings[b].level,nextLevel);
     Menu menu=new Menu(ShelterAdminMenuHandler);menu.SetTitle("%s",title);
     AdminAdd(menu,client,Admin_BuildingApply,"AdminConfirm",b,gBuildings[b].uid,gBuildings[b].level,-1,nextLevel,nearby);
-    AdminAdd(menu,client,Admin_Building,"AdminBack",b,gBuildings[b].uid,gBuildings[b].level,-1,0,nearby);menu.Display(client,30);
+    AdminAdd(menu,client,Admin_Building,"AdminBack",b,gBuildings[b].uid,gBuildings[b].level,-1,0,nearby);AdminDisplayMenu(menu,client);
 }
 
 void ApplyAdminMaterialChange(int client,int fields[AT_Count],bool base,bool delta)
@@ -352,28 +467,52 @@ bool ParseAdminAmount(const char[] number,int &value)
     value=StringToInt(number);return true;
 }
 
+bool AdminPendingSkillInput(int client)
+{
+    // The token is created only by this plugin. This is a prompt choice; the
+    // complete identity and signed action are still checked before mutation.
+    char parts[view_as<int>(AT_Count)+1][24];
+    return ExplodeString(gAdminPendingToken[client],":",parts,view_as<int>(AT_Count)+1,sizeof(parts[]))==view_as<int>(AT_Count)
+        && StringToInt(parts[AT_Action])==view_as<int>(Admin_SkillCustomApply);
+}
+
 public Action ShelterAdminValueCommand(int client,int args)
 {
     if(!AdminActor(client)){ReplyToCommand(client,"%T","AdminAccessDenied",client);return Plugin_Handled;}
     char number[32];GetCmdArg(1,number,sizeof(number));int value;
     if(args!=1 || !ParseAdminAmount(number,value))
-    {Tell(client,"%T","AdminCustomInput",client);return Plugin_Handled;}
+    {Tell(client,"%T",AdminPendingSkillInput(client) ? "AdminSkillCustomInput" : "AdminCustomInput",client);return Plugin_Handled;}
     int fields[AT_Count];
     if(!gAdminPendingToken[client][0] || GetGameTime()>gAdminPendingUntil[client]
         || !ValidateAdminToken(client,gAdminPendingToken[client],fields))
     {gAdminPendingToken[client][0]=0;Tell(client,"%T","AdminMenuExpired",client);return Plugin_Handled;}
-    gAdminPendingToken[client][0]=0;fields[AT_Value]=value;
+    gAdminPendingToken[client][0]=0;gAdminPendingUntil[client]=0.0;
+    if(fields[AT_Action]==view_as<int>(Admin_SkillCustomApply))
+    {
+        if(value<1){Tell(client,"%T","AdminSkillCustomInput",client);return Plugin_Handled;}
+        ApplyAdminSkillChange(client,fields,value*fields[AT_Value]);return Plugin_Handled;
+    }
+    fields[AT_Value]=value;
     ApplyAdminMaterialChange(client,fields,fields[AT_Action]==view_as<int>(Admin_SetBase),false);return Plugin_Handled;
 }
 
 public int ShelterAdminMenuHandler(Menu menu,MenuAction action,int client,int item)
 {
-    if(action==MenuAction_End)delete menu;
+    if(action==MenuAction_End)
+    {
+        for(int owner=1;owner<=MaxClients;owner++)AdminCloseMenu(owner,menu);
+        delete menu;
+    }
+    else if(action==MenuAction_Cancel)AdminCloseMenu(client,menu);
     else if(action==MenuAction_Select)
     {
+        if(!AdminCurrentMenu(client,menu))return 0;
         char token[256];int fields[AT_Count];menu.GetItem(item,token,sizeof(token));
         if(!ValidateAdminToken(client,token,fields))
         {if(client>0 && IsClientInGame(client))Tell(client,"%T","AdminMenuExpired",client);return 0;}
+        // Selection consumes this handle before any replacement menu or pending
+        // exact input is created. Old Cancel/End cannot revoke the new session.
+        gAdminCurrentMenu[client]=null;
         int subject=fields[AT_Subject],material=fields[AT_Material];bool nearby=fields[AT_Nearby]!=0;
         switch(view_as<AdminMenuAction>(fields[AT_Action]))
         {
@@ -382,6 +521,11 @@ public int ShelterAdminMenuHandler(Menu menu,MenuAction action,int client,int it
             case Admin_Reset: RequestDayReset();
             case Admin_BaseList: ShowAdminBaseList(client);
             case Admin_PlayerList: ShowAdminPlayerList(client);
+            case Admin_SkillPlayers: ShowAdminSkillPlayers(client);
+            case Admin_SkillPlayer: ShowAdminSkillPlayer(client,subject);
+            case Admin_SkillChange: ApplyAdminSkillChange(client,fields,fields[AT_Value]);
+            case Admin_SkillCustomAdd: BeginAdminSkillCustom(client,fields,true);
+            case Admin_SkillCustomRemove: BeginAdminSkillCustom(client,fields,false);
             case Admin_BuildingList: ShowAdminBuildingList(client);
             case Admin_TravelList: ShowAdminTravelMenu(client);
             case Admin_Travel:

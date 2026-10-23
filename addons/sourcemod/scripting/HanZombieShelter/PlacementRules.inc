@@ -34,11 +34,11 @@ bool PlacementBoxesIntersect(const float lowA[3],const float highA[3],const floa
     return true;
 }
 
-bool ShelterOverlapsNPC(const char[] model,PlacementCandidate candidate)
+bool ShelterOverlapsNPC(const char[] model,PlacementCandidate candidate,float modelScale=1.0)
 {
     float low[3],high[3];
     // An unknown envelope cannot safely establish that the dormant Boss is free.
-    if(!PlacementModelBounds(model,low,high) || !PlacementBoundsValid(low,high))return true;
+    if(!PlacementModelBounds(model,low,high,modelScale) || !PlacementBoundsValid(low,high))return true;
     for(int n=0;n<MAX_NPCS;n++)
     {
         if(!gNPCs[n].used || gNPCs[n].dead || gNPCs[n].registrationEpoch!=gEpoch)continue;
@@ -69,7 +69,7 @@ int RecipeBuildCoreAt(int recipe,PlacementCandidate candidate)
     if(selected>=0 || recipe<0 || recipe>=gRecipeCount || gRecipes[recipe].kind!=Kind_Fence)return selected;
     char profile[128],model[PLATFORM_MAX_PATH];Format(profile,sizeof(profile),"Types/%s",gRecipes[recipe].type);
     Text(gRecipes[recipe].file,profile,"model",model,sizeof(model));
-    float low[3],high[3];if(!PlacementModelBounds(model,low,high) || !PlacementBoundsValid(low,high))return -1;
+    float low[3],high[3];if(!PlacementModelBounds(model,low,high,gRecipes[recipe].meta.modelScale) || !PlacementBoundsValid(low,high))return -1;
     RefreshBuildAreas();float nearest=999999999.0;
     for(int c=0;c<gCoreCount;c++)
     {

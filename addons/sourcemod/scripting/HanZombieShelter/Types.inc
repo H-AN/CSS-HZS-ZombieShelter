@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.7.2"
+#define SHELTER_VERSION "0.8.0"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
@@ -11,6 +11,8 @@
 #define LEGACY_MATERIALS 5
 
 enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
+// Ordered so a Boss completion wins over rescue in the same outcome batch.
+enum VictoryReason { Victory_None, Victory_Rescue, Victory_Bosses }
 enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander,
     Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire, Kind_Tesla, Kind_Plasma, Kind_Watchtower }
 enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops,
@@ -104,8 +106,12 @@ enum struct BuildingMetadata
     int render[4];
     int skin;
     int body;
+    char idleAnimation[64];
+    float modelScale;
     char placementMode[16];
     float originOffset[3];
+    float modelGroundZ;
+    float modelGroundCurveZ;
     float angleOffset[3];
     bool allowOverlap;
     float maxDistance;
@@ -280,6 +286,7 @@ int gBaseInventory[MAX_CORES][MATERIALS];
 int gEpoch, gUID, gConfigRevision;
 int gDay=1, gNativeKills;
 Phase gPhase=Phase_Waiting;
+VictoryReason gVictoryReason=Victory_None;
 bool gEnabled, gCoreReady, gSnapshot, gRollback, gTerminal, gFailureCandidate, gVictoryCandidate;
 bool gRoundPrepared, gRoundRestored, gWarningSent, gRebuilding;
 bool gOutcomeQueued, gTerminationExpected;
@@ -290,7 +297,7 @@ float gDaySeconds, gNightSeconds, gWarningSeconds, gExposureInterval, gRecoveryF
 float gGatherCooldown, gRepairCooldown, gUseDistance, gUseCooldown;
 #pragma unused gRepairCooldown
 int gExposureDamage, gSummonLimit, gPopulationLimit, gNativePoolSize, gInventoryCap;
-int gRollbackDays, gMinimumDay;
+int gRollbackDays, gMinimumDay, gSurvivalDayLimit;
 bool gDestroySummons, gDirectLoss, gExposureEnabled;
 char gSpawnPolicy[32], gMap[64], gFailureText[256], gVictoryText[256];
 float gParking[3];

@@ -43,6 +43,7 @@ void PrepareRound()
     CancelAllBaseTeleportSelections();
     gEpoch++;gRoundPrepared=false;gPhase=Phase_Waiting;gEnvironmentPhase=HZSHEnvironment_Day;gWarningSent=false;
     gFailureCandidate=false;gVictoryCandidate=false;gOutcomeQueued=false;gTerminationExpected=false;
+    gVictoryReason=Victory_None;
     CleanWorld();ApplyMapAdjustments();
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<gBossCount;i++)gBosses[i].boundThisRound=false;
@@ -59,7 +60,8 @@ void StartDay(bool advance)
 {
     if(!gEnabled || gTerminal || !gRoundPrepared)return;
     Phase previous=gPhase;
-    if(advance)gDay++;
+    if(advance && gDay<2147483647)gDay++;
+    SkillsObserveDay();
     gPhase=Phase_Day;gEnvironmentPhase=HZSHEnvironment_Day;gDeadline=GetGameTime()+gDaySeconds;gWarningSent=false;gNextAdmissions=0.0;
     ApplyDayCvars();
     TrimOrdinary(DayTarget());
@@ -111,10 +113,15 @@ public void Han_OnHumanWin()
     else LogError("[Shelter] Core Stage completed before map Boss; 99999 bridge/configuration needs review");
 }
 
-void QueueOutcome(bool victory)
+void QueueOutcome(bool victory,VictoryReason reason=Victory_Bosses)
 {
     if(!gEnabled || gTerminal || gPhase==Phase_Ending)return;
-    if(victory)gVictoryCandidate=true;else gFailureCandidate=true;
+    if(victory)
+    {
+        gVictoryCandidate=true;
+        if(reason>gVictoryReason)gVictoryReason=reason;
+    }
+    else gFailureCandidate=true;
     if(!gOutcomeQueued){gOutcomeQueued=true;RequestFrame(ResolveOutcome,gEpoch);}
 }
 
@@ -122,6 +129,8 @@ public void ResolveOutcome(any epoch)
 {
     if(epoch!=gEpoch || !gEnabled || gTerminal || gPhase==Phase_Ending || (!gVictoryCandidate && !gFailureCandidate))return;
     gOutcomeQueued=false;bool victory=gVictoryCandidate;
+    LogMessage("[Shelter] Campaign outcome victory=%d reason=%s day=%d target=%d",victory,
+        victory ? (gVictoryReason==Victory_Rescue ? "army_rescue" : "all_required_bosses") : "failure",gDay,gSurvivalDayLimit);
     Phase previous=gPhase;int previousDay=gDay;
     gPhase=Phase_Ending;gSnapshot=true;
     PlayGlobalInteractionSound(victory ? "victory" : "failure");
@@ -139,7 +148,8 @@ public void ResolveOutcome(any epoch)
     }
     if(victory || gDirectLoss)
     {
-        gTerminal=true;gDeadline=GetGameTime()+gOutcomeSeconds;AnnouncePhrase(victory ? gVictoryText : gFailureText);
+        gTerminal=true;gDeadline=GetGameTime()+gOutcomeSeconds;
+        AnnouncePhrase(victory ? (gVictoryReason==Victory_Rescue ? "CampaignRescueVictory" : gVictoryText) : gFailureText);
     }
     else
     {
@@ -205,6 +215,7 @@ public Action CS_OnTerminateRound(float &delay,CSRoundEndReason &reason)
 public void PlayerSpawn(Event event,const char[] name,bool dontBroadcast)
 {
     int client=GetClientOfUserId(event.GetInt("userid"));if(!gEnabled || !LiveHuman(client))return;
+    SkillsSpawnClient(client);
     DataPack pack=new DataPack();pack.WriteCell(GetClientSerial(client));pack.WriteCell(gEpoch);pack.WriteCell(0);
     RequestFrame(RedirectHuman,pack);
 }
@@ -228,12 +239,15 @@ public Action RetryHuman(Handle timer,DataPack value)
 
 void ExposureTick(float now)
 {
-    if(gPhase!=Phase_Night || !gExposureEnabled || now<gNextExposure)return;
+    if(gPhase!=Phase_Night || !gExposureEnabled || gExposureDamage<=0 || now<gNextExposure)return;
     gNextExposure=now+gExposureInterval;
     for(int client=1;client<=MaxClients;client++)
     {
         if(!LiveHuman(client))continue;
-        float position[3];GetClientAbsOrigin(client,position);if(InSafeBase(position) || CampfireSafeAt(position))continue;
+        float position[3];GetClientAbsOrigin(client,position);
+        bool valid=true;for(int axis=0;axis<3;axis++)if((view_as<int>(position[axis])&0x7f800000)==0x7f800000)valid=false;
+        if(!valid || InSafeBase(position) || CampfireSafeAt(position))continue;
+        if(SkillsExposureImmune(client)){PlaySkillsImmunitySound(client);continue;}
         int health=GetClientHealth(client)-gExposureDamage;
         if(health<=0)ForcePlayerSuicide(client);else SetEntityHealth(client,health);
     }
@@ -266,19 +280,31 @@ public Action WorldTick(Handle timer)
 {
     float now=GetGameTime(),elapsed=now-gPreviousTick;gPreviousTick=now;
     BurnVisualTick(now);
-    if(!gEnabled)return Plugin_Continue;
+    if(!gEnabled){SkillsTick(now);return Plugin_Continue;}
     bool previousReady=gCoreReady;gCoreReady=APIAvailable();
     if(previousReady!=gCoreReady){if(!gCoreReady){StopPowerEffects();ClearGrenades();}PublishShelterState();}
     if(gTerminal)
     {
+        SkillsTick(now);
         CampaignHUD();if(now>=gDeadline)ChangeCampaignMap();return Plugin_Continue;
     }
-    if(!Running()){SuspendCampfires();return Plugin_Continue;}
-    if(now>=gDeadline){if(gPhase==Phase_Day)StartNight();else StartDay(true);}
+    if(!Running()){SkillsTick(now);SuspendCampfires();return Plugin_Continue;}
+    if(now>=gDeadline)
+    {
+        if(gPhase==Phase_Day)StartNight();
+        else if(gSurvivalDayLimit>0 && gDay>=gSurvivalDayLimit)
+        {
+            QueueOutcome(true,Victory_Rescue);
+            return Plugin_Continue; // No extra day/point, NPC attack, exposure or recovery.
+        }
+        else StartDay(true);
+    }
     else if(gPhase==Phase_Day && !gWarningSent && gDeadline-now<=gWarningSeconds)
     {
         gWarningSent=true;AnnouncePhrase("NightApproaching");
     }
+    int skillEpoch=gEpoch;SkillsTick(now);
+    if(!Running() || gTerminal || skillEpoch!=gEpoch)return Plugin_Continue;
     EntityBudgetTick(now);FlushSharedOverflow();RestoreDeferredBuildings();
     SyncDynamicBasesGeometry();ResourceTick(elapsed);CampfireTick(elapsed);NPCTick(now);PowerTick();RestorationTick(now);BeaconTick(now);MineWorldTick();ExpansionWorldTick(now);ExposureTick(now);CampaignHUD();
     if(gNextBossAudit>0.0 && now>=gNextBossAudit)

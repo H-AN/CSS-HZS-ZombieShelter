@@ -299,7 +299,13 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
             AddRecipeStat(menu,client,"BuildStatSafeRadius",radius);
             AddRecipeStat(menu,client,"BuildStatDecayAmount",float(decay));
             AddRecipeStat(menu,client,"BuildStatDecayInterval",interval);
-            AddRecipeStat(menu,client,"BuildStatInactiveHP",float(threshold));
+            int capacity,gain,cost;
+            if(ReadCampfireFuelProfileLevel(profile,level,capacity,gain,cost))
+            {
+                AddRecipeStat(menu,client,"BuildStatFuelCapacity",float(capacity));
+                AddRecipeStat(menu,client,"BuildStatFuelGain",float(gain));
+                AddRecipeStat(menu,client,"BuildStatFuelCost",float(cost));
+            }
         }
     }
     if(kind==Kind_Amplifier)
@@ -534,6 +540,121 @@ public Action ReloadCommand(int client,int args)
     BootMode();ReplyToCommand(client,"%T","CmdReloadResult",client,gEnabled);return Plugin_Handled;
 }
 
+// Outdoor E is navigation only. Existing object, tower and base interactions
+// keep their priority; both destinations retain their own purchase/build checks.
+Menu gQuickMenuHandle[MAXPLAYERS+1];
+int gQuickMenuNonce[MAXPLAYERS+1];
+int gQuickMenuSerial[MAXPLAYERS+1],gQuickMenuEpoch[MAXPLAYERS+1],gQuickMenuRevision[MAXPLAYERS+1];
+int gQuickMenuSkillsSession[MAXPLAYERS+1],gQuickMenuSkillsRevision[MAXPLAYERS+1];
+
+void ResetQuickMenu(int client)
+{
+    if(client<1 || client>MaxClients)return;
+    gQuickMenuHandle[client]=null;gQuickMenuNonce[client]++;
+    gQuickMenuSerial[client]=0;gQuickMenuEpoch[client]=0;gQuickMenuRevision[client]=0;
+    gQuickMenuSkillsSession[client]=0;gQuickMenuSkillsRevision[client]=0;
+}
+
+void ResetAllQuickMenus()
+{
+    for(int client=1;client<=MaxClients;client++)ResetQuickMenu(client);
+}
+
+public void QuickMenuRoundReset(Event event,const char[] name,bool dontBroadcast)
+{
+    ResetAllQuickMenus();
+}
+
+public void QuickMenuPlayerReset(Event event,const char[] name,bool dontBroadcast)
+{
+    ResetQuickMenu(GetClientOfUserId(event.GetInt("userid")));
+}
+
+bool QuickMenuAvailable(int client)
+{
+    if(!LiveHuman(client) || IsFakeClient(client) || !Running())return false;
+    float origin[3];GetClientAbsOrigin(client,origin);
+    for(int axis=0;axis<3;axis++)
+        if((view_as<int>(origin[axis])&0x7f800000)==0x7f800000)return false;
+    return SafeCoreAt(origin)<0 && BuildCoreAt(origin)<0;
+}
+
+bool ParseQuickMenuToken(const char[] token,int values[7])
+{
+    // Seven nonnegative cell fields, at most ten digits each. Reject overlong
+    // fields before ExplodeString can turn a truncated prefix into another ID.
+    if(strlen(token)>76)return false;
+    char parts[8][64];
+    if(ExplodeString(token,":",parts,sizeof(parts),sizeof(parts[]))!=7)return false;
+    for(int i=0;i<7;i++)if(!ParseLevelInteger(parts[i],values[i]))return false;
+    return values[6]==0 || values[6]==1;
+}
+
+bool QuickMenuSessionMatches(int client,const int values[7])
+{
+    return client>0 && client<=MaxClients && values[0]==gQuickMenuNonce[client]
+        && values[1]==gQuickMenuSerial[client] && values[2]==gQuickMenuEpoch[client]
+        && values[3]==gQuickMenuRevision[client] && values[4]==gQuickMenuSkillsSession[client]
+        && values[5]==gQuickMenuSkillsRevision[client];
+}
+
+bool ValidateQuickMenu(int client,Menu menu,const char[] token,int &operation)
+{
+    int values[7];
+    if(!ParseQuickMenuToken(token,values) || !QuickMenuSessionMatches(client,values)
+        || gQuickMenuHandle[client]!=menu || !QuickMenuAvailable(client)
+        || values[1]!=GetClientSerial(client) || values[2]!=gEpoch || values[3]!=gConfigRevision
+        || values[4]!=gSkillsMapSession || values[5]!=gSkillsConfigRevision)return false;
+    operation=values[6];
+    return operation==0 || SkillsActor(client);
+}
+
+void ShowQuickMenu(int client)
+{
+    if(!QuickMenuAvailable(client))return;
+    ResetQuickMenu(client);
+    gQuickMenuSerial[client]=GetClientSerial(client);gQuickMenuEpoch[client]=gEpoch;
+    gQuickMenuRevision[client]=gConfigRevision;gQuickMenuSkillsSession[client]=gSkillsMapSession;
+    gQuickMenuSkillsRevision[client]=gSkillsConfigRevision;
+    Menu menu=new Menu(QuickMenuHandler);gQuickMenuHandle[client]=menu;
+    menu.SetTitle("快捷菜单");
+    for(int operation=0;operation<2;operation++)
+    {
+        char token[128];
+        Format(token,sizeof(token),"%d:%d:%d:%d:%d:%d:%d",gQuickMenuNonce[client],gQuickMenuSerial[client],
+            gQuickMenuEpoch[client],gQuickMenuRevision[client],gQuickMenuSkillsSession[client],gQuickMenuSkillsRevision[client],operation);
+        menu.AddItem(token,operation==0 ? "建造菜单" : "角色技能菜单",
+            operation==0 || SkillsActor(client) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+    }
+    menu.Display(client,30);
+}
+
+public int QuickMenuHandler(Menu menu,MenuAction action,int client,int item)
+{
+    if(action==MenuAction_End)
+    {
+        // Ending an older menu must never invalidate its replacement.
+        for(int c=1;c<=MaxClients;c++)if(gQuickMenuHandle[c]==menu)ResetQuickMenu(c);
+        delete menu;return 0;
+    }
+    if(client<1 || client>MaxClients || gQuickMenuHandle[client]!=menu)return 0;
+    if(action==MenuAction_Cancel){ResetQuickMenu(client);return 0;}
+    if(action!=MenuAction_Select)return 0;
+    char token[128];int operation;
+    if(item<0 || item>=menu.ItemCount || !menu.GetItem(item,token,sizeof(token))
+        || !ValidateQuickMenu(client,menu,token,operation))
+    {
+        ResetQuickMenu(client);
+        if(IsClientInGame(client))Tell(client,"快捷菜单已过期，请在基地和建造范围外重新按 E。");
+        return 0;
+    }
+    // Consume the quote before Display synchronously cancels the old handle.
+    ResetQuickMenu(client);
+    if(operation==0)ShowBuildCategories(client);
+    else ShowSkills(client,-1);
+    return 0;
+}
+
 public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],float angles[3],int &weapon,int &subtype,int &cmdnum,int &tickcount,int &seed,int mouse[2])
 {
     int previousButtons=gLastButtons[client];gLastButtons[client]=buttons;
@@ -566,6 +687,7 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     float origin[3];GetClientAbsOrigin(client,origin);int core=SafeCoreAt(origin);
     if(core>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBaseMenu(client,core);}
     else if(BuildCoreAt(origin)>=0){gNextUse[client]=GetGameTime()+gUseCooldown;ShowBuildCategories(client);}
+    else {gNextUse[client]=GetGameTime()+gUseCooldown;ShowQuickMenu(client);}
     return Plugin_Continue;
 }
 
@@ -949,9 +1071,9 @@ bool ValidateBaseMenuToken(int client,const char[] token,int &core,int &operatio
     if(building<0 || building>=MAX_BUILDINGS || !gBuildings[building].used
         || values[3]!=gBuildings[building].uid || values[4]!=gBuildings[building].level)return false;
     operation=values[6];material=FindMaterial(fields[8]);
-    if(!ParseLevelInteger(fields[9],quantity,true) || operation<0 || operation>7)return false;
-    if(operation>=5 && material<0)return false;
-    if(operation>=6 && quantity!=1 && quantity!=10 && quantity!=-1)return false;
+    if(!ParseLevelInteger(fields[9],quantity,true) || operation<0 || operation>8)return false;
+    if(operation>=5 && operation<=7 && material<0)return false;
+    if((operation==6 || operation==7) && quantity!=1 && quantity!=10 && quantity!=-1)return false;
     // A menu selection is a single-use transaction, including failures and navigation.
     gBaseMenuNonce[client]++;
     return true;
@@ -989,6 +1111,7 @@ void ShowBaseMenu(int client,int core)
     menu.AddItem(token,line,upgrade ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
     BaseMenuToken(client,core,4,token,sizeof(token));TranslateLabel(client,"MenuStorage",line,sizeof(line));menu.AddItem(token,line);
     BaseMenuToken(client,core,3,token,sizeof(token));TranslateLabel(client,"MenuBuild",line,sizeof(line));menu.AddItem(token,line);
+    BaseMenuToken(client,core,8,token,sizeof(token));menu.AddItem(token,"玩家技能");
     menu.Display(client,30);
 }
 
@@ -1111,6 +1234,7 @@ public int BaseMenuHandler(Menu menu,MenuAction action,int client,int item)
             case 2: ShowBaseMenu(client,core);
             case 3: BuildMenuCommand(client,0);
             case 4: ShowBaseStorageMenu(client,core);
+            case 8: ShowSkills(client,core);
         }
     }
     return 0;

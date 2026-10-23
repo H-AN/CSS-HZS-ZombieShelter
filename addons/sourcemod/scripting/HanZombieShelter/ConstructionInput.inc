@@ -1,4 +1,5 @@
-// A claimed right-click is consumed until release, including rejected refunds.
+// A claimed right-click is consumed until release, including rejected refunds
+// and fuel requests. An unfinished campfire always takes the cancellation path.
 // This prevents the same input from also executing a knife secondary attack.
 bool gConstructionCancelHeld[MAXPLAYERS+1];
 
@@ -16,8 +17,11 @@ bool HandleConstructionCancelInput(int client,int &buttons,int previousButtons)
     int knife;
     if(!HeldKnifeSlotWeapon(client,knife) || !ResourceMeleeHit(client,client))return false;
     int building=FindBuilding(AimedEntity(client,gUseDistance));
-    if(building<0 || !gBuildings[building].used || !gBuildings[building].alive || !gBuildings[building].constructing)return false;
+    if(building<0 || !gBuildings[building].used || !gBuildings[building].alive)return false;
+    bool cancel=gBuildings[building].constructing;
+    if(!cancel && gBuildings[building].kind!=Kind_Campfire)return false;
     gConstructionCancelHeld[client]=true;buttons&=~IN_ATTACK2;
-    CancelUnfinishedConstruction(client,building);
+    if(cancel)CancelUnfinishedConstruction(client,building);
+    else RefuelCampfire(client,building);
     return true;
 }

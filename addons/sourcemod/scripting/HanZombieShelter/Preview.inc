@@ -94,6 +94,8 @@ public Action BuildPreviewTransmit(int entity,int client)
 
 void CachePlacementModelBounds(const char[] model,int entity)
 {
+    // Call only while this newly spawned visual still has its default 1.0
+    // scale. A model key always owns canonical bounds, never per-recipe scale.
     if(gPlacementModelBounds==null){gPlacementModelBounds=new StringMap();gPlacementModelBoundsValues=new ArrayList(6);}
     int existing;if(gPlacementModelBounds.GetValue(model,existing))return;
     float low[3],high[3],values[6];
@@ -102,9 +104,9 @@ void CachePlacementModelBounds(const char[] model,int entity)
     gPlacementModelBounds.SetValue(model,gPlacementModelBoundsValues.PushArray(values,6));
 }
 
-int CreatePlacementVisual(const char[] model,const float origin[3],const float angles[3],const char[] name)
+int CreatePlacementVisual(const char[] model,const float origin[3],const float angles[3],const char[] name,float scale=1.0)
 {
-    if(!CanAllocateEntities(1,true))return -1;
+    if(!ModelVisualScaleValid(scale) || !CanAllocateEntities(1,true))return -1;
     int entity=CreateEntityByName("prop_dynamic_override");if(entity<0)return -1;
     DispatchKeyValue(entity,"model",model);DispatchKeyValue(entity,"solid","0");
     DispatchKeyValue(entity,"targetname",name);DispatchKeyValue(entity,"spawnflags","0");
@@ -112,14 +114,19 @@ int CreatePlacementVisual(const char[] model,const float origin[3],const float a
     DispatchKeyValueVector(entity,"origin",origin);DispatchKeyValueVector(entity,"angles",angles);
     if(!DispatchSpawn(entity)){RemoveEntity(entity);return -1;}
     if(!CanAllocateEntities(1,true)){RemoveEntity(entity);return -1;}
+    CachePlacementModelBounds(model,entity);
+    if(scale!=1.0 && !ApplyModelVisualScale(entity,model,scale)){RemoveEntity(entity);return -1;}
+    // SetModel/scale inputs may rebuild collision. Apply preview-only safety
+    // after scaling so an invisible blueprint never becomes a solid obstacle.
     AcceptEntityInput(entity,"DisableCollision");SetEntityMoveType(entity,MOVETYPE_NONE);
     SetEntProp(entity,Prop_Data,"m_takedamage",0,1);SetEntityRenderMode(entity,RENDER_TRANSCOLOR);
-    SetEntityRenderColor(entity,255,255,255,0);CachePlacementModelBounds(model,entity);
+    SetEntityRenderColor(entity,255,255,255,0);
     return entity;
 }
 
-bool PlacementModelBounds(const char[] model,float low[3],float high[3])
+bool PlacementModelBounds(const char[] model,float low[3],float high[3],float scale=1.0)
 {
+    if(!ModelVisualScaleValid(scale))return false;
     int row;
     if(gPlacementModelBounds==null || !gPlacementModelBounds.GetValue(model,row))
     {
@@ -128,13 +135,14 @@ bool PlacementModelBounds(const char[] model,float low[3],float high[3])
         if(!gPlacementModelBounds.GetValue(model,row))return false;
     }
     float values[6];gPlacementModelBoundsValues.GetArray(row,values,6);
-    for(int a=0;a<3;a++){low[a]=values[a];high[a]=values[a+3];}
+    // Apply the requested positive scale once, to a copy of canonical bounds.
+    for(int a=0;a<3;a++){low[a]=values[a]*scale;high[a]=values[a+3]*scale;}
     return true;
 }
 
-bool PlacementHullClear(const char[] model,const float origin[3],const float angles[3],int ignored)
+bool PlacementHullClear(const char[] model,const float origin[3],const float angles[3],int ignored,float scale=1.0)
 {
-    float low[3],high[3],mins[3],maxs[3],zero[3];if(!PlacementModelBounds(model,low,high))return false;
+    float low[3],high[3],mins[3],maxs[3],zero[3];if(!PlacementModelBounds(model,low,high,scale))return false;
     for(int a=0;a<3;a++){mins[a]=99999.0;maxs[a]=-99999.0;}
     for(int corner=0;corner<8;corner++)
     {
@@ -165,7 +173,7 @@ void UpdateBuildPreview(int client,float now)
     if(entity<0 && now>=gBuildPreviewNextAttempt[client])
     {
         gBuildPreviewNextAttempt[client]=now+1.0;
-        float zero[3];entity=CreatePlacementVisual(model,zero,zero,"hzsh_build_preview");
+        float zero[3];entity=CreatePlacementVisual(model,zero,zero,"hzsh_build_preview",gRecipes[recipe].meta.modelScale);
         if(entity>MaxClients)
         {
             if(entity>=BUILD_PREVIEW_ENTITY_SLOTS || !SDKHookEx(entity,SDKHook_SetTransmit,BuildPreviewTransmit))

@@ -2,7 +2,7 @@
 // and no gameplay cap such as 16 or 100; limits below protect SourcePawn cells.
 #define LEVEL_CELL_LIMIT 2000000000
 
-static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness","build_limit","build_limit_bonus","restore_amount","max_per_base","decay_amount","inactive_hp","no_decay_at_max_level"};
+static const char sLevelIntegerFields[][]={"max_hp","initial_hp","burn_damage","minimum_base_level","power_priority","light_brightness","build_limit","build_limit_bonus","restore_amount","max_per_base","decay_amount","inactive_hp","no_decay_at_max_level","fuel_capacity","fuel_per_wood","fuel_wood_cost"};
 static const char sLevelFloatFields[][]={"damage","range","fire_interval","cone_half_angle_degrees","burn_interval",
     "burn_duration","blast_radius","player_ordinary_bonus","player_boss_bonus","defense_ordinary_bonus","defense_boss_bonus",
     "power_output","power_required","light_radius","projectile_speed","build_range_bonus","build_half_extents_x","build_half_extents_y","restore_interval_seconds","safe_radius","safe_height","decay_interval_seconds","charge_seconds",
@@ -92,6 +92,7 @@ bool IntegerLevelBounds(const char[] key,int &minimum,int &maximum)
     if(StrEqual(key,"restore_amount")){maximum=1000000;return true;}
     if(StrEqual(key,"max_per_base")){minimum=1;maximum=MAX_BUILDINGS;return true;}
     if(StrEqual(key,"decay_amount") || StrEqual(key,"inactive_hp")){maximum=1000000;return true;}
+    if(StrEqual(key,"fuel_capacity") || StrEqual(key,"fuel_per_wood") || StrEqual(key,"fuel_wood_cost")){minimum=1;return true;}
     if(StrEqual(key,"no_decay_at_max_level")){maximum=1;return true;}
     return false;
 }

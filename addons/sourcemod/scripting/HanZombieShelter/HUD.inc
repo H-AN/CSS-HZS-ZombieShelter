@@ -89,6 +89,12 @@ void HudBuildingTarget(int client,int building)
         Format(line,sizeof(line),"%T","HUDTargetPowerCompact",client,state,EffectiveBuildingPowerDemand(building));StrCat(text,sizeof(text),line);
     }
     BuildingKind kind=gBuildings[building].kind;
+    if(kind==Kind_Campfire)
+    {
+        Format(line,sizeof(line),"\n燃料 %d/%d | %s\n左键修耐久 | 右键耗%d木（每木+%d燃料）",CampfireFuelCurrent(building),CampfireFuelMaximum(building),
+            CampfireActive(building) ? "燃烧中" : "燃料耗尽",CampfireFuelWoodCost(building),CampfireFuelPerWood(building));
+        StrCat(text,sizeof(text),line);
+    }
     if(SupportMenuKind(kind) && kind!=Kind_Beacon)
     {
         float interval=gBuildings[building].restoreInterval;if(interval<1.0)interval=1.0;
@@ -201,7 +207,7 @@ void RenderCampaignHUD()
             if(refreshStatus)
             {
                 SetHudTextParams(-1.0,0.34,1.2,255,225,120,255,0,0.0,0.0,0.1);
-                ShowHudText(client,HUD_OUTCOME,"%T",gVictoryCandidate ? gVictoryText : gFailureText,client);
+                ShowHudText(client,HUD_OUTCOME,"%T",gVictoryCandidate ? (gVictoryReason==Victory_Rescue ? "CampaignRescueVictory" : gVictoryText) : gFailureText,client);
             }
             continue;
         }

@@ -62,7 +62,7 @@ int WeightedMaterial(ConfigFile file,const char[] path)
     return -1;
 }
 
-int CreateBody(const char[] model,const float origin[3],const float angles[3],const char[] name,bool dynamic=false,bool optional=false)
+int CreateBody(const char[] model,const float origin[3],const float angles[3],const char[] name,bool dynamic=false,bool optional=false,float modelScale=1.0)
 {
     if(!CanAllocateEntities(1,optional))return -1;
     int body=CreateEntityByName(dynamic ? "prop_dynamic_override" : "prop_physics_override");if(body==-1)return -1;
@@ -72,6 +72,7 @@ int CreateBody(const char[] model,const float origin[3],const float angles[3],co
     DispatchKeyValueVector(body,"origin",origin);DispatchKeyValueVector(body,"angles",angles);
     if(!DispatchSpawn(body)){RemoveEntity(body);return -1;}
     if(!CanAllocateEntities(1,optional)){RemoveEntity(body);return -1;}
+    if(modelScale!=1.0 && !ApplyModelVisualScale(body,model,modelScale,!dynamic)){RemoveEntity(body);return -1;}
     if(!dynamic)AcceptEntityInput(body,"DisableMotion");SetEntProp(body,Prop_Data,"m_takedamage",2,1);
     return body;
 }
@@ -138,7 +139,8 @@ bool SpawnBuildingBody(int index)
 {
     char target[64];Format(target,sizeof(target),"hzsh_build_%d_%d",gBuildings[index].uid,++gBuildings[index].generation);
     int entity=CreateBody(gBuildings[index].model,gBuildings[index].origin,gBuildings[index].angles,target,
-        gBuildings[index].kind==Kind_Tesla,gBuildings[index].kind!=Kind_Base);
+        gBuildings[index].kind==Kind_Tesla || gBuildings[index].meta.idleAnimation[0]!=0,gBuildings[index].kind!=Kind_Base,
+        gBuildings[index].meta.modelScale>0.0 ? gBuildings[index].meta.modelScale : 1.0);
     if(entity<0)return false;
     if(gBuildings[index].kind!=Kind_Base || gBuildings[index].file==C_Shelters)
     {
@@ -148,6 +150,12 @@ bool SpawnBuildingBody(int index)
         if(HasEntProp(entity,Prop_Send,"m_nBody"))SetEntProp(entity,Prop_Send,"m_nBody",gBuildings[index].meta.body);
     }
     gBuildings[index].ref=EntIndexToEntRef(entity);gBuildings[index].nextFire=GetGameTime()+0.5;gBuildings[index].lastAttackAt=0.0;
+    if(gBuildings[index].meta.idleAnimation[0])
+    {
+        SetVariantString(gBuildings[index].meta.idleAnimation);AcceptEntityInput(entity,"SetDefaultAnimation");
+        SetVariantString(gBuildings[index].meta.idleAnimation);AcceptEntityInput(entity,"SetAnimation");
+        if(HasEntProp(entity,Prop_Send,"m_flPlaybackRate"))SetEntPropFloat(entity,Prop_Send,"m_flPlaybackRate",1.0);
+    }
     SyncConstructionVisual(index);
     if(IsRestorationKind(gBuildings[index].kind))gBuildings[index].nextRestore=GetGameTime()+gBuildings[index].restoreInterval;
     float worldMin[3],worldMax[3];ModelWorldBounds(entity,gBuildings[index].origin,gBuildings[index].angles,worldMin,worldMax);
@@ -376,6 +384,7 @@ public Action ResourceDamageHook(int entity,int &attacker,int &inflictor,float &
     ResourceMeleeFeedback(entity,attacker,inflictor,damagePosition);
     int repair,construction,multiplier;
     if(!HeldWeaponWorkAmounts(attacker,repair,construction,multiplier) || multiplier<=0)return Plugin_Handled;
+    multiplier=SkillsGatherBonus(attacker,multiplier);
     // Classname rules and their knife fallback apply only after the slot/hit gate.
     float now=GetGameTime();if(now<gNextGather[attacker])return Plugin_Handled;
     int amount;
@@ -403,6 +412,7 @@ public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &
     // Every accepted knife-slot hit uses one absolute amount; no building cooldown.
     int repair=gBuildings[b].constructing ? constructionHP : repairHP;
     if(repair<1)return Plugin_Handled;
+    repair=SkillsWorkHP(attacker,repair,gBuildings[b].constructing);
     if(gBuildings[b].hp<gBuildings[b].maxHP)
     {
         int missing=gBuildings[b].maxHP-gBuildings[b].hp;if(repair>missing)repair=missing;
@@ -571,17 +581,23 @@ void TransformPlacementCandidate(BuildingMetadata meta,PlacementCandidate candid
     else if(StrEqual(meta.placementMode,"surface"))
         SurfacePlacementAngles(candidate.yaw,candidate.normal,frame);
     ComposeModelAngles(frame,meta.angleOffset,candidate.angles);
-    WorldPoint(meta.originOffset,candidate.anchor,candidate.angles,candidate.origin);
+    // The model's unscaled foot is configured once. Changing model_scale then
+    // adjusts contact height automatically; origin_offset remains a world-unit
+    // fine adjustment. No model path or per-model height is hardcoded here.
+    float offset[3];offset=meta.originOffset;
+    offset[2]-=meta.modelGroundZ*meta.modelScale
+        +meta.modelGroundCurveZ*meta.modelScale*(meta.modelScale-1.0);
+    WorldPoint(offset,candidate.anchor,candidate.angles,candidate.origin);
 }
 
-bool PlacementWorldOriginAllowed(const char[] model,PlacementCandidate candidate)
+bool PlacementWorldOriginAllowed(const char[] model,PlacementCandidate candidate,float modelScale=1.0)
 {
     if(!TR_PointOutsideWorld(candidate.origin))return true;
     // A converted model's pivot may be below its actual foot, inside the floor.
     // In that case validate a transformed bounding-box representative instead;
     // the traced surface anchor and every other placement guard still apply.
     float low[3],high[3],localCenter[3],worldCenter[3];
-    if(!PlacementModelBounds(model,low,high))return false;
+    if(!PlacementModelBounds(model,low,high,modelScale))return false;
     for(int a=0;a<3;a++)
     {
         if(!(low[a]>=-15000.0 && high[a]<=15000.0 && high[a]-low[a]>=0.01))return false;
@@ -612,7 +628,7 @@ bool ValidatePlacementCandidate(int client,const char[] model,BuildingMetadata m
     PlacementCandidate derived;derived=candidate;TransformPlacementCandidate(meta,derived);
     if(GetVectorDistance(candidate.origin,derived.origin)>0.01 || GetVectorDistance(candidate.angles,derived.angles)>0.01)
         return PlacementError(client,"BuildMenuTargetChanged",report);
-    if(!shelter && !PlacementWorldOriginAllowed(model,candidate))return PlacementError(client,"BuildInvalidWorld",report);
+    if(!shelter && !PlacementWorldOriginAllowed(model,candidate,meta.modelScale))return PlacementError(client,"BuildInvalidWorld",report);
     if(!shelter && ReservedBounds(candidate.anchor,candidate.anchor))return PlacementError(client,"BuildSpawnProtected",report);
     if(StrEqual(meta.placementMode,"wall") && FloatAbs(candidate.normal[2])>0.7)
         return PlacementError(client,"BuildInvalidSurface",report);
@@ -632,8 +648,8 @@ bool ValidatePlacementCandidate(int client,const char[] model,BuildingMetadata m
         }
         delete trace;if(!visible)return PlacementError(client,"BuildMenuTargetChanged",report);
     }
-    if(shelter && ShelterOverlapsNPC(model,candidate))return PlacementError(client,"ShelterNPCOverlap",report);
-    if(!shelter && !meta.allowOverlap && !PlacementHullClear(model,candidate.origin,candidate.angles,-1))
+    if(shelter && ShelterOverlapsNPC(model,candidate,meta.modelScale))return PlacementError(client,"ShelterNPCOverlap",report);
+    if(!shelter && !meta.allowOverlap && !PlacementHullClear(model,candidate.origin,candidate.angles,-1,meta.modelScale))
         return PlacementError(client,"BuildOverlapDenied",report);
     return true;
 }
@@ -720,7 +736,7 @@ bool RecipePlacementRules(int client,int recipe,PlacementCandidate candidate,int
 // Kept for existing test helpers. Production uses the recipe-bound metadata.
 stock bool Placement(int client,const char[] model,float origin[3],float angles[3])
 {
-    BuildingMetadata meta;strcopy(meta.placementMode,sizeof(meta.placementMode),"upright");meta.maxDistance=512.0;meta.allowOverlap=true;
+    BuildingMetadata meta;strcopy(meta.placementMode,sizeof(meta.placementMode),"upright");meta.maxDistance=512.0;meta.allowOverlap=true;meta.modelScale=1.0;
     float anchor[3];return ComputePlacement(client,model,meta,anchor,origin,angles,false);
 }
 
