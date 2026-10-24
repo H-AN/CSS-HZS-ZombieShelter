@@ -1,0 +1,38 @@
+// Windows x64 signatures for the reviewed CS:S server build only.
+// Derived from Ducheese/hzs-supporting-plugin; see package-root LICENSE.upstream-MIT.txt.
+// CHostage_Idle is read only: no detour, return patch or address write.
+"Games"
+{
+    "cstrike"
+    {
+        "Signatures"
+        {
+            "RangeJA"
+            {
+                "library"    "server"
+                "windows64"  "\x0F\x87\x2A\x2A\x2A\x2A\x83\xBF\x60\x2A\x00\x00\x00\x7E"
+            }
+            "PathLengthJA"
+            {
+                "library"    "server"
+                "windows64"  "\x0F\x87\x2A\x2A\x2A\x2A\x0F\xB6\x87\x58\x0A\x00\x00"
+            }
+            "CHostage_Idle"
+            {
+                "library"    "server"
+                "windows64"  "\x40\x53\x48\x83\xEC\x20\x48\x8D\x99\x0C\x0A\x00\x00\x4C\x8B\xC9\x8B\x13\x85\xD2\x74\x43\xB8\xFF\x1F\x00\x00\x83\xFA\xFF\x74\x03"
+            }
+        }
+        "Addresses"
+        {
+            "RangeJAAddr"
+            {
+                "signature"    "RangeJA"
+            }
+            "PathLengthJAAddr"
+            {
+                "signature"    "PathLengthJA"
+            }
+        }
+    }
+}

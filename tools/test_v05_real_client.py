@@ -20,7 +20,7 @@ import sys
 import time
 import uuid
 
-from local_server_runtime import startup_arguments
+from local_server_runtime import startup_arguments, retired_local_runner
 
 REPO = Path(__file__).resolve().parents[1]
 ISOLATED = (REPO / 'tests/runtime/v05_server').resolve()
@@ -177,6 +177,7 @@ class RCON:
 
 class RealClientSession:
     def __init__(self, options):
+        retired_local_runner()
         self.options = options
         self.server = ISOLATED
         self.client = CLIENT.resolve()
@@ -475,6 +476,7 @@ class RealClientSession:
 
 
 def main(argv=None):
+    retired_local_runner()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', default=str(REPO / 'tests/reports/v05/real_client'))
     parser.add_argument('--observe-seconds', type=float, default=30)

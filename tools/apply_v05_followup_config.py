@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import shutil
 from migrate_v05_materials import load, save
+from local_server_runtime import retired_local_runner
 
 ROOT = Path(__file__).resolve().parents[1]
 POINTS = {
@@ -23,6 +24,8 @@ def apply(target, report):
     target = target.resolve()
     allowed = (ROOT / 'addons/sourcemod/configs/HanZombieShelter',
                ROOT / 'tests/runtime/v05_server/cstrike/addons/sourcemod/configs/HanZombieShelter')
+    if target == allowed[1]:
+        retired_local_runner()
     if target not in allowed:
         raise ValueError('Only repository defaults or the fixed isolated configuration may be patched')
     if target == allowed[1] and not (ROOT / 'tests/runtime/v05_server/.shelter-v05-isolated.json').is_file():

@@ -1,6 +1,11 @@
 """Prepare a separate writable game tree; only immutable assets use hard links."""
 from pathlib import Path
 import argparse, shutil, os, json, subprocess, base64
+from local_server_runtime import retired_local_runner
+
+# Retained implementation below is historical; it must never copy defaults or
+# create another test tree after the fixed-directory migration.
+retired_local_runner()
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()

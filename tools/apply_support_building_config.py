@@ -11,6 +11,7 @@ import json
 import shutil
 
 from migrate_v05_materials import load, save
+from local_server_runtime import retired_local_runner
 
 ROOT = Path(__file__).resolve().parents[1]
 ISOLATED = ROOT / 'tests/runtime/v05_server'
@@ -19,6 +20,7 @@ NEW_FILES = ('repair_stations.cfg', 'heal_stations.cfg', 'armor_stations.cfg', '
 
 
 def apply(target: Path, report: Path):
+    retired_local_runner()
     target = target.resolve()
     if target != TARGET or not (ISOLATED / '.shelter-v05-isolated.json').is_file():
         raise ValueError('Only the marked 27139 isolated configuration is an allowed target')

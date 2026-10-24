@@ -1,26 +1,30 @@
 ﻿param(
-    [string]$ServerRoot = 'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server',
-    [int]$Port = 27129,
+    [string]$ServerRoot = 'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server\昼夜求生本地测试服务器',
+    [int]$Port = 27169,
     [string]$ListenAddress = '0.0.0.0',
     [string]$RconPassword = ''
 )
 $ErrorActionPreference = 'Stop'
-$serverPath = [IO.Path]::GetFullPath($ServerRoot)
-$executable = Join-Path $serverPath 'srcds_win64.exe'
-if (-not (Test-Path -LiteralPath $executable)) { throw "Server missing: $executable" }
-if (-not (Test-Path -LiteralPath (Join-Path $serverPath 'cstrike\cfg\zsh_codex_test.cfg'))) { throw 'Local test configuration missing' }
-if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Invalid port' }
-$parsedAddress = $null
-if (-not [Net.IPAddress]::TryParse($ListenAddress,[ref]$parsedAddress)) { throw 'ListenAddress must be an IP address' }
-if (-not $RconPassword) { $RconPassword = [Guid]::NewGuid().ToString('N') }
-if ($RconPassword -notmatch '^[A-Za-z0-9_-]{8,128}$') { throw 'Use 8-128 letters, numbers, underscore or hyphen for RCON' }
-$running = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $executable }
-if ($running) { throw 'This dedicated server is already running' }
-$secretPath = Join-Path $serverPath '.zsh-local-rcon.txt'
-[IO.File]::WriteAllText($secretPath,$RconPassword,[Text.Encoding]::ASCII)
-$arguments = @('-console','-game','cstrike','-insecure','-nohltv','-ip',$ListenAddress,'-port',$Port,
-    '+maxplayers','32','+servercfgfile','zsh_codex_test.cfg','+rcon_password',$RconPassword,
-    '+con_logfile','zsh_local_runtime.log','+map','zsh_desertplant_cso_v1_d')
-$process = Start-Process -FilePath $executable -ArgumentList $arguments -WorkingDirectory $serverPath -WindowStyle Hidden -PassThru
-Write-Output "Started test server PID $($process.Id); listen ${ListenAddress}:$Port; use the LAN address for a game client"
-Write-Output "RCON password is in $secretPath"
+$expectedRoot = 'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server\昼夜求生本地测试服务器'
+$serverPath = [IO.Path]::GetFullPath($ServerRoot).TrimEnd('\')
+if (-not $serverPath.Equals($expectedRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Local server tests may use only: $expectedRoot"
+}
+if ($Port -ne 27169) { throw 'Local server tests may use only port 27169' }
+if ($ListenAddress -ne '0.0.0.0') { throw 'The confirmed local test listener must be 0.0.0.0' }
+if ($PSBoundParameters.ContainsKey('RconPassword')) {
+    throw 'The fixed controller manages private RCON credentials; do not supply a password'
+}
+$controller = Join-Path $serverPath 'tools\server_control.py'
+if (-not (Test-Path -LiteralPath $controller -PathType Leaf)) {
+    throw "The fixed local test environment is not prepared: $controller"
+}
+$pythonPath = Join-Path $serverPath 'tools\python\python.exe'
+if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+    $pythonPath = 'D:\python\python.exe'
+}
+if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
+    throw 'The bundled Python runtime is missing; finish preparing the fixed local test environment first'
+}
+& $pythonPath -B -X utf8 $controller --start
+if ($LASTEXITCODE -ne 0) { throw 'The fixed local test server could not start; inspect its control/session.json' }

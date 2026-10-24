@@ -1,7 +1,8 @@
 from pathlib import Path
 import subprocess,socket,secrets,time,json,shutil,re,sys,os
 import struct,argparse
-from local_server_runtime import runtime_paths,startup_arguments
+from local_server_runtime import runtime_paths,startup_arguments,retired_local_runner
+from local_test_environment import TEST_ROOT, PORT as FIXED_PORT
 def packet(sock,pid,kind,s):
     data=struct.pack('<ii',pid,kind)+s.encode()+b'\0\0'
     sock.sendall(struct.pack('<i',len(data))+data)
@@ -65,16 +66,22 @@ def write_error_classification(report,errors):
     return classification
 
 parser=argparse.ArgumentParser(description='RCON tests for a prepared HZS shelter server')
-parser.add_argument('--server-root',default=str(Path(__file__).resolve().parents[1]/'tests/runtime/v05_server'))
+parser.add_argument('--server-root',default=str(TEST_ROOT))
 parser.add_argument('--report-dir',default=str(Path(__file__).resolve().parents[1]/'tests/reports/v05/runtime'))
 parser.add_argument('--integration',action='store_true',help='Requires the test-only probe compiled as HanZombieShelter.smx')
 parser.add_argument('--focused',action='store_true')
-parser.add_argument('--port',type=int,default=27139,help='Isolated test port; recording port 27129 is prohibited')
+parser.add_argument('--port',type=int,default=FIXED_PORT,help='The sole local test port is 27169; the legacy live runner is retired')
 parser.add_argument('--legacy-scenarios',action='store_true',help='Run the old map-specific mutation scenarios using a connected living real player')
 parser.add_argument('--power',action='store_true',help='Include 0.4 power, light, projectile and public API checks')
 parser.add_argument('--power-only',action='store_true',help='Run only new 0.4 engine scenarios (requires --integration --power)')
 parser.add_argument('--classify-existing',action='store_true',help='Classify the existing error-log report offline; do not launch a server')
 options=parser.parse_args()
+if options.classify_existing:
+    REPORT=Path(options.report_dir).resolve()
+    existing=json.loads((REPORT/'原生主体联合错误日志.json').read_text(encoding='utf-8-sig'))
+    classified=write_error_classification(REPORT,existing)
+    raise SystemExit(0 if classified['runtime_check_passed'] else 1)
+retired_local_runner()
 if options.legacy_scenarios and not options.integration:raise SystemExit('--legacy-scenarios requires --integration and an already connected living real client')
 CSS,STAGE,REPORT=runtime_paths(options.server_root,options.report_dir)
 PORT=options.port;SERVER_CONFIG='zsh_codex_test.cfg'
@@ -83,10 +90,6 @@ if PORT==27129:raise SystemExit('Recording port 27129 is not a test target')
 REPORT.mkdir(parents=True,exist_ok=True)
 sys_encoding='utf-8'
 sys.stdout.reconfigure(encoding='utf-8',errors='backslashreplace')
-if options.classify_existing:
-    existing=json.loads((REPORT/'原生主体联合错误日志.json').read_text(encoding='utf-8-sig'))
-    classified=write_error_classification(REPORT,existing)
-    raise SystemExit(0 if classified['runtime_check_passed'] else 1)
 runtime_root=Path(__file__).resolve().parents[1]/'tests/runtime'
 if not CSS.resolve().is_relative_to(runtime_root.resolve()):raise SystemExit('Tests may launch only an isolated tree below tests/runtime')
 if not (CSS/'.shelter-v05-isolated.json').is_file():raise SystemExit('Prepare a v0.5 isolated tree first; safety marker missing')

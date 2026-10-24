@@ -4,6 +4,7 @@ Does not reload maps, change plugin binaries, seed inventories, or touch HZS sou
 """
 from pathlib import Path
 import argparse, datetime, hashlib, json, re, shutil
+from local_server_runtime import retired_local_runner
 
 REPO = Path(__file__).resolve().parents[1]
 SERVER = Path(r'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server')
@@ -46,6 +47,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
+    if args.apply:
+        retired_local_runner()
     stamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     output = HANDOFF / '03_录制演示配置' / '生效配置'
     backup = SERVER / 'zsh_test_backup' / f'v04_demo_{stamp}'

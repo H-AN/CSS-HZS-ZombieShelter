@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-from local_server_runtime import startup_arguments
+from local_server_runtime import startup_arguments, retired_local_runner
 from migrate_v05_materials import load as load_keyvalues
 from test_v05_real_client import (CLIENT_LAN_IP, PORT, REPO, SERVER_BIND_IP,
                                   RCON, RealClientSession, a2s_info,
@@ -280,6 +280,7 @@ class ManualReviewSession(RealClientSession):
 
 
 def main(argv=None):
+    retired_local_runner()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', default=str(REPO / 'tests/reports/v05/manual_review'))
     parser.add_argument('--connect-timeout', type=float, default=180)

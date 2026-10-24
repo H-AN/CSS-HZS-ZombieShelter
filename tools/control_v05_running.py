@@ -12,9 +12,11 @@ import time
 import uuid
 
 from test_v05_real_client import CLIENT, ISOLATED, REPO, matching_processes, windows_processes
+from local_server_runtime import retired_local_runner
 
 
 def control(commands, report=None, authorized_restart=False):
+    retired_local_runner()
     for command in commands:
         if authorized_restart and command in ('quit','sm plugins unload HanZombieShelter','sm plugins unload UnmodifiedHZS'):
             continue

@@ -2,6 +2,7 @@
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 import argparse, hashlib, json, shutil, zipfile
+from local_server_runtime import retired_local_runner
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = Path(r'D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server')
@@ -11,6 +12,8 @@ REPORT = ROOT / 'tests/reports/v04'
 parser = argparse.ArgumentParser()
 parser.add_argument('--deploy', action='store_true')
 options = parser.parse_args()
+if options.deploy:
+    retired_local_runner()
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def write_json(path, data):

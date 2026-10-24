@@ -258,6 +258,7 @@ tools/local_rcon.py只连接本机27129并读服务器根.zsh-local-rcon.txt。�
     write('03_录制演示配置/恢复演示前平衡.ps1',r'''
 param()
 $ErrorActionPreference = 'Stop'
+throw 'This historical local-server restore entry is retired. Review backups only in the fixed local test environment; do not restore the old test tree.'
 $record = Get-Content -LiteralPath (Join-Path $PSScriptRoot '配置应用记录.json') -Encoding UTF8 -Raw | ConvertFrom-Json
 $demoServerRoot = [IO.Path]::GetFullPath($record.server_root)
 $demoBackupRoot = [IO.Path]::GetFullPath($record.backup)

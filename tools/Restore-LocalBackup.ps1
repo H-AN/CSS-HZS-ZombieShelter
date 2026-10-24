@@ -2,6 +2,7 @@
     [Parameter(Mandatory=$true)][string]$BackupRoot
 )
 $ErrorActionPreference = 'Stop'
+throw 'This historical local-server restore entry is retired. Use only the fixed local test environment and review its backups there; old server trees must not be restored as test targets.'
 $backupPath = [IO.Path]::GetFullPath($BackupRoot).TrimEnd('\')
 $record = Get-Content -LiteralPath (Join-Path $backupPath '备份清单.json') -Encoding UTF8 -Raw | ConvertFrom-Json
 $serverPath = [IO.Path]::GetFullPath($record.server_root).TrimEnd('\')

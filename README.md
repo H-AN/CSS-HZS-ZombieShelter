@@ -4,6 +4,16 @@
 
 # CSS-HZS-ZombieShelter
 
+## 可选引擎伴生插件
+
+依赖引擎签名的 NPC 追击距离修复独立放在 [可选插件目录](server-support/optional-plugins/README.md)，由服主选择安装，不并入 `HanZombieShelter`，也不作为主插件启动的必需前置。首个子包为 [NPC 追击距离修复](server-support/optional-plugins/npc-follow-range/README.md)，自带源码、SMX 和独立 gamedata，保留 Ducheese 与华仔 H-AN 的署名及上游许可。签名、原始指令或支持环境不匹配时，伴生插件拒绝加载；主玩法继续按原逻辑运行。BOT 修复暂缓，不随该包发布。
+
+## 唯一本地测试服务器入口（2026-10-24）
+
+本地测试环境统一放在 `D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server\昼夜求生本地测试服务器`，以后只在此目录进行本地服务端测试。插件、配置、地图和资源全部位于其下 `cstrike`；添加兼容插件时使用 `cstrike\addons\sourcemod\plugins`。通过目录内的 `启动测试服务器.cmd` 启动，程序仍使用父安装目录 `srcds_win64.exe`，并用绝对 `-game` 指向新 `cstrike`。固定地址为 `192.168.0.102:27169`。
+
+迁移和正式插件启动已完成25项核验，25通过／0失败；2026-10-24 07:47采样唯一27169沙漠服继续运行，5正式插件、0真人0BOT，本轮未启动普通客户端。启动、状态、RCON入口与证据边界见[进度11](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/11_本地测试服务器迁移与固定入口.md)。旧制作目录runtime、旧端口和下方历史脚本保留作证据与方法参考，不再作为本地测试启动位置。
+
 ## v0.8.0 玩家技能与生存目标
 
 黑夜免疫成功挡住暴露伤害时，仅给该玩家播放一次内置护甲受击音效`player/bhit_helmet-1.wav`，预缓存即可，无额外资源下载。正式部署及测试见[免疫提示音交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/08_黑夜免疫成功提示音.md)。

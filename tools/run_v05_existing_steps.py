@@ -10,6 +10,7 @@ import sys
 import time
 
 from control_v05_running import control
+from local_server_runtime import retired_local_runner
 from test_v05_real_client import (
     CLIENT, ISOLATED, RealClientSession, load_steps, matching_processes,
     validate_rcon, windows_processes,
@@ -49,6 +50,7 @@ class ExistingSession(RealClientSession):
 
 
 def main():
+    retired_local_runner()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report-dir', required=True)
     parser.add_argument('--rcon-script', required=True)

@@ -9,10 +9,11 @@ import secrets
 import subprocess
 import sys
 import time
-from local_server_runtime import startup_arguments
+from local_server_runtime import startup_arguments, retired_local_runner
 from test_v05_real_client import ISOLATED, REPO, RCON, matching_processes, windows_processes
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+retired_local_runner()
 
 report = REPO / 'tests/reports/v05/followup/patch_diagnostic'
 report.mkdir(parents=True, exist_ok=True)

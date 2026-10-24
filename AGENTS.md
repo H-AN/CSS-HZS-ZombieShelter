@@ -1,4 +1,25 @@
-## 2026-10-23 扩大器原生动画及781资源：最新接手入口
+## 2026-10-24 v0.8.1 环境与兼容交接：最新阅读入口
+
+- 先读[12 v0.8.1测试环境与外部插件兼容交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/12_v0.8.1_测试环境与外部插件兼容交接.md)。v0.8.1本轮没有新增主玩法，主SMX仍为59218基线；刀/HWS、丧尸技能和资源属于本地兼容，仓库新独立追击包尚未部署，不能把旧Local版的采样当新包运行验收。Boss点位修复、BOT修复和全图路径验收均未完成或暂缓。
+- 用户明确已主动退出服务器和普通客户端，目前只要求写文档。10:48只读核对无两个游戏进程及27169监听；不启动、不重启、不重连。09:39/10:09及下方各轮ready、PID和留服记录为历史，不能据此恢复旧局。当前证据在固定ROOT的 `reports/v081_handoff_20261024/read_only_state.json`；旧PID存活字段与实际名称/路径/监听核对不一致时，以实际核对为准。
+
+## 2026-10-24 可选引擎补丁必须外置
+
+- 用户明确要求：NPC 追击距离等依赖引擎签名的可选修复必须作为独立伴生插件，置于 `server-support/optional-plugins/`；不得并入 `HanZombieShelter` 主玩法或成为其启动必需前置。签名变化、gamedata 缺失或原指令不匹配时，伴生插件拒绝加载，不能因此使主玩法无法加载。
+- 当前子包 `npc-follow-range` 提供 `HanZombieShelterNPCFollow.sp/.smx` 与独立 `hzsh_npc_follow.gamedata.txt`，只改 2000 直线距离和 4000 路径长度两处跳转，Idle 保持原样，不使用 DHooks；保留 Ducheese 原始逆向/签名来源、华仔 H-AN 适配维护署名及上游 MIT 许可。原套件仓库、SMX、模型资源均不是此子包的运行前置。
+- 新可选包不得与本地旧 `LocalHZSContinuousFollow.smx` 或其他提供同项补丁的实现叠加。源码、说明与独立编译核验不等于新版已实际部署；本次仓库整理不改当前运行服，不重启、不切换补丁。既有本机两距离分支实测与本次包装验证分开记录，不宣称所有 NPC 路径已走通。
+- BOT 修复继续暂缓，不分发可用 SMX、不恢复 BOT/FakeClient 测试、不解除主体保护；旧 `hzsh_followrange_fix` 和 `hzs_botaddfix_guarded` 为失败试验历史，不作新发行基线。保留旧证据，不因新增可选目录而重新启用。
+
+## 2026-10-24 本地测试服务器迁移：唯一现行入口
+
+- 用户明确要求统一迁移本地测试环境，并规定以后只允许在 `D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server\昼夜求生本地测试服务器` 进行本地服务端测试。先读[进度11](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/11_本地测试服务器迁移与固定入口.md)。本节优先于下方各轮的旧目录、旧启动脚本和旧端口说明。
+- 新root下的 `cstrike` 是唯一现行游戏、插件、配置、地图与资源目录。服务端程序仍是父安装目录的 `srcds_win64.exe`，必须通过新root的 `启动测试服务器.cmd` 启动，并显式传入新 `cstrike` 的绝对 `-game` 路径。不能直接启动父安装目录默认 `cstrike`，不能再在制作计划或repo的历史runtime创建测试服。
+- 固定入口为新root的 `启动测试服务器.cmd`、`服务器状态.cmd`、`服务器命令.cmd`；三个CMD调用root内 `tools/python` 的内置Python与 `tools/server_control.py`（`--start`／`--status`／`--command '<命令>'`／`--console`）。新报告为 `reports/migration_20261024/migration_manifest.json`、`verification_summary.json` 和 `control/session.json`。迁移与正式插件启动核验25通过／0失败，以这些新报告为准，不将旧JSON的ready或PID当成新状态。
+- 2026-10-24T07:47:04+08:00采样唯一server20188／controller12892，`192.168.0.102:27169`／沙漠图，ready／kept_running／window_minimized=true；5正式插件、0真人0BOT，技能configured/effective2／override-1、当日SM错误0／动画报警0、官方停怪恢复0有回执。本轮启动前无普通客户端，也未启动客户端。5插件只是本次采样，今后用户添加兼容插件不能据此删回5个。仅文件迁移、引擎路径与正式插件启动验证，不称玩法／真人／多人回归。
+- 原 `D:\gmod昼夜求生资源\文档\制作计划\v0.7.0\preview_update\runtime\server` 及原安装目录默认 `cstrike` 只作历史备份／对照，不再作为部署或启动目标。历史01—10、旧报告、旧构建和失败证据保留。
+- 迁移沿用最新正式主SMX `59218e6e94f1df6bf12b1eb26075fee894a6d4aa05ed91b710a194bf44aa1e3f` 及既有现场配置；不整套覆盖成发行默认，不更改HZS／API／gamedata。唯一27169、零BOT／FakeClient、两项失败补丁停用、不扩修运行换图崩溃、客户端最小化／关原生页／JPEG门禁和留服约束继续有效。
+
+## 2026-10-23 扩大器原生动画及781资源：最新功能基线
 
 - 先读[进度10](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/10_扩大器原生动画模型与资源包.md)与`native_expander_update/reports/final_session.json`、`verification_summary.json`。正式主SMX `59218e6e94f1df6bf12b1eb26075fee894a6d4aa05ed91b710a194bf44aa1e3f`，48来源0错0警告，四份一致；128文件包SHA `3b1f7de8f09d956dbe4148bc3d7506443b30f091640336db7670d81d75975ebd`。
 - 用户明确反对OnGameFrame外观旋转，现Types/Config/World/Lifecycle四源仅删除旧回调、旋转队列和rotation_speed_degrees_per_second，无timer/RequestFrame替代。两扩大器新路径models/hzsh/han/build/range_expander.mdl，idle原生601帧/30fps/20秒，root底座固定、上部rotor转动；实体angles固定。旧.8实际可见尺寸与脚点烘焙，runtime model_scale1.0、offset0，删除两档旧ground/curve补偿，Downloads各6件；只有repo/live两份expanders.cfg变化。通用model_scale仍缺省1、.01..16与其他脚点规则保持；原dynamic非1 PHY限制未扩修。
@@ -82,14 +103,14 @@
 
 ## 已确认的本地测试入口：直接沿用，不再询问或重新搜索
 
-- 本地服务端：`D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server`。
+- 唯一本地服务端root：`D:\css\CS2\steamcmd\steamapps\common\Counter-Strike Source Dedicated Server\昼夜求生本地测试服务器`；游戏目录为其下 `cstrike`。启动用root的 `启动测试服务器.cmd`，程序指向父安装目录 `srcds_win64.exe`，`-game` 必须明确指向新游戏目录。旧隔离目录及旧版runner仅供查阅，后续如需复用先改为该root，不在别处启动测试服。
 - 本地 CS:S 客户端：`D:\SteamLibrary\steamapps\common\Counter-Strike Source`，执行文件 `cstrike_win64.exe`。
 - 客户端命令沿用 `cstrike_win64.exe -hijack -game cstrike +exec <本次测试cfg>`；截图沿用客户端 `jpeg`，菜单沿用实际客户端输入/menuselect。
-- 真人客户端联调沿用 `tools/Start-LocalShelter.ps1` 的网络方式：服务端监听 `0.0.0.0`，客户端连接局域网地址（当前 `192.168.0.102`）；v0.5 隔离联调为 `192.168.0.102:27139`。RCON仍可走127.0.0.1。不要将离线 runner 的127.0.0.1游戏监听直接搬来替代已有真人联调方法。
+- 真人客户端联调保持服务端监听 `0.0.0.0`，唯一地址为 `192.168.0.102:27169`；RCON仍可走127.0.0.1。仓库 `tools/Start-LocalShelter.ps1` 已委托现行root的同一控制器，`tools/local_rcon.py` 亦走该控制器。其他历史脚本不能按旧runtime或旧端口直接启动。不要将离线 runner 的127.0.0.1游戏监听直接搬来替代已有真人联调方法。
 - 服务端控制沿用 RCON。已有 `tools/local_rcon.py`、`tools/client_keyboard.py`、`tools/test_client_ui_v03.py` 是现成方法来源；先复用与改造，不再把已知路径/方法当作待确认信息。不得读取或打印既有 RCON 密码；独立 runner 内部生成的临时口令不输出。
 - 旧版测试证据继续保留，按改动补新版回归；不能说旧测试全部作废。旧 runner 的自动 BOT/假客户端部分必须先移除，不能因此否定 hijack/RCON 方法。
-- v0.5 单客户端入口：`tools/test_v05_real_client.py`，步骤文件 `tests/v05_real_client_steps.json`；服务端断言入口：`tools/test_local_server.py`。隔离服目录 `tests/runtime/v05_server`、端口 27139；27129 是录制服，保持零 BOT，不用于开发试错。
-- 用户明确要求：测试完毕交付时保留服务器和普通 Steam 客户端，供用户本人复测，不要全部关闭。自动化夹具可先清理，再用 `tools/start_v05_manual_review.py` 启动正式 SMX 的隔离复测会话并保持运行；交付后除非用户要求停止，不发送 quit、disconnect、sm_zsh_fail 或结束这些进程。交付说明给出连接地址和实际运行状态。
+- v0.5 单客户端入口 `tools/test_v05_real_client.py`、步骤 `tests/v05_real_client_steps.json` 及服务端断言 `tools/test_local_server.py` 保留为历史方法来源。旧 `tests/runtime/v05_server`／27139和27129不得重新启动；任何后续本地服务端测试只使用现行root／27169，保持零BOT。
+- 用户明确要求：测试完毕交付时保留服务器和普通 Steam 客户端，供用户本人复测，不要全部关闭。自动化夹具先清理，再通过现行root的 `启动测试服务器.cmd` 留服；交付后除非用户要求停止，不发送 quit、disconnect、sm_zsh_fail 或结束这些进程。交付说明给出连接地址和实际运行状态。
 
 先读 `docs/BOT与人质NPC引擎限制.md`，现成修复源码在
 `D:\github\git\css\hzs-supporting-plugin\addons\sourcemod\scripting\hzs_botaddfix.sp`，
