@@ -2024,6 +2024,21 @@
         "en"    "You survived the final night. Army rescue has arrived!"
         "chi"    "你们熬过了最后一夜，军队救援已抵达！"
     }
+    "BuildWorkbenchName"
+    {
+        "en"    "Crafting bench"
+        "chi"   "合成台"
+    }
+    "HUDWorkbenchUseHint"
+    {
+        "en"    "Aim here and press E to craft weapons or materials"
+        "chi"   "瞄准按 E：武器合成 / 材料合成"
+    }
+    "CraftingOpen"
+    {
+        "en"    "Open crafting menu"
+        "chi"   "打开合成菜单"
+    }
     "WatchtowerCooldown"
     {
         "en"    "Wait briefly before using tower travel again."

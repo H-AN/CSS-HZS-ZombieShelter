@@ -1,3 +1,60 @@
+## 2026-10-25 文档补全：未来地图Boss五点的阅读入口
+
+- 用户要求把本轮测试与增项、以后地图移植时寻找五个Boss点的详细流程写清。已新增[地图移植：Boss五点选址与验证指南](D:/github/git/css/CSS-HZS-ZombieShelter/docs/地图移植_Boss五点选址与验证指南.md)与[进度06总结及移植入口](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/06_本轮增项总结与Boss五点移植入口.md)，未来移植地图、准备录点或复核路线时先读。指南包含玩家操作、管理员准备、缺槽导致主玩法禁用的处理、原生数量匹配、配置候选、真实几何／追击验收、失败处理、清场和可复制任务模板。
+- 本次仅写文档及只读核对已有文件，不发送游戏命令、不读取实时游戏状态、不启停／切图／重载、不改源码、SMX、配置、BSP或冻结ZIP／随包说明。下方20:25与20:34等是前轮历史采样，不因本节发布而成为新的运行保证，也不能按其PID／库存复位。后续用户明确安排新地图实施或测试时，按新的授权推进，不能把这次文档范围当作永久禁止测试。
+- 采点助手可跨图，记录存活真人落地后的脚底origin和yaw；5／5仅为槽位齐，不等于体积／支撑／路径通过。五槽不自动生成五只Boss，原生Stage同key数量仍须精确匹配有效定义。不得把沙漠／死城坐标套给另一个BSP，用户选的平台高度先验证，不擅自压到NAV地面。
+- 现有deadcity候选生成器与批处理写死地图、Boss、基地、诊断身份和报告位置，不是通用新地图工具；未来先适配并使用独立报告。控制器目前只允许沙漠DN和死城DN，新图还需核对允许列表、BSP、Shelter地图配置与原生Stage；只使用固定ROOT／27169，不另开旧环境。全部测量仍零BOT／FakeClient，失败尝试保留，临时阵容／助手须恢复清理。
+- 本轮15／15等真实成绩、30起的Boss近战、固定120建筑伤害、休眠／全部Boss胜利和冷启动修复的证据均集中在06；离线、受控路测、实际冷启动、未测范围分开。原四份v0.8.2冻结说明与既有ZIP保留，新增指南不回写旧包。
+
+## 2026-10-25 死城五点与Boss近战：20:25正式交接历史入口
+
+- 先读[05死城／伤害交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/05_死城采点准备与Boss伤害调整.md)、[冻结新说明](D:/github/git/css/CSS-HZS-ZombieShelter/docs/v0.8.2_Boss近战成长与死城点位.md)及`tests/reports/v082_deadcity_routes_20261025/verification_summary.json`、`final_session.json`、`cold_start_runtime_verification.json`、`preservation_verification.json`（固定ROOT同名reports双存）。本节优先；下方19:22、19:46准备及更旧“当前／助手保留／未部署”等均是历史，不据此回退现场。
+- 正式主SMX `a02f00dcbe0ae4c054d83bda3b018da65ca1671ba3a9035783be5e1b67e06ae0`，52输入0错0警告，build／repo／live一致；8e007过期产物留history。仅Combat/NPC两源变，其余50保持。HZS原生配置仅boss_pangzi／boss_angela／boss_yixing的damage三叶10→30（d990005a…），20:18:37正式mapstart已读；HZS主体源码／API／gamedata／其他插件／BSP不改。Boss原生普通近战用一次性凭据按普通天数倍率，建筑120／技能原值保持；298／0仅离线VM，没有新增真人／AI逐天伤害实测。
+- 同一GetGameTime的定位回调不扣次数，原5游戏秒／50有效尝试保持。164／0包含129旧＋35新，不再相加；实际空服0真人超过30秒pending，真人连接同epoch2成功胖子50000／dormant1／attempts2，无指令创建／复活NPC，旧50耗光失败保留。
+- 死城五点原字节8625285b40f574cc5ad0787fc3acb1e1a385b48169b1fe9a2fa6e4fc03d65013保存在`server-support/map-point-updates/zsh_deadcity_han_dn/BossSpawnPoints.cfg`；正式地图686fb488fd09c51b87b4d49034d4cd1593c2ceeb1fb0ab679dd28b0bb42f5c88。交付恢复原单胖子guard_01、Stage原字节e61da159…；diag_angela／diag_yixing仅临时路测，不随包部署；点表不能跨BSP套用。
+- 死城3类型×5点15／15到至少一基地，20尝试含15成功／3停滞／2超时，固定run `f3c53c74472242a9bcafbcfd03acb81a_e2_t1792929507_l27244`。胖子全A；安哥拉P1到C其余A，P1此前A停滞46.574秒／B超时180.075；异形P2到D其余A，P2此前A停滞45.734／B超时180.075／C停滞48.975。停滞是连续30秒无16单位位移，不把场景总秒数写30或全写180。独立审计事件／连续轨迹／同基地及实际六基地3D安全盒通过、invalid raw pass0；测量server31944／779e诊断／epoch2，不是最终留服或新伤害验证。保护／控时钟／Exposure暂关等边界保留，不称自然多人战斗通过。
+- 最终回执20:25:08、游戏样本20:22:46：server13004／controller23652／原普通客户端30344，session730a60a669634e2c925510f18b034f6b，唯一192.168.0.102:27169死城服、ready／kept_running／window_minimized，28插件1真人0BOT；自然epoch3／phase1、6基地1胖子50000睡眠，基地01HP990不复位。助手全卸载删除、停怪0／JPEG已看，玩家快照god0／damage2／move2、七材料0／仅六基地；之后自然收益与用户操作不按零样本再重置。新SM错误0／动画0，历史失败与precache／性能提示不删、不称全修。
+- live265文件3改（主SMX、死城图、HZS三叶配置）／262保持，Stage原字节恢复；启动参数与10mock另有deadcity_setup审计。本次正式冷启动通过固定入口，不扩大为任意地图回归。用户此前自行changelevel成功；本轮单胖子1／1后实际换图与长期续局未重测，旧换图边界不宣称修复。不擅自启停当前服务端／客户端、回放回调、重生NPC或代启停demo；唯一ROOT／27169、零BOT／FakeClient、失败补丁停用、JPEG门禁继续有效。
+- 新包`dist/CSS-HZS-ZombieShelter-v0.8.2-boss-damage-deadcity-update.zip`为58文件／534971字节，SHA256 `89382446f7c5c691ee463637614b8fe60f9b60ab8a74b948edd15eed4f016b94`；boss_damage/package_verification.json包装65／0独立，不加玩法成绩。旧三ZIP含2c9a保持。随包新doc冻结hash `cd637c09e48cc40955f09fb542b063a8177a8abf85035c30945e44bcafb617e1`，ZIP hash只补外部进度和入口，不回写doc。
+
+## 2026-10-25 Boss路线与回合修订：19:22正式交接历史入口
+
+- 先读[04实际路线与回合交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/04_Boss点位实追击与回合规则.md)、[随包联测说明](D:/github/git/css/CSS-HZS-ZombieShelter/docs/v0.8.2_Boss点位联测与回合规则.md)、[最终汇总](D:/github/git/css/CSS-HZS-ZombieShelter/tests/reports/v082_boss_routes_20261025/verification_summary.json)与仓库`tests/reports/v082_boss_routes_20261025/final_session.json`、`victory_runtime_verification.json`、`preservation_verification.json`（固定ROOT报告同目录双存）。用户已授权选五点、实追击及回合修复；原12:54“未部署”和13:07“采点助手须保留”只对应旧时点，不能据此回退当前正式构建或重装助手。
+- 正式主SMX SHA256 `374c50f3aabef6eeac1bc7b9a5da69e76477bbfad0f48605c9aebbf2e9e00276`，52生产输入、0错0警告，build／repo／live一致；19:18:17已热重载。控制器`control/session.json`中的368诊断启动hash保留历史，以`formal_deployment.json`核对当前正式身份。正式替换后的自然新回合三条HP50000／dormant1／attempts2，19:19:43状态三只awake0／bound1／positioned_hp50000，不因旧启动hash或旧报警清空／重启当前局。
+- 三种Boss五点实追击15／15组合到至少一基地，P1／P4到A、P2／P3／P5到B；保留6次走A约180秒超时和1次未射击等候失败，不能写成所有尝试或两基地全通过。原epoch2 run `12cae4de51ca47e196d96fd33492f19f_e2_t1792924053_l174` 固定保存，后续epoch／scene重号不混算。NPC在测量中由HZS／游戏AI自己走，fixture只在准备／清理边界搬NPC，玩家回基地用生产安全传送；有保护／停时钟等诊断条件，不称完整自然战斗或多人压力通过。
+- 新引擎回合清苏醒／绑定／定位标志但保留伤害及已死进度；真人死亡后紧接epoch4和后续epoch6均确认三只重新休眠，安哥拉49999保留。Boss击杀胜利要求所有有效启用定义死亡，旧required_boss_ids忽略；默认第30天独立救援及关闭该救援的0配置保持。epoch9三次真人USP击杀native death，前两只不胜、第三只才胜；实际changelevel因既有本地崩溃被夹具拦截，只验调度，不宣称换图成功。VM244／0、288／0、129／0独立，288夹具仍一条203 unused BossSpawnHullClear warning，不混称所有编译零警告。
+- 用户原五点只叶级加入live `zsh_desert_han_dn.cfg`，10新增叶／旧叶保持，地图SHA `15acf009f11c20c52df5171d240b465721e3eb5958646605b66ce1fe9a705205`；两个铁块点Z=-1504.318725不降地。repo无DN整图配置，发行带`map_point_updates/zsh_desert_han_dn/BossSpawnPoints.cfg`独立片段，源在`server-support/map-point-updates/zsh_desert_han_dn/`，不能把五点写进desertplant或整套覆盖现场。旧其他地图候选未获本轮路线验收。
+- 最终采样2026-10-25T19:22:42.346359+08:00：server28800／controller30480／普通Steam客户端30344，`192.168.0.102:27169`，ready／kept_running／window_minimized，28插件、1真人0BOT。四助手CssBossPointCapture、CssV082BossPointCheck、CssV082UserSnapshot、hzsh_v082_close_panels均卸载删除；官方hzs_stopzombie恢复0，完整JPEG已审。玩家god0／damage2／move2，临时七材料0、仅两地图基地；用户中断后主动关服与关客户端再授权18:23重开，没有重放旧day6／7／库存／自建发电机快照。此后保留自然收益与用户操作，不按零样本再复位，也不quit／disconnect／结束进程或代启停demo。
+- 正式加载后新增SM错误0／动画0；历史错误保留，音频与客户端delta报警未宣称修复。旧产品审计repo103中5变／98保持（4inc+SMX），live266中3变／263保持（主SMX+DN地图+旧采点助手删除）；外部HZS、公共API、gamedata、其他插件、BSP及旧两个ZIP保持。新包`dist/CSS-HZS-ZombieShelter-v0.8.2-boss-routes-update.zip`为67文件／562186字节，SHA256 `2c9a82a4399f1b4e16cb10ed098d74c53b57c3c17ea0b590c57ea64e6d6c75c0`，包装核验75／0独立；随包doc冻结hash `4db83eb01515bf078f40eab13dc148db9a4b02048e114578cccd2c083495a485`，ZIP身份不回写它。唯一ROOT／27169、零BOT／FakeClient、失败补丁停用、不扩修换图崩溃、JPEG门禁继续有效。
+
+## 2026-10-25 临时Boss采点助手：13:07历史补充
+
+- 先读[03临时Boss采点指令](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/03_临时Boss采点指令.md)和[就绪回执](D:/github/git/css/CSS-HZS-ZombieShelter/tests/reports/v082_boss_spawnpoints_20261025/point_capture_ready.json)。13:07:12.086991+08:00已加载独立临时 `tests/CssBossPointCapture.smx`（SHA256 `015986dfeb916396822980e857bb39770f1880c27b85f68f9dbf3c5f803ba062`，编译0错0警告），插件列表确认29个；当时地图zsh_desert_han_dn记录0/5，服务端client0写点拒绝。没有代玩家采点或发送客户端输入。
+- 用户以存活真人ROOT管理员、关闭noclip并落地后，在聊天输入 `!bosspoint 1` 至 `!bosspoint 5`，或自己控制台 `sm_bosspoint 1` 至 `5`；`!bosspoint list`查看。存脚下origin和水平yaw，首次有效采点才生成固定ROOT `cstrike/addons/sourcemod/data/zsh_boss_points/<map>.cfg`；同编号更新，保留全量旧文件备份和失败pending。助手不创建/移动NPC，不修改地图配置；五点记录不代表大Boss空间/通路验收。
+- **暂时保留采点助手供用户录点，不能按旧夹具清场卸载。** 录齐通知后直接读文件检查，完成采点后再卸载助手且保留记录备份。主插件仍live3920、未重载，新a318点池代码仍未启用；不自动替用户选点或改当前局。本阶段已执行助手加载/列表/拒绝检查命令，下方12:54“无游戏命令、265文件不变”只对当时核对成立，不能扩为本次所有阶段。当前局内阶段/天数/Boss/库存/错误数本轮未重新采样；冻结随包说明和两ZIP保持。
+
+## 2026-10-25 v0.8.2 Boss坐标点补充：最新入口，未启用live
+
+- 先读[02补充交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/02_Boss坐标点池与循环分配.md)、[Boss坐标点说明](D:/github/git/css/CSS-HZS-ZombieShelter/docs/v0.8.2_Boss坐标点配置.md)及仓库`tests/reports/v082_boss_spawnpoints_20261025/verification_summary.json`、`final_session.json`（固定ROOT的reports同目录有副本）。功能代码、离线验证与修订包已完成，但用户明确下一步才选新的五个位置；当前只迁移旧坐标及重复占位，不能称五点安全、点位已修复或新构建已运行。
+- 新正式SMX SHA256为`a31813761234a5f87d1248fecb5394ae460c0a603a8c7ad41705eda83cd7629e`，52生产输入、0错误0警告，build／repo／新包一致；live主SMX仍为`3920d6fcc9a5f4a490255153dd91a044ce532f637c3c6b066c050945d2dcfab1`，本轮没有部署、热重载或切换当前局。新增BossSpawns.inc、BossBridge.inc；公共API、外部HZS与BSP不改。
+- `BossSpawnPoints`必须boss1..boss5，origin为三个有限数且各在±15000，angles可选默认0 0 0、填写时各在±360。按有效启用Boss条目配置顺序循环；>5允许共享点，每个ID独立状态。新代码完全忽略旧marker／info_target且无fallback；旧叶与live标记插件仍保留。原生Stage同key数量必须与有效Boss定义数量精确相等，增加／禁用定义需同步Stage；位置循环不会创建或复活NPC，原生CSV及共同NPC预算继续约束数量。
+- 生产函数VM最终274／0，包含7真候选及3份live Stage读入，8份生产源码快照匹配。VM夹具有一条203 unused BossSpawnHullClear warning，不能称所有夹具零警告；使用显式native替身，不代表真实碰撞、同点显示、寻路或运行生成已通过。迁移工具16／0，七候选7／7，各自范围分别记录，不与前轮合成台147／0、75／0或20／0相加。
+- 2026-10-25 12:54:46.862422 +08:00最新只读样本仅确认原server5492／普通client13940进程保留及live3920文件身份；本轮无RCON／游戏操作，无重载／移动／新位置选择。当前局内阶段、天数、Boss、库存和错误数均未采样；旧11:41／11:43的phase1／phase0、Boss绑定及3／4条报警只属历史，不得沿用成当前状态，也不能为校准到旧快照回放回调、重生NPC、换图、重启或清库存。继续保留用户服务端与普通客户端。
+- live审计265文件SHA全部不变；repo原101文件中7项批准变化、94项保持。repo仅原地图cfg加入五槽；其他地图候选在`tests/reports/v082_boss_spawnpoints_20261025/candidate_maps/local/`、`release/`及`repo/`，保持现场三Boss与发行单Boss各自旧定义。不要整份互相覆盖，不写固定ROOT／地图成品／旧交付；迁移工具拒绝原地覆盖及固定ROOT输出，已有点表保留／拒绝，叶级diff及来源hash均有报告。
+- 修订包`dist/CSS-HZS-ZombieShelter-v0.8.2-boss-spawnpoints-update.zip`为65文件／552785字节，SHA256`b9760a928398d7f5d8530d22b84ca01253aba117e0ed6a8b0994517dfdc66b4b`。逐成员／字节／CRC核验通过，无另编N项总数；随包两脚本独立导入／help通过。旧crafting包及冻结说明保留，新Boss说明也已冻结，ZIP自身hash只写外部进度与入口，不回写随包doc。
+- 下一步按用户安排选择五个新位置后再验证／应用，本轮不自动部署。唯一ROOT／27169、零BOT／FakeClient、失败补丁停用、不扩修运行换图崩溃、不代启停demo、普通客户端JPEG门禁和保护当前自然局面约束继续有效。下面合成台及更旧节保留历史，其中“当前／最新”仅指当时采样，不代表本次未采样的局内状态。
+
+## 2026-10-25 v0.8.2 合成台与武器材料合成：前轮阅读入口
+
+- 先读[v0.8.2进度README](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/README.md)、[01合成台交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/01_合成台与武器材料合成.md)和[配置说明](D:/github/git/css/CSS-HZS-ZombieShelter/docs/v0.8.2_合成台配置说明.md)。本轮用户已明确授权实施、部署与普通客户端联测，旧v0.8.1“仅文档、双方进程已退出”是上一轮历史，不能据此关闭当前进程或复建旧局。
+- 新“合成台”用内置`models/props/de_piranesi/pi_sundial.mdl`，生产合法放置偏移`0 0 0.5`（引擎minZ=-.28125）；仅近距瞄准已完工台按E进入武器／材料合成与管理升级，不加基地／快捷菜单入口，不接B购买、不改mp_buytime。独立3cfg，Types组名精确匹配武器显式台名；省略绑定第一个可用类型，required_level缺省1。材料配方所有台型／等级通用但仍需正常供电，只扣个人背包，容量不足整次拒绝。
+- 最终合成台为十级、HP500→1400、需求50＋每级30→320，一基地组限1，建造木50铁20铜5。基础斧头合成费仅木50铁20；十刀实际HWS命令接入，apexshuangren为sm_shuangren；仅十刀修建／维修HP乘十，采集倍率、HWS攻击／动画／音效不动，密客刀继续禁用。command只接受单个无参数已注册命令名，不把它当命令链。HWS负责实体与切换，不以slot2新实体宣称自动装备。
+- 正式主SMX SHA256为`3920d6fcc9a5f4a490255153dd91a044ce532f637c3c6b066c050945d2dcfab1`，50生产输入、0警告，build／repo／live／包身份已核对。固定ROOT的`reports/v082_crafting_20261025/formal_hotload.json`记录同进程正式热重载；控制器session.json保留启动诊断hash历史，用热替换回执核对当前正式身份，不改历史控制记录。只回放过一次既有HZS轮的Han_OnGameStart使Shelter新会话day1，无重启／换图／玩家或NPC重生，不能称自然生命周期验收，也不能再次自动回放来复位。
+- 最新只读样本是`reports/v082_crafting_20261025/retained_state_latest.json`（仓库tests/reports同目录有副本）：2026-10-25 11:43:30 +08:00，server5492／controller5868／普通client13940、userid3，唯一0.0.0.0:27169／192.168.0.102:27169，1真人0BOT、28插件，ready1／phase0等待、day1／epoch6／tracked0／boss bound0。11:41:16的final_session.json是phase1／3条Boss缺失报警的历史快照；自然续跑新增Boss03实际Hull不适配目标、保持停车，最新错误总4（3missing＋1hull）。不得写SM错误0、当前phase1或全玩法通过，不擅自复活NPC／换图／重启／修Boss点位来消除报警。PID与状态都只是采样，后续先只读核对名称、路径、监听和自然变化。
+- 分项证据为离线生产函数VM147／0、刀配置静态86／0、最终功耗静态59／0；带电业务73加清场2为嵌套累计75／0（不可重复相加），包含诊断状态与真实引擎生产函数，非75项纯真人操作。十刀真实客户端短按施工／维修另20／0。旧零耗电UI材料／斧头及九次升级、25／1菜单过期失败、旧搜索／工具错误继续保留历史，不继承为最终功耗或多人验收。最终汇总verification_summary.json及final_session.json均已生成；最新状态以上述retained_state_latest为准。
+- 清场恢复七材料原0、精确删除自建台和发电机、白名单25件测试工具清理恢复普通刀、god0／takedamage2／move2；两助手卸载删除，官方hzs_stopzombie0有回执，最终完整JPEG已实际审阅无遮挡。之后自然收益、库存和用户操作不得再按零快照重置。保留唯一服务端与普通客户端，不quit／disconnect／sm_zsh_fail，不代启停demo，不按旧5插件清单删除外部兼容插件。
+- 增量包`dist/CSS-HZS-ZombieShelter-v0.8.2-crafting-update.zip`为59文件／539301字节，SHA256`a9c3f549e2ba72cf452be59e5399582e516b7a451a832174257f4ae0818247eb`，package_verification.json为66／0（不追加为玩法成绩）。随包配置说明冻结hash`02f3d4f53f72aa0d18390c54ff9e40fa5e790ec9e3197ecfdd6571f1fb0d6ac2`；ZIP自身hash不回写随包doc。原HZS／API／gamedata和其他外部插件边界保持，Local连续追击旧版保留，不切新可选包；零BOT／FakeClient、失败补丁停用、唯一ROOT和27169、JPEG门禁、换图／Boss点位暂缓继续有效。
+
 ## 2026-10-24 v0.8.1 环境与兼容交接：最新阅读入口
 
 - 先读[12 v0.8.1测试环境与外部插件兼容交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/12_v0.8.1_测试环境与外部插件兼容交接.md)。v0.8.1本轮没有新增主玩法，主SMX仍为59218基线；刀/HWS、丧尸技能和资源属于本地兼容，仓库新独立追击包尚未部署，不能把旧Local版的采样当新包运行验收。Boss点位修复、BOT修复和全图路径验收均未完成或暂缓。

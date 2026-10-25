@@ -1,9 +1,10 @@
-#define SHELTER_VERSION "0.8.0"
+#define SHELTER_VERSION "0.8.2"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
 #define MAX_CORES 8
-#define MAX_BOSSES 8
+#define MAX_BOSSES MAX_NPCS // Boss definitions share the actual NPC tracking budget; five points are not a count cap.
+#define BOSS_SPAWN_POINT_COUNT 5
 #define MAX_BOXES 8
 #define MAX_POINTS 32
 #define MAX_RECIPES 256 // Configuration catalogue, independent of live building capacity.
@@ -14,9 +15,11 @@ enum Phase { Phase_Waiting, Phase_Day, Phase_Night, Phase_Ending }
 // Ordered so a Boss completion wins over rescue in the same outcome batch.
 enum VictoryReason { Victory_None, Victory_Rescue, Victory_Bosses }
 enum BuildingKind { Kind_Base, Kind_Turret, Kind_Flame, Kind_Fence, Kind_Mine, Kind_Amplifier, Kind_Generator, Kind_Light, Kind_Grenade, Kind_Expander,
-    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire, Kind_Tesla, Kind_Plasma, Kind_Watchtower }
+    Kind_AutoRepair, Kind_Heal, Kind_Armor, Kind_Beacon, Kind_Campfire, Kind_Tesla, Kind_Plasma, Kind_Watchtower,
+    Kind_Workbench=19 } // 18 remains the existing mortar build-menu category.
 enum ConfigFile { C_Mode, C_Lifecycle, C_Resources, C_Zombies, C_Days, C_Bosses, C_Bases, C_Turrets, C_Flames, C_Fences, C_Mines, C_Drops, C_Map, C_Sounds, C_Amplifiers, C_Progression, C_Entities, C_Management, C_Power, C_Generators, C_Lights, C_Grenades, C_Expanders, C_Materials, C_ZombieDrops,
-    C_Repair, C_Heal, C_Armor, C_Beacons, C_Campfires, C_Shelters, C_Tesla, C_Plasma, C_Watchtowers, C_Count }
+    C_Repair, C_Heal, C_Armor, C_Beacons, C_Campfires, C_Shelters, C_Tesla, C_Plasma, C_Watchtowers,
+    C_Workbenches, C_WeaponCrafting, C_MaterialCrafting, C_Count }
 
 // Reward identity is independent of the living client required by the HZS
 // damage API. Delayed hits retain this snapshot after a facility is removed.
@@ -83,7 +86,7 @@ enum struct BossDef
     char id[64];
     char publicName[64];
     char key[64];
-    char marker[64];
+    int spawnPoint; // Zero-based index in the map's five configured BossSpawnPoints.
     char idle[64];
     char attack[64];
     float origin[3];

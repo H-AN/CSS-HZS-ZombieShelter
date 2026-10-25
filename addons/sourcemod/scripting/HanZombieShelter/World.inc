@@ -727,7 +727,8 @@ bool RecipePlacementRules(int client,int recipe,PlacementCandidate candidate,int
     if(IsBaseSupportKind(gRecipes[recipe].kind))
     {
         int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
-        int count=gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind);
+        int count=gRecipes[recipe].kind==Kind_Workbench ? WorkbenchCount(buildCore)
+            : (gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind));
         if(limit<1 || count>=limit){if(report)Tell(client,"%t","BuildSupportGroupLimitReached",count,limit);return false;}
     }
     return true;
@@ -789,7 +790,8 @@ bool BuildRecipeCandidateTransaction(int client,int recipe,int expectedCore,Plac
     if(IsBaseSupportKind(gRecipes[recipe].kind))
     {
         int limit=SupportBuildLimit(gRecipes[recipe].file,gRecipes[recipe].type,1);
-        int count=gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind);
+        int count=gRecipes[recipe].kind==Kind_Workbench ? WorkbenchCount(buildCore)
+            : (gRecipes[recipe].kind==Kind_Beacon ? BeaconCount(buildCore) : RestorationCount(buildCore,gRecipes[recipe].kind));
         if(limit<1 || count>=limit){Tell(client,"%t","BuildSupportGroupLimitReached",count,limit);return false;}
     }
     if(!CheckConstructionBudget(client))return false;

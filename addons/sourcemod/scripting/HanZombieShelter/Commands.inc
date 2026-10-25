@@ -1,6 +1,6 @@
 static const char sBuildCategoryPhrases[][]={"BuildShelterName","HUDTurretName","HUDFlameName","BuildStructureName","HUDMineName",
     "HUDAmplifierName","HUDGeneratorName","HUDLightName","HUDGrenadeName","BuildExpanderName",
-    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName","BuildCampfireName","BuildTeslaName","BuildPlasmaName","BuildWatchtowerName","BuildMortarName"};
+    "BuildAutoRepairName","BuildHealName","BuildArmorName","BuildBeaconName","BuildCampfireName","BuildTeslaName","BuildPlasmaName","BuildWatchtowerName","BuildMortarName","BuildWorkbenchName"};
 #define BUILD_CATEGORY_MORTAR view_as<BuildingKind>(18)
 enum BuildMenuGroup { BuildGroup_Shelter, BuildGroup_Autonomous, BuildGroup_Restoration, BuildGroup_BaseFacilities,
     BuildGroup_Lighting, BuildGroup_Defenses, BuildGroup_Campfire, BuildGroup_Count }
@@ -8,7 +8,7 @@ enum BuildMenuView { BuildView_Closed, BuildView_Root, BuildView_Group, BuildVie
 static const char sBuildGroupPhrases[][]={"BuildShelterName","BuildGroupAutonomous","BuildGroupRestoration","BuildGroupBaseFacilities",
     "BuildGroupLighting","BuildGroupDefenses","BuildCampfireName"};
 static const BuildingKind sBuildCategoryOrder[]={Kind_Base,Kind_Turret,Kind_Flame,Kind_Grenade,BUILD_CATEGORY_MORTAR,Kind_Tesla,Kind_Plasma,Kind_Heal,Kind_AutoRepair,Kind_Armor,
-    Kind_Expander,Kind_Beacon,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Fence,Kind_Mine,Kind_Watchtower,Kind_Campfire};
+    Kind_Expander,Kind_Beacon,Kind_Workbench,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Fence,Kind_Mine,Kind_Watchtower,Kind_Campfire};
 int gBuildMenuNonce[MAXPLAYERS+1],gBuildMenuEpoch[MAXPLAYERS+1],gBuildMenuSerial[MAXPLAYERS+1],gBuildMenuRevision[MAXPLAYERS+1];
 BuildMenuGroup gBuildMenuGroup[MAXPLAYERS+1];
 BuildMenuView gBuildMenuView[MAXPLAYERS+1];
@@ -33,7 +33,7 @@ BuildMenuGroup BuildGroupForKind(BuildingKind kind)
         case Kind_Base:return BuildGroup_Shelter;
         case Kind_Turret,Kind_Flame,Kind_Grenade,BUILD_CATEGORY_MORTAR,Kind_Tesla,Kind_Plasma:return BuildGroup_Autonomous;
         case Kind_Heal,Kind_AutoRepair,Kind_Armor:return BuildGroup_Restoration;
-        case Kind_Expander,Kind_Beacon,Kind_Amplifier,Kind_Generator:return BuildGroup_BaseFacilities;
+        case Kind_Expander,Kind_Beacon,Kind_Workbench,Kind_Amplifier,Kind_Generator:return BuildGroup_BaseFacilities;
         case Kind_Light:return BuildGroup_Lighting;
         case Kind_Fence,Kind_Mine,Kind_Watchtower:return BuildGroup_Defenses;
         case Kind_Campfire:return BuildGroup_Campfire;
@@ -194,12 +194,13 @@ void AddRecipeStat(Menu menu,int client,const char[] phrase,float value)
 
 bool SupportMenuKind(BuildingKind kind)
 {
-    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon;
+    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon || kind==Kind_Workbench;
 }
 
 int SupportMenuCount(int core,BuildingKind kind)
 {
     if(core<0 || core>=gCoreCount || !SupportMenuKind(kind))return 0;
+    if(kind==Kind_Workbench)return WorkbenchCount(core);
     return kind==Kind_Beacon ? BeaconCount(core,-1) : RestorationCount(core,kind,-1);
 }
 
@@ -262,7 +263,7 @@ void AddProfileLevelItems(Menu menu,int client,ConfigFile file,BuildingKind kind
     {
         char type[64];if(StrContains(profile,"Types/")==0)strcopy(type,sizeof(type),profile[6]);
         AddRecipeStat(menu,client,"BuildStatMaxPerBase",float(SupportBuildLimit(file,type,level)));
-        if(kind!=Kind_Beacon)
+        if(kind!=Kind_Beacon && kind!=Kind_Workbench)
         {
             ReadLevelFloat(file,profile,level,"restore_interval_seconds",20.0,value);if(value<1.0)value=1.0;
             AddRecipeStat(menu,client,"BuildStatRestoreInterval",value);
@@ -489,6 +490,8 @@ public Action StatusCommand(int client,int args)
         gPowerEnabled,gPowerOverloadPenalty,gPowerOverloadCvar==null ? -1 : gPowerOverloadCvar.IntValue,PowerOverloadPenaltyEnabled());
     for(int i=0;i<gCoreCount;i++){int b=gCores[i].building;if(b>=0)ReplyToCommand(client,"%T","CmdStatusBase",client,gCores[i].id,gBuildings[b].level,gBuildings[b].hp,gBuildings[b].maxHP,gBuildings[b].alive,gBuildings[b].ref);}
     for(int i=0;i<gBossCount;i++)ReplyToCommand(client,"%T","CmdStatusBoss",client,gBosses[i].id,gBosses[i].savedHP,gBosses[i].awakened,gBosses[i].defeated,gBosses[i].boundThisRound,gBosses[i].positionedHP);
+    for(int i=0;i<gBossCount;i++)ReplyToCommand(client,"[ShelterBossSpawn] %s point=boss%d origin=%.3f %.3f %.3f angles=%.1f %.1f %.1f",
+        gBosses[i].id,gBosses[i].spawnPoint+1,gBosses[i].origin[0],gBosses[i].origin[1],gBosses[i].origin[2],gBosses[i].angles[0],gBosses[i].angles[1],gBosses[i].angles[2]);
     for(int c=0;c<gCoreCount;c++)ReplyToCommand(client,"%T","CmdPowerStatus",client,gCores[c].id,gGridProduction[c],gGridDemand[c],gGridAllocated[c],gGridOffline[c]);
     return Plugin_Handled;
 }
@@ -563,11 +566,13 @@ void ResetAllQuickMenus()
 public void QuickMenuRoundReset(Event event,const char[] name,bool dontBroadcast)
 {
     ResetAllQuickMenus();
+    ResetAllCraftingMenus();
 }
 
 public void QuickMenuPlayerReset(Event event,const char[] name,bool dontBroadcast)
 {
-    ResetQuickMenu(GetClientOfUserId(event.GetInt("userid")));
+    int client=GetClientOfUserId(event.GetInt("userid"));
+    ResetQuickMenu(client);ResetCraftingMenu(client);
 }
 
 bool QuickMenuAvailable(int client)
@@ -667,6 +672,10 @@ public Action OnPlayerRunCmd(int client,int &buttons,int &impulse,float vel[3],f
     if(b>=0 && gBuildings[b].kind==Kind_Beacon)
     {
         gNextUse[client]=GetGameTime()+gUseCooldown;ShowBeaconMenu(client,b);return Plugin_Continue;
+    }
+    if(b>=0 && gBuildings[b].kind==Kind_Workbench)
+    {
+        gNextUse[client]=GetGameTime()+gUseCooldown;ShowCraftingMenu(client,b);return Plugin_Continue;
     }
     if(b>=0 && gBuildings[b].kind!=Kind_Base)
     {
@@ -770,7 +779,7 @@ bool ValidateDefenseMenuToken(int client,const char[] token,int &building,int &o
     if(!DefenseMenuBuildingAvailable(client,building) || (requireAim && !(FenceRotationContinuationOperation(operation)
         ? FenceRotationInRange(client,building) : BuildingInUseRange(client,building)))
         || gBuildings[building].uid!=values[4] || gBuildings[building].generation!=values[7]
-        || gBuildings[building].level!=values[5] || gBuildings[building].ref!=values[9] || operation<0 || operation>20)return false;
+        || gBuildings[building].level!=values[5] || gBuildings[building].ref!=values[9] || operation<0 || operation>21)return false;
     if((operation==2 || operation==3 || operation==4) && !CanManageBuilding(client,building))return false;
     if(operation==5 && !IsShelterAdmin(client))return false;
     if(((operation>=6 && operation<=11) || (operation>=13 && operation<=15))
@@ -779,6 +788,7 @@ bool ValidateDefenseMenuToken(int client,const char[] token,int &building,int &o
     if(operation==16 && (gBuildings[building].kind!=Kind_Beacon || IsFakeClient(client)))return false;
     if((operation==17 || operation==18) && (gBuildings[building].kind!=Kind_Watchtower || !WatchtowerActor(client)))return false;
     if((operation==19 || operation==20) && !CanSetBuildingLightManualState(client,building,operation==19))return false;
+    if(operation==21 && gBuildings[building].kind!=Kind_Workbench)return false;
     gDefenseMenuNonce[client]++;return true;
 }
 
@@ -916,6 +926,7 @@ void ShowDefenseMenu(int client,int building,bool rotationContinuation=false)
     Menu menu=new Menu(DefenseMenuHandler);menu.SetTitle("%s",title);
     int cost[MATERIALS],nextHP;bool upgrade=ReadBaseUpgrade(building,cost,nextHP);
     AddDefenseMenuItem(menu,client,building,1,upgrade ? "DefenseUpgradeView" : "DefenseUpgradeUnavailable",upgrade);
+    if(gBuildings[building].kind==Kind_Workbench)AddDefenseMenuItem(menu,client,building,21,"CraftingOpen");
     if(gBuildings[building].kind==Kind_Light && BuildingOperational(building))
     {
         bool manualOff=!gBuildings[building].lightManualOff;
@@ -1019,6 +1030,7 @@ public int DefenseMenuHandler(Menu menu,MenuAction action,int client,int item)
             case 14: ShowFenceRotationMenu(client,building,0);
             case 15: ShowFenceRotationMenu(client,building,1);
             case 16: ShowBeaconMenu(client,building);
+            case 21: ShowCraftingMenu(client,building);
             case 17,18:
             {
                 ResetDefenseMenuClient(client);

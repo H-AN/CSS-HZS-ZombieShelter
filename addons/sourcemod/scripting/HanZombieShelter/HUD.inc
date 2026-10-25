@@ -40,6 +40,7 @@ void BuildingDisplayName(int building,char[] name,int length,int client=LANG_SER
         case Kind_Tesla: strcopy(name,length,"Tesla Coil");
         case Kind_Plasma: strcopy(name,length,"Ion Cannon");
         case Kind_Watchtower: strcopy(name,length,"Watchtower");
+        case Kind_Workbench: TranslateLabel(client,"BuildWorkbenchName",name,length);
     }
 }
 
@@ -61,7 +62,8 @@ void HudBuildingTarget(int client,int building)
 {
     char name[64],action[128];BuildingDisplayName(building,name,sizeof(name),client);
     TranslateLabel(client,gBuildings[building].kind==Kind_Base ? "HUDBaseUseHint" :
-        (gBuildings[building].kind==Kind_Beacon ? "HUDBeaconUseHint" : "HUDDefenseUseHint"),action,sizeof(action));
+        (gBuildings[building].kind==Kind_Beacon ? "HUDBeaconUseHint" :
+            (gBuildings[building].kind==Kind_Workbench ? "HUDWorkbenchUseHint" : "HUDDefenseUseHint")),action,sizeof(action));
     SetHudTextParams(-1.0,0.54,0.4,225,245,255,255,0,0.0,0.0,0.1);
     char text[512];
     if(gBuildings[building].constructing)
@@ -95,7 +97,7 @@ void HudBuildingTarget(int client,int building)
             CampfireActive(building) ? "燃烧中" : "燃料耗尽",CampfireFuelWoodCost(building),CampfireFuelPerWood(building));
         StrCat(text,sizeof(text),line);
     }
-    if(SupportMenuKind(kind) && kind!=Kind_Beacon)
+    if(SupportMenuKind(kind) && kind!=Kind_Beacon && kind!=Kind_Workbench)
     {
         float interval=gBuildings[building].restoreInterval;if(interval<1.0)interval=1.0;
         Format(line,sizeof(line),"%T",kind==Kind_AutoRepair ? "HUDRepairEffectCompact" : (kind==Kind_Heal ? "HUDHealEffectCompact" : "HUDArmorEffectCompact"),

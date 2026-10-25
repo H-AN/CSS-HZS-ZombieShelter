@@ -1,5 +1,5 @@
-static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg","repair_stations.cfg","heal_stations.cfg","armor_stations.cfg","beacons.cfg","campfires.cfg","shelters.cfg","tesla_coils.cfg","plasma_turrets.cfg","watchtowers.cfg"};
-static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops","ShelterRepairStations","ShelterHealStations","ShelterArmorStations","ShelterBeacons","ShelterCampfires","ShelterShelters","ShelterTeslaCoils","ShelterPlasmaTurrets","ShelterWatchtowers"};
+static const char sFiles[][]={"mode.cfg","lifecycle.cfg","resources.cfg","zombies.cfg","days.cfg","bosses.cfg","bases.cfg","turrets.cfg","flame_turrets.cfg","fences.cfg","mines.cfg","drops.cfg","maps/{map}.cfg","sounds.cfg","amplifiers.cfg","progression.cfg","entities.cfg","management.cfg","power.cfg","generators.cfg","lights.cfg","grenade_turrets.cfg","expanders.cfg","materials.cfg","zombie_drops.cfg","repair_stations.cfg","heal_stations.cfg","armor_stations.cfg","beacons.cfg","campfires.cfg","shelters.cfg","tesla_coils.cfg","plasma_turrets.cfg","watchtowers.cfg","workbenches.cfg","weapon_crafting.cfg","material_crafting.cfg"};
+static const char sRoots[][]={"ShelterMode","ShelterLifecycle","ShelterResources","ShelterZombies","ShelterDays","ShelterBosses","ShelterBases","ShelterTurrets","ShelterFlameTurrets","ShelterFences","ShelterMines","ShelterDrops","ShelterMap","ShelterSounds","ShelterAmplifiers","ShelterProgression","ShelterEntities","ShelterManagement","ShelterPower","ShelterGenerators","ShelterLights","ShelterGrenadeTurrets","ShelterExpanders","ShelterMaterials","ShelterZombieDrops","ShelterRepairStations","ShelterHealStations","ShelterArmorStations","ShelterBeacons","ShelterCampfires","ShelterShelters","ShelterTeslaCoils","ShelterPlasmaTurrets","ShelterWatchtowers","ShelterWorkbenches","ShelterWeaponCrafting","ShelterMaterialCrafting"};
 
 bool Node(ConfigFile file, const char[] path)
 {
@@ -57,6 +57,8 @@ bool LoadConfigs()
             if(i>=view_as<int>(C_Repair) && !FileExists(path))
             {delete gCfg[i];gCfg[i]=null;continue;} // New optional categories do not disable an older installation.
             if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops.cfg missing/invalid: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
+            if(i==view_as<int>(C_WeaponCrafting) || i==view_as<int>(C_MaterialCrafting))
+            {LogError("[Shelter] Invalid optional crafting table %s: this table is disabled",sFiles[i]);delete gCfg[i];gCfg[i]=null;continue;}
             return ConfigFailure(path);
         }
         char root[64];gCfg[i].GetSectionName(root,sizeof(root));
@@ -65,10 +67,12 @@ bool LoadConfigs()
         bool buildingSchema=i==view_as<int>(C_Bases) || i==view_as<int>(C_Turrets) || i==view_as<int>(C_Flames)
             || i==view_as<int>(C_Fences) || i==view_as<int>(C_Mines) || i==view_as<int>(C_Amplifiers)
             || i==view_as<int>(C_Generators) || i==view_as<int>(C_Lights) || i==view_as<int>(C_Grenades) || i==view_as<int>(C_Expanders)
-            || i>=view_as<int>(C_Repair);
+            || (i>=view_as<int>(C_Repair) && i<=view_as<int>(C_Workbenches));
         if(!StrEqual(root,sRoots[i]) || (actualSchema!=schema && !(buildingSchema && actualSchema==2)))
         {
             if(i==view_as<int>(C_ZombieDrops)){LogMessage("[Shelter] WARNING zombie_drops root/schema mismatch: kill rewards disabled");delete gCfg[i];gCfg[i]=null;continue;}
+            if(i==view_as<int>(C_WeaponCrafting) || i==view_as<int>(C_MaterialCrafting))
+            {LogError("[Shelter] Optional crafting table %s root/schema mismatch: this table is disabled",sFiles[i]);delete gCfg[i];gCfg[i]=null;continue;}
             return ConfigFailure("root/schema_version mismatch");
         }
     }
@@ -93,8 +97,8 @@ bool LoadConfigs()
     gCfg[C_Zombies].GetVector("parking_origin",gParking);
     if(gDaySeconds<1.0 || gNightSeconds<1.0 || gExposureInterval<0.1 || gExposureDamage<0
         || gUseDistance<16.0 || gUseDistance>512.0 || gUseCooldown<0.1 || gGatherCooldown<0.1
-        || gPopulationLimit<1 || gPopulationLimit>(MAX_NPCS-MAX_BOSSES)/2 || gNativePoolSize<gPopulationLimit
-        || gNativePoolSize>(MAX_NPCS-MAX_BOSSES)/2
+        || gPopulationLimit<1 || gPopulationLimit>MAX_NPCS/2 || gNativePoolSize<gPopulationLimit
+        || gNativePoolSize>MAX_NPCS/2 // ValidateNativeBridge accounts for the actual custom/Boss population below.
         || gInventoryCap<0)return ConfigFailure("invalid time/range/entity limits");
     for(int axis=0;axis<3;axis++)if(FloatAbs(gParking[axis])>15000.0)return ConfigFailure("parking must remain inside engine +/-15000 bounds");
     if(FloatAbs(gParking[0])<8000.0 && FloatAbs(gParking[1])<8000.0)return ConfigFailure("parking point must be outside playable area");
@@ -119,7 +123,7 @@ bool LoadConfigs()
         && ValidateLevelProfiles() && ReadRecipes() && LoadProgression()
         && LoadManagementSettings() && LoadEntitySettings() && LoadPowerSettings() && LoadSupportSettings()
         && LoadBeaconSettings() && LoadCampfireSettings() && LoadShelterSettings()
-        && LoadExpansionSettings() && LoadWatchtowerSettings()
+        && LoadExpansionSettings() && LoadWatchtowerSettings() && LoadCraftingConfig()
         && ValidateDayRanges() && ValidateNativeBridge() && LoadRepairWeapons();
     if(!valid)return false;
     ReadZombieDrops();
@@ -141,17 +145,17 @@ bool ValidResourceGrowth(float hold,float grow,float scale)
 
 bool IsBaseSupportKind(BuildingKind kind)
 {
-    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon;
+    return kind==Kind_AutoRepair || kind==Kind_Heal || kind==Kind_Armor || kind==Kind_Beacon || kind==Kind_Workbench;
 }
 
 bool LoadSupportSettings()
 {
-    ConfigFile files[]={C_Repair,C_Heal,C_Armor,C_Beacons};
+    ConfigFile files[]={C_Repair,C_Heal,C_Armor,C_Beacons,C_Workbenches};
     for(int f=0;f<sizeof(files);f++)
     {
         if(gCfg[files[f]]==null)continue;
         int limit;bool found;
-        if(!StoredLevelInt(files[f],"Limits","max_per_base",files[f]==C_Beacons ? 1 : 2,limit,found)
+        if(!StoredLevelInt(files[f],"Limits","max_per_base",files[f]==C_Beacons || files[f]==C_Workbenches ? 1 : 2,limit,found)
             || limit<1 || limit>MAX_BUILDINGS)return ConfigFailure("support group max_per_base must be 1..1024");
     }
     return true;
@@ -160,10 +164,34 @@ bool LoadSupportSettings()
 int SupportBuildLimit(ConfigFile file,const char[] type,int level)
 {
     if(file==C_Beacons)return 1; // One logical beacon per base, across every variant.
-    if(file!=C_Repair && file!=C_Heal && file!=C_Armor)return 0;
-    int group=Number(file,"Limits","max_per_base",2),limit;char profile[128];Format(profile,sizeof(profile),"Types/%s",type);
+    if(file!=C_Repair && file!=C_Heal && file!=C_Armor && file!=C_Workbenches)return 0;
+    int group=Number(file,"Limits","max_per_base",file==C_Workbenches ? 1 : 2),limit;char profile[128];Format(profile,sizeof(profile),"Types/%s",type);
     if(!ReadLevelInt(file,profile,level,"max_per_base",group,limit))return 0;
     return limit<group ? limit : group;
+}
+
+int WorkbenchCount(int core,int exclude=-1)
+{
+    if(core<0 || core>=gCoreCount)return 0;
+    int count;
+    for(int b=0;b<MAX_BUILDINGS;b++)if(b!=exclude && gBuildings[b].used && gBuildings[b].alive
+        && gBuildings[b].kind==Kind_Workbench && gBuildings[b].buildCore==core)count++;
+    return count;
+}
+
+bool WorkbenchTypeEnabledUnique(const char[] type)
+{
+    if(!CraftingValidSectionName(type) || !Node(C_Workbenches,"Types")
+        || !gCfg[C_Workbenches].GotoFirstSubKey())return false;
+    int matches;
+    do
+    {
+        char name[1024];gCfg[C_Workbenches].GetSectionName(name,sizeof(name));
+        if(StrEqual(name,type))matches++;
+    }while(gCfg[C_Workbenches].GotoNextKey());
+    if(matches!=1)return false;
+    char path[128];Format(path,sizeof(path),"Types/%s",type);bool enabled;
+    return CraftingEnabled(C_Workbenches,path,enabled) && enabled;
 }
 
 bool ReadMaterials()
@@ -282,46 +310,25 @@ bool ReadMapData()
         }while(gCfg[C_Map].GotoNextKey());
         gCfg[C_Map].GoBack();gCfg[C_Map].GoBack();
     }while(gCfg[C_Map].GotoNextKey());
-    if(!Node(C_Map,"Bosses") || !gCfg[C_Map].GotoFirstSubKey())return ConfigFailure("Bosses");
-    do
-    {
-        if(gBossCount>=MAX_BOSSES)return ConfigFailure("too many bosses");
-        BossDef boss;char profile[64];
-        gCfg[C_Map].GetSectionName(boss.id,sizeof(boss.id));gCfg[C_Map].GetString("boss_profile",profile,sizeof(profile));
-        gCfg[C_Map].GetString("marker_targetname",boss.marker,sizeof(boss.marker));
-        if(!boss.marker[0])gCfg[C_Map].GetString("marker",boss.marker,sizeof(boss.marker));
-        boss.maxHP=0;strcopy(boss.key,sizeof(boss.key),profile);gBosses[gBossCount++]=boss;
-    }while(gCfg[C_Map].GotoNextKey());
-    char required[512];Text(C_Map,"","required_boss_ids",required,sizeof(required));
-    for(int i=0;i<gBossCount;i++)
-    {
-        char section[128];Format(section,sizeof(section),"BossTypes/%s",gBosses[i].key);
-        Text(C_Bosses,section,"han_config_key",gBosses[i].key,sizeof(gBosses[].key));
-        Text(C_Bosses,section,"public_name",gBosses[i].publicName,sizeof(gBosses[].publicName));
-        gBosses[i].maxHP=Number(C_Bosses,section,"max_hp",50000);
-        gBosses[i].savedHP=gBosses[i].maxHP;
-        gBosses[i].damage=Decimal(C_Bosses,section,"building_damage",120.0);
-        gBosses[i].interval=Decimal(C_Bosses,section,"building_attack_interval",1.0);
-        gBosses[i].required=TokenPresent(required,gBosses[i].id);
-        strcopy(gBosses[i].idle,sizeof(gBosses[].idle),"idle");strcopy(gBosses[i].attack,sizeof(gBosses[].attack),"attack1");
-        if(!gBosses[i].publicName[0] || StrEqual(gBosses[i].publicName,"TO_MATCH_ACTUAL_NAME") || gBosses[i].maxHP<1)return ConfigFailure("boss public name/HP");
-        int marker=-1,matched=0;
-        while((marker=FindEntityByClassname(marker,"info_target"))!=-1)
-        {
-            char name[64];GetEntPropString(marker,Prop_Data,"m_iName",name,sizeof(name));
-            if(!StrEqual(name,gBosses[i].marker))continue;
-            matched++;GetEntPropVector(marker,Prop_Data,"m_vecOrigin",gBosses[i].origin);GetEntPropVector(marker,Prop_Data,"m_angRotation",gBosses[i].angles);
-        }
-        if(matched!=1)return ConfigFailure("each boss needs one unique compiled marker");
-    }
+    if(!ReadBossSpawnPoints() || !ReadBossDefinitions())return false;
     if(!gCoreCount || !gBossCount)return ConfigFailure("cores/bosses empty");
     return true;
 }
 
-bool TokenPresent(const char[] tokens,const char[] word)
+stock bool TokenPresent(const char[] tokens,const char[] word)
 {
-    char values[16][64];int count=ExplodeString(tokens," ",values,16,64);
-    for(int i=0;i<count;i++)if(StrEqual(values[i],word))return true;
+    int length=strlen(tokens),wanted=strlen(word),cursor;
+    if(!wanted)return false;
+    while(cursor<length)
+    {
+        while(cursor<length && tokens[cursor]<=32)cursor++;
+        int start=cursor;
+        while(cursor<length && tokens[cursor]>32)cursor++;
+        if(cursor-start!=wanted)continue;
+        bool match=true;
+        for(int i=0;i<wanted;i++)if(tokens[start+i]!=word[i]){match=false;break;}
+        if(match)return true;
+    }
     return false;
 }
 
@@ -428,6 +435,7 @@ bool ReadTypeMetadata(ConfigFile file,const char[] type,BuildingMetadata meta)
     BuildingKind kind=Kind_Fence;
     if(file==C_Turrets)kind=Kind_Turret;else if(file==C_Flames)kind=Kind_Flame;else if(file==C_Grenades)kind=Kind_Grenade;
     else if(file==C_Tesla)kind=Kind_Tesla;else if(file==C_Plasma)kind=Kind_Plasma;else if(file==C_Watchtowers)kind=Kind_Watchtower;
+    else if(file==C_Workbenches)kind=Kind_Workbench;
     else if(file==C_Campfires)kind=Kind_Campfire;else if(file==C_Shelters)kind=Kind_Base;
     char path[128];Format(path,sizeof(path),"Types/%s",type);return ReadBuildingMetadata(file,path,kind,meta) && ValidateMortarType(file,type);
 }
@@ -435,9 +443,9 @@ bool ReadTypeMetadata(ConfigFile file,const char[] type,BuildingMetadata meta)
 bool ReadRecipes()
 {
     gRecipeCount=0;
-    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons,C_Campfires,C_Shelters,C_Tesla,C_Plasma,C_Watchtowers};
+    ConfigFile files[]={C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons,C_Campfires,C_Shelters,C_Tesla,C_Plasma,C_Watchtowers,C_Workbenches};
     BuildingKind kinds[]={Kind_Turret,Kind_Flame,Kind_Fence,Kind_Mine,Kind_Amplifier,Kind_Generator,Kind_Light,Kind_Grenade,Kind_Expander,
-        Kind_AutoRepair,Kind_Heal,Kind_Armor,Kind_Beacon,Kind_Campfire,Kind_Base,Kind_Tesla,Kind_Plasma,Kind_Watchtower};
+        Kind_AutoRepair,Kind_Heal,Kind_Armor,Kind_Beacon,Kind_Campfire,Kind_Base,Kind_Tesla,Kind_Plasma,Kind_Watchtower,Kind_Workbench};
     for(int file=0;file<sizeof(files);file++)
     {
         ConfigFile source=files[file];ArrayList ids=new ArrayList(ByteCountToCells(64));
@@ -450,6 +458,13 @@ bool ReadRecipes()
             Recipe recipe;recipe.file=source;recipe.kind=kinds[file];ids.GetString(entry,recipe.id,sizeof(recipe.id));
             char path[192],profile[128],model[PLATFORM_MAX_PATH];Format(path,sizeof(path),"BuildRecipes/%s",recipe.id);
             if(!Number(source,path,"enabled",1))continue;
+            if(source==C_Workbenches)
+            {
+                char type[1024];bool enabled;
+                Text(source,path,"output_type",type,sizeof(type));
+                if(!CraftingEnabled(source,path,enabled) || !enabled || !WorkbenchTypeEnabledUnique(type))
+                {LogError("[Shelter] Disabled workbench recipe %s: invalid, disabled or duplicate workbench name",recipe.id);continue;}
+            }
             Text(source,path,"output_type",recipe.type,sizeof(recipe.type));Text(source,path,"display_name",recipe.label,sizeof(recipe.label));
             Format(profile,sizeof(profile),"Types/%s",recipe.type);
             bool valid=recipe.id[0] && recipe.type[0] && StrContains(recipe.id,"/")<0 && StrContains(recipe.type,"/")<0
@@ -513,15 +528,10 @@ bool ValidateNativeBridge()
     KeyValues kv=new KeyValues("Stage");
     if(!kv.ImportFromFile(path) || !kv.GotoFirstSubKey()){delete kv;return ConfigFailure("install the supplied per-map native Stage bridge");}
     if(kv.GetNum("count")!=99999 || kv.GetNum("healthboost")!=0){delete kv;return ConfigFailure("native bridge count99999/healthboost0 required");}
-    char ordinary[512],custom[512];kv.GetString("zombie",ordinary,sizeof(ordinary));kv.GetString("customzombies",custom,sizeof(custom));
+    // One spare byte beyond HZS's 512-byte buffers makes truncation detectable.
+    char ordinary[513],custom[513];kv.GetString("zombie",ordinary,sizeof(ordinary));kv.GetString("customzombies",custom,sizeof(custom));
     if(!ordinary[0] || kv.GetNum("maxszombiecount")!=0){delete kv;return ConfigFailure("ordinary pool / special count0 required");}
-    ReplaceString(custom,sizeof(custom),","," ");
-    for(int i=0;i<gBossCount;i++)
-    {
-        if(StrContains(ordinary,gBosses[i].key)!=-1){delete kv;return ConfigFailure("fixed boss cannot appear in ordinary reborn pool");}
-        char token[96];Format(token,sizeof(token),"%s:1",gBosses[i].key);
-        if(!TokenPresent(custom,token) && !StrEqual(custom,token)){delete kv;return ConfigFailure("each fixed boss needs customzombies key:1");}
-    }
+    if(!ValidateBossNativeCustomList(ordinary,custom)){delete kv;return false;}
     bool extra=kv.GotoNextKey();delete kv;
     if(extra)return ConfigFailure("native bridge must contain one Stage");
     return true;

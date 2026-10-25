@@ -1,3 +1,29 @@
+**地图移植流程入口：** 以后为其他地图寻找Boss点位，先读[地图移植：Boss五点选址与验证指南](docs/地图移植_Boss五点选址与验证指南.md)，包含新图前置、采点指令、配置合并、真实Hull／追击验收、失败点处理、清场交接及可复制的任务模板。本轮测试与增项集中在[进度06：本轮总结与后续移植入口](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/06_本轮增项总结与Boss五点移植入口.md)。这次只补文档，未操作游戏；以下部署与运行状态是上一轮带时间戳的证据，不能当作本次实时读回。
+
+**最新：v0.8.2 Boss近战成长与死城五点已正式启用。** 先读[冻结新说明](docs/v0.8.2_Boss近战成长与死城点位.md)、[05外部交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/05_死城采点准备与Boss伤害调整.md)、[最终汇总](tests/reports/v082_deadcity_routes_20261025/verification_summary.json)与[最终会话](tests/reports/v082_deadcity_routes_20261025/final_session.json)。正式主SMX a02f00dcbe0ae4c054d83bda3b018da65ca1671ba3a9035783be5e1b67e06ae0，52源0错0警告、build／repo／live一致；原生普通近战30按普通天数倍率，建筑120／技能原值保持。298／0仅离线伤害VM，不冒充新增真实逐天受击测量。
+
+死城三类型五点15／15到至少一基地，20尝试保留3停滞＋2超时；正式恢复单胖子和原Stage。真实冷启动空服超过30秒pending、真人连接后同epoch2成功50000／休眠／attempts2；定位VM164含原129＋35，不重复相加。20:22:46游戏样本为server13004／controller23652／client30344、死城6基地／1胖子、28插件1真人0BOT，助手全清／停怪0／JPEG已看；自然epoch3／基地01HP990保留，不按旧快照复位。[保留审计](tests/reports/v082_deadcity_routes_20261025/preservation_verification.json)265文件3改262保持，52源2改50保持。
+
+[独立58项新ZIP](dist/CSS-HZS-ZombieShelter-v0.8.2-boss-damage-deadcity-update.zip)为534971字节，SHA256 `89382446f7c5c691ee463637614b8fe60f9b60ab8a74b948edd15eed4f016b94`，[包装核验](tests/reports/v082_boss_damage_20261025/package_verification.json)65／0独立，不加玩法成绩。旧三包及冻结说明保持，新doc冻结hash cd637c09e48cc40955f09fb542b063a8177a8abf85035c30945e44bcafb617e1，ZIP身份不回写它。
+
+继续保留当前唯一正式服务端和普通客户端。单胖子1／1后实际换图与长期续局未重测，不把用户此前自行成功切图扩大为旧换图崩溃已全面修复。以下各轮“最新／当前／未启用／助手保留”仅对应当时历史。
+
+**最新补充：v0.8.2 Boss坐标点功能、离线验证及修订包已完成，尚未启用到运行服。** 先读 [02补充交接](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/02_Boss坐标点池与循环分配.md)、[Boss坐标点说明](docs/v0.8.2_Boss坐标点配置.md) 和 [修订包](dist/CSS-HZS-ZombieShelter-v0.8.2-boss-spawnpoints-update.zip)。地图配置五个点按有效Boss顺序循环分配，超过五只允许重叠；不再查旧marker，原生Stage同key数量须精确匹配。本轮只迁移旧坐标／重复占位，下一步才选新五点，不能称点位已修复或五点安全。
+
+新正式构建`a31813761234a5f87d1248fecb5394ae460c0a603a8c7ad41705eda83cd7629e`，52生产输入、0错误0警告，build／repo／包一致。生产函数VM274／0，迁移16／0、候选7／7分别记录；VM夹具保留一条203 unused `BossSpawnHullClear` warning，不等同真实物理或运行生成通过。65文件修订包的[成员／字节／CRC核验](tests/reports/v082_boss_spawnpoints_20261025/package_verification.json)及[独立迁移CLI检查](tests/reports/v082_boss_spawnpoints_20261025/package_tool_smoke.json)通过，旧合成台包保留。
+
+最新[只读会话](tests/reports/v082_boss_spawnpoints_20261025/final_session.json)采样为2026-10-25 12:54:46.862422 +08:00：只确认server5492／普通client13940进程保留，live仍是3920构建，审计的265文件SHA不变；本轮没有RCON／游戏操作、重载／移动或新位置选择，当前局内阶段、天数、Boss、库存和错误数没有采样。不要将下方11:43的等待阶段／四条报警当作当前状态。[补充汇总](tests/reports/v082_boss_spawnpoints_20261025/verification_summary.json)明确新代码完成但未应用live。
+
+以下为前轮合成台发布和更早历史；旧段的“最新／当前”仅指各自记录时点。
+
+**前轮：v0.8.2 合成台、武器合成与材料合成已实施并完成分项联测和增量交付。** 先读 [v0.8.2进度入口](D:/gmod昼夜求生资源/文档/进度文档/v0.8.2/README.md)、[配置说明](docs/v0.8.2_合成台配置说明.md) 和 [增量包](dist/CSS-HZS-ZombieShelter-v0.8.2-crafting-update.zip)。合成台使用内置日晷模型，近距瞄准完工台按E，独立配置武器／材料配方；默认十级、耗电50且每级加30。基础斧头木50／铁20，接入十把三角洲刀且仅修建／维修HP乘十，采集倍率与外部攻击数据不变。B购买设置不改。
+
+正式主SMX为`3920d6fcc9a5f4a490255153dd91a044ce532f637c3c6b066c050945d2dcfab1`，50生产输入、0警告。带电阶段及清场嵌套累计75／0、十刀真人短按施工／维修20／0，离线VM147／0、配置审计86／0和59／0分开；不是多人或自然生命周期验收。增量ZIP为59文件，[打包核验](tests/reports/v082_crafting_20261025/package_verification.json)66／0。
+
+**最新只读留服样本为2026-10-25 11:43:30 +08:00：进程保留、ready1，Shelter处于phase0等待阶段。** 原server5492／controller5868／client13940，唯一`192.168.0.102:27169`，1真人0BOT、28插件。现有4条Boss相关LogError（3条missing＋1条hull不适配），tracked0／boss bound0，详见 [retained_state_latest.json](tests/reports/v082_crafting_20261025/retained_state_latest.json)。11:41的[正式会话快照](tests/reports/v082_crafting_20261025/final_session.json)为phase1／3条报警的历史时点，不能沿用为当前阶段；不为恢复phase1回放回调、重生NPC、换图或重启。测试助手、补给／保护／自建场景已清理，正常停怪已恢复，服务端和普通客户端保留。
+
+以下扩大器与各旧版本段落保留历史，当前功能和状态以上述v0.8.2交接为准。
+
 最新扩大器已改为模型原生动画，旧OnGameFrame旋转已删除；新完整资源781件及最终留服见 [进度10](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/10_扩大器原生动画模型与资源包.md)。
 
 前轮设施模型与可配置尺寸记录，见 [进度09](D:/gmod昼夜求生资源/文档/进度文档/v0.8.0/09_设施模型颜色尺寸与信标恢复.md)。

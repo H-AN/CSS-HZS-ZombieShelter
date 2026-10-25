@@ -15,11 +15,14 @@
 #include "HanZombieShelter/Levels.inc"
 #include "HanZombieShelter/Progression.inc"
 #include "HanZombieShelter/Config.inc"
+#include "HanZombieShelter/BossSpawns.inc"
+#include "HanZombieShelter/BossBridge.inc"
 #include "HanZombieShelter/DayCvars.inc"
 #include "HanZombieShelter/Geometry.inc"
 #include "HanZombieShelter/MapAdjustments.inc"
 #include "HanZombieShelter/BuildAreas.inc"
 #include "HanZombieShelter/Inventory.inc"
+#include "HanZombieShelter/Crafting.inc"
 #include "HanZombieShelter/Drops.inc"
 #include "HanZombieShelter/Management.inc"
 #include "HanZombieShelter/EntityBudget.inc"
@@ -47,6 +50,7 @@
 #include "HanZombieShelter/HUD.inc"
 #include "HanZombieShelter/Lifecycle.inc"
 #include "HanZombieShelter/Commands.inc"
+#include "HanZombieShelter/CraftingMenu.inc"
 #include "HanZombieShelter/SkillsMenu.inc"
 #include "HanZombieShelter/ConstructionInput.inc"
 #include "HanZombieShelter/Admin.inc"
@@ -91,6 +95,7 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
+    ResetAllCraftingMenus();
     ResetAllQuickMenus();
     ResetCampfireFuelState();
     SkillsMapStart();
@@ -134,6 +139,7 @@ void BootMode()
 
 public void OnClientPutInServer(int client)
 {
+    ResetCraftingMenu(client);
     ResetQuickMenu(client);
     ResetSkillMenu(client);SkillsBindClient(client);
     ResetConstructionCancelInput(client);
@@ -147,6 +153,7 @@ public void OnClientPutInServer(int client)
 
 public void OnClientDisconnect(int client)
 {
+    ResetCraftingMenu(client);
     ResetQuickMenu(client);
     ResetSkillMenu(client);SkillsDisconnectClient(client);
     ResetConstructionCancelInput(client);
@@ -220,6 +227,7 @@ public void CleanOrphan(any ref)
 
 public void OnMapEnd()
 {
+    ResetAllCraftingMenus();
     ResetAllQuickMenus();
     SkillsMapEnd();
     CancelAllBaseTeleportSelections();
@@ -229,6 +237,7 @@ public void OnMapEnd()
 
 public void OnPluginEnd()
 {
+    ResetAllCraftingMenus();
     ResetAllQuickMenus();
     SkillsUnload();
     ClearBurnVisuals();

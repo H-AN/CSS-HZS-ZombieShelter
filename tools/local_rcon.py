@@ -16,7 +16,7 @@ def command(text):
         raise RuntimeError(f'The fixed local test controller is missing: {CONTROLLER}')
     result = subprocess.run(
         [sys.executable, '-B', '-X', 'utf8', str(CONTROLLER), '--command', text],
-        capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45,
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=45,
     )
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or 'The fixed local test command failed')

@@ -28,6 +28,7 @@ CONTROL = ROOT / 'control'
 PORT = 27169
 ADDRESS = '192.168.0.102:27169'
 MAP = 'zsh_desert_han_dn'
+ALLOWED_MAPS = (MAP, 'zsh_deadcity_han_dn')
 
 
 def now():
@@ -99,6 +100,26 @@ def check(require_main=False):
         raise RuntimeError('The deployed formal main plugin is missing.')
     return {'prepared': True, 'game': str(GAME), 'server_executable': str(SERVER / 'srcds_win64.exe'),
             'port': PORT, 'address': ADDRESS, 'main_sha256': digest(main), 'zero_bots': True}
+
+
+def chosen_map_name(map_name=None):
+    chosen_map = MAP if map_name is None else map_name
+    if chosen_map not in ALLOWED_MAPS:
+        raise ValueError('Local test map must be one of: ' + ', '.join(ALLOWED_MAPS))
+    return chosen_map
+
+
+def check_map(map_name):
+    chosen_map = chosen_map_name(map_name)
+    files = {
+        'bsp': GAME / 'maps' / (chosen_map + '.bsp'),
+        'shelter_map': GAME / 'addons/sourcemod/configs/HanZombieShelter/maps' / (chosen_map + '.cfg'),
+        'hzs_stage': GAME / 'addons/sourcemod/configs/HanZombieScenario' / chosen_map / 'HanZombieScenarioStage.cfg',
+    }
+    for kind, path in files.items():
+        if not path.is_file():
+            raise RuntimeError('Local test map prerequisite missing (' + kind + '): ' + str(path))
+    return {'map': chosen_map, 'map_files': {kind: str(path) for kind, path in files.items()}}
 
 
 def install_main(source):
@@ -188,8 +209,10 @@ def minimize_owned_server_window(pid):
     return row.get('minimized_or_hidden', False)
 
 
-def daemon():
+def daemon(map_name=None):
+    chosen_map = chosen_map_name(map_name)
     check(require_main=True)
+    check_map(chosen_map)
     assert_stopped()
     for kind in [socket.SOCK_STREAM, socket.SOCK_DGRAM]:
         with socket.socket(socket.AF_INET, kind) as sock:
@@ -198,9 +221,9 @@ def daemon():
     env = os.environ.copy()
     env.update(TEMP=str(ROOT / 'temp'), TMP=str(ROOT / 'temp'))
     arguments = [str(SERVER / 'srcds_win64.exe'), '-game', str(GAME), '-console', '-insecure', '-nohltv', '-dev',
-                 '-ip', '0.0.0.0', '-port', str(PORT), '+maxplayers', '32', '+sv_lan', '1', '+sv_cheats', '1',
+                 '-ip', '0.0.0.0', '-port', str(PORT), '+maxplayers', '32', '+sv_lan', '1', '+sv_cheats', '1', '+sv_pure', '0',
                  '+servercfgfile', 'local_test_server.cfg', '+rcon_password', secret,
-                 '+con_logfile', 'local_test_runtime.log', '+bot_quota', '0', '+map', MAP]
+                 '+con_logfile', 'local_test_runtime.log', '+bot_quota', '0', '+map', chosen_map]
     startup = subprocess.STARTUPINFO()
     startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
     startup.wShowWindow = 0
@@ -211,7 +234,7 @@ def daemon():
         raise RuntimeError('The local test server failed to launch.') from None
     record = {'pid': process.pid, 'controller_pid': os.getpid(), 'session_id': uuid.uuid4().hex, 'port': PORT, 'address': ADDRESS,
               'listen_ip': '0.0.0.0', 'game': str(GAME), 'server_executable': str(SERVER / 'srcds_win64.exe'),
-              'map': MAP, 'ready': False, 'kept_running': True, 'status': 'starting', 'started_at': time.time(),
+              'map': chosen_map, 'ready': False, 'kept_running': True, 'status': 'starting', 'started_at': time.time(),
               'main_sha256': digest(GAME / 'addons/sourcemod/plugins/HanZombieShelter.smx'),
               'secret_policy': 'Generated only in controller memory; never printed or serialized'}
     record['window_minimized'] = minimize_owned_server_window(process.pid)
@@ -252,14 +275,16 @@ def daemon():
 
 
 def start(map_name=None):
-    chosen_map = map_name or MAP
-    if chosen_map != MAP:
-        raise ValueError('The retained local environment starts only its configured desert map.')
+    chosen_map = chosen_map_name(map_name)
     check(require_main=True)
     current = session()
     if current and pid_running(current.get('pid')) and pid_running(current.get('controller_pid')):
+        if map_name is not None and current.get('map') != chosen_map:
+            raise RuntimeError('The existing local test server is running map ' + str(current.get('map'))
+                               + '; requested map ' + chosen_map + '. It was preserved; no map change or second server was started.')
         print(json.dumps({'already_running': True, **current}, ensure_ascii=False))
         return
+    check_map(chosen_map)
     assert_stopped()
     CONTROL.mkdir(parents=True, exist_ok=True)
     lock = CONTROL / 'start.lock'
@@ -270,7 +295,7 @@ def start(map_name=None):
     os.close(handle)
     try:
         with (CONTROL / 'daemon_stdout.log').open('ab') as output, (CONTROL / 'daemon_stderr.log').open('ab') as error:
-            controller = subprocess.Popen([sys.executable, '-B', '-X', 'utf8', str(Path(__file__).resolve()), '--daemon'],
+            controller = subprocess.Popen([sys.executable, '-B', '-X', 'utf8', str(Path(__file__).resolve()), '--daemon', '--map', chosen_map],
                                           cwd=ROOT, stdout=output, stderr=error, creationflags=subprocess.CREATE_NO_WINDOW)
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
@@ -327,11 +352,14 @@ def main():
     mode.add_argument('--session', action='store_true')
     mode.add_argument('--check', action='store_true')
     mode.add_argument('--install-main')
+    parser.add_argument('--map', choices=ALLOWED_MAPS, help='Map for --start or --daemon; default: ' + MAP)
     args = parser.parse_args()
+    if args.map is not None and not (args.start or args.daemon):
+        parser.error('--map can be used only with --start or --daemon')
     if args.start:
-        start()
+        start(args.map)
     elif args.daemon:
-        daemon()
+        daemon(args.map)
     elif args.command is not None:
         command(args.command)
     elif args.console:

@@ -36,6 +36,18 @@ void RestoreCorePool()
     gPoolOverridden=false;
 }
 
+// A new engine round recreates native Boss bodies. Resume campaign progress,
+// but let every surviving Boss begin dormant at its configured position.
+void ResetBossRoundState()
+{
+    for(int i=0;i<gBossCount;i++)
+    {
+        gBosses[i].boundThisRound=false;
+        gBosses[i].awakened=false;
+        gBosses[i].positionedHP=0;
+    }
+}
+
 void PrepareRound()
 {
     if(!gEnabled || gTerminal)return;
@@ -46,7 +58,7 @@ void PrepareRound()
     gVictoryReason=Victory_None;
     CleanWorld();ApplyMapAdjustments();
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
-    for(int i=0;i<gBossCount;i++)gBosses[i].boundThisRound=false;
+    ResetBossRoundState();
     gRoundRestored=gSnapshot;
     if(!CreateWorld(gSnapshot))
     {
@@ -110,7 +122,7 @@ public void Han_OnHumanWin()
 {
     if(!gEnabled || gTerminal)return;
     if(AllBossesDefeated())QueueOutcome(true);
-    else LogError("[Shelter] Core Stage completed before map Boss; 99999 bridge/configuration needs review");
+    else LogError("[Shelter] Core Stage completed before all configured Bosses were defeated; 99999 bridge/configuration needs review");
 }
 
 void QueueOutcome(bool victory,VictoryReason reason=Victory_Bosses)
@@ -130,7 +142,7 @@ public void ResolveOutcome(any epoch)
     if(epoch!=gEpoch || !gEnabled || gTerminal || gPhase==Phase_Ending || (!gVictoryCandidate && !gFailureCandidate))return;
     gOutcomeQueued=false;bool victory=gVictoryCandidate;
     LogMessage("[Shelter] Campaign outcome victory=%d reason=%s day=%d target=%d",victory,
-        victory ? (gVictoryReason==Victory_Rescue ? "army_rescue" : "all_required_bosses") : "failure",gDay,gSurvivalDayLimit);
+        victory ? (gVictoryReason==Victory_Rescue ? "army_rescue" : "all_bosses") : "failure",gDay,gSurvivalDayLimit);
     Phase previous=gPhase;int previousDay=gDay;
     gPhase=Phase_Ending;gSnapshot=true;
     PlayGlobalInteractionSound(victory ? "victory" : "failure");

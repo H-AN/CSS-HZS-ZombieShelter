@@ -405,7 +405,7 @@ bool ValidateLevelProfile(ConfigFile file,const char[] profile)
 
 bool ValidateLevelProfiles()
 {
-    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons,C_Campfires,C_Shelters,C_Tesla,C_Plasma,C_Watchtowers};
+    ConfigFile files[]={C_Bases,C_Turrets,C_Flames,C_Fences,C_Mines,C_Amplifiers,C_Generators,C_Lights,C_Grenades,C_Expanders,C_Repair,C_Heal,C_Armor,C_Beacons,C_Campfires,C_Shelters,C_Tesla,C_Plasma,C_Watchtowers,C_Workbenches};
     for(int f=0;f<sizeof(files);f++)
     {
         char section[16];strcopy(section,sizeof(section),f==0 ? "Profiles" : "Types");

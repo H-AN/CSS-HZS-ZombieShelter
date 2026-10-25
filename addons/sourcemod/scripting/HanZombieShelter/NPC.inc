@@ -1,6 +1,49 @@
 float gNextTargetFallback[MAX_NPCS];
 int gFallbackAssignments;
 
+#define BOSS_POSITION_RETRY_INTERVAL 0.1
+#define BOSS_POSITION_RETRY_SECONDS 5.0
+#define BOSS_POSITION_MAX_ATTEMPTS 50
+bool gBossPositionPending[MAX_NPCS];
+int gBossPositionRef[MAX_NPCS],gBossPositionEpoch[MAX_NPCS],gBossPositionAttempts[MAX_NPCS];
+float gBossPositionStarted[MAX_NPCS],gBossPositionLastAttempt[MAX_NPCS];
+
+bool BossPositionRetryAllowed(int attempts,float elapsed)
+{
+    return attempts>0 && attempts<BOSS_POSITION_MAX_ATTEMPTS && elapsed>=0.0 && elapsed<BOSS_POSITION_RETRY_SECONDS;
+}
+
+bool BossPositionContextValid(int n,int ref,int epoch)
+{
+    return gEnabled && gCoreReady && epoch==gEpoch && n>=0 && n<MAX_NPCS
+        && gNPCs[n].used && gNPCs[n].ref==ref && gNPCs[n].registrationEpoch==epoch
+        && gNPCs[n].ready && !gNPCs[n].dead && gNPCs[n].boss>=0 && gNPCs[n].boss<gBossCount;
+}
+
+void FinishBossPositionRetry(int n,int ref,int epoch)
+{
+    // An old callback must not cancel a replacement NPC's placement task.
+    if(n>=0 && n<MAX_NPCS && gBossPositionRef[n]==ref && gBossPositionEpoch[n]==epoch)
+        gBossPositionPending[n]=false;
+}
+
+void QueueBossPosition(int n)
+{
+    if(n<0 || n>=MAX_NPCS)return;
+    int ref=gNPCs[n].ref,epoch=gEpoch;
+    if(!BossPositionContextValid(n,ref,epoch) || Resolve(ref)<0)return;
+    int b=gNPCs[n].boss;
+    if(gBosses[b].defeated){ParkNPC(n);return;}
+    if(gBosses[b].positionedHP>0)return;
+    if(gBossPositionPending[n] && gBossPositionRef[n]==ref && gBossPositionEpoch[n]==epoch)return;
+    gBossPositionPending[n]=true;gBossPositionRef[n]=ref;gBossPositionEpoch[n]=epoch;
+    gBossPositionAttempts[n]=0;gBossPositionStarted[n]=GetGameTime();
+    gBossPositionLastAttempt[n]=gBossPositionStarted[n];
+    DataPack timerPack;
+    CreateDataTimer(BOSS_POSITION_RETRY_INTERVAL,BossPosition,timerPack,TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+    timerPack.WriteCell(ref);timerPack.WriteCell(epoch);
+}
+
 void ClearDisconnectedNPCTarget(int n,int client,int serial)
 {
     int entity=Resolve(gNPCs[n].ref);if(entity<0)return;
@@ -55,10 +98,10 @@ void BindNPC(int entity)
     if(slot<0){LogError("[Shelter] NPC tracking budget exceeded; native spawn count must fit configured pool");return;}
     char name[128];if(!Han_GetZombieName(entity,name,sizeof(name)))return;
     NPC npc;npc.used=true;npc.registrationEpoch=gEpoch;npc.ref=EntIndexToEntRef(entity);npc.visualRef=INVALID_ENT_REFERENCE;npc.boss=-1;
-    for(int i=0;i<gBossCount;i++)if(StrEqual(name,gBosses[i].publicName))
+    npc.boss=ClaimBossDefinition(name);
+    if(npc.boss<0)for(int i=0;i<gBossCount;i++)if(StrEqual(name,gBosses[i].publicName))
     {
-        if(!gBosses[i].boundThisRound){npc.boss=i;gBosses[i].boundThisRound=true;}
-        else LogError("[Shelter] Duplicate fixed boss %s: kept in parked ordinary overflow pool",gBosses[i].id);
+        LogError("[Shelter] Surplus fixed boss %s: all matching definitions bound; kept in parked ordinary overflow pool",name);
         break;
     }
     gNPCs[slot]=npc;gNextTargetFallback[slot]=0.0;
@@ -100,11 +143,7 @@ public void NPCReady(any value)
     SDKHook(entity,SDKHook_Think,ExpansionNPCThinkPre);
     int boss=gNPCs[n].boss;
     ParkNPC(n);
-    if(boss>=0)
-    {
-        DataPack timerPack;CreateDataTimer(0.1,BossPosition,timerPack,TIMER_FLAG_NO_MAPCHANGE);
-        timerPack.WriteCell(ref);timerPack.WriteCell(epoch);
-    }
+    if(boss>=0)QueueBossPosition(n);
 }
 
 void Colors(int n,bool visible)
@@ -147,23 +186,40 @@ void RestoreNPCBody(int n)
 
 public Action BossPosition(Handle timer,DataPack pack)
 {
-    pack.Reset();int entity=Resolve(pack.ReadCell()),epoch=pack.ReadCell();
-    if(entity<0 || epoch!=gEpoch || !gEnabled)return Plugin_Stop;
-    int n=FindNPC(entity);if(n<0 || gNPCs[n].boss<0)return Plugin_Stop;
+    pack.Reset();int ref=pack.ReadCell(),epoch=pack.ReadCell(),entity=Resolve(ref);
+    int n=entity<0 ? -1 : FindNPC(entity);
+    if(!BossPositionContextValid(n,ref,epoch))
+    {FinishBossPositionRetry(n,ref,epoch);return Plugin_Stop;}
     int b=gNPCs[n].boss;
-    if(gBosses[b].defeated){ParkNPC(n);return Plugin_Stop;}
+    if(gBosses[b].defeated){FinishBossPositionRetry(n,ref,epoch);ParkNPC(n);return Plugin_Stop;}
+    if(gBosses[b].positionedHP>0){FinishBossPositionRetry(n,ref,epoch);return Plugin_Stop;}
+    if(!gBossPositionPending[n] || gBossPositionRef[n]!=ref || gBossPositionEpoch[n]!=epoch)return Plugin_Stop;
+    // Empty-server startup can dispatch timers while simulation time is frozen.
+    // Bounds cannot finish initializing then; only advancing game time spends
+    // the existing 50-attempt / five-game-second placement budget.
+    float now=GetGameTime();
+    if(now<=gBossPositionLastAttempt[n])return Plugin_Continue;
+    gBossPositionLastAttempt[n]=now;
+    int attempts=++gBossPositionAttempts[n];float elapsed=now-gBossPositionStarted[n];
     float mins[3],maxs[3];NPCBounds(entity,mins,maxs);
-    if(!ClearHull(gBosses[b].origin,mins,maxs,entity))
+    if(!BossSpawnHullClear(gBosses[b].origin,mins,maxs,entity))
     {
-        LogError("[Shelter] Boss %s actual hull does not fit target; mins=%.1f %.1f %.1f maxs=%.1f %.1f %.1f; remains parked",gBosses[b].id,mins[0],mins[1],mins[2],maxs[0],maxs[1],maxs[2]);return Plugin_Stop;
+        // Engine collision bounds can still change after the creation forward.
+        // Keep the native body parked and sample its current bounds again;
+        // never substitute a guessed hull or alter the configured position.
+        if(BossPositionRetryAllowed(attempts,elapsed))return Plugin_Continue;
+        FinishBossPositionRetry(n,ref,epoch);
+        LogError("[Shelter] Boss %s initial placement timed out after %d attempts (%.2fs); actual hull does not fit target; mins=%.1f %.1f %.1f maxs=%.1f %.1f %.1f; remains parked",
+            gBosses[b].id,attempts,elapsed,mins[0],mins[1],mins[2],maxs[0],maxs[1],maxs[2]);return Plugin_Stop;
     }
+    FinishBossPositionRetry(n,ref,epoch);
     TeleportEntity(entity,gBosses[b].origin,gBosses[b].angles,view_as<float>({0.0,0.0,0.0}));
     SetEntProp(entity,Prop_Data,"m_iHealth",gBosses[b].savedHP);
     gBosses[b].positionedHP=GetEntProp(entity,Prop_Data,"m_iHealth");
     gNPCs[n].lastHP=gBosses[b].savedHP;RestoreNPCBody(n);
     gNPCs[n].active=true;
     if(!gBosses[b].awakened)FreezeNPC(n);
-    PrintToServer("[Shelter] Boss positioned %s hp=%d dormant=%d",gBosses[b].id,gBosses[b].savedHP,!gBosses[b].awakened);
+    PrintToServer("[Shelter] Boss positioned %s hp=%d dormant=%d attempts=%d",gBosses[b].id,gBosses[b].savedHP,!gBosses[b].awakened,attempts);
     return Plugin_Stop;
 }
 
@@ -356,8 +412,9 @@ public void Han_OnZombieDeath(int zombie,int killer)
 
 bool AllBossesDefeated()
 {
-    int required;for(int i=0;i<gBossCount;i++)if(gBosses[i].required){required++;if(!gBosses[i].defeated)return false;}
-    return required>0;
+    if(gBossCount<1)return false;
+    for(int i=0;i<gBossCount;i++)if(!gBosses[i].defeated)return false;
+    return true;
 }
 
 void RestoreNPCOnUnload(int n)
