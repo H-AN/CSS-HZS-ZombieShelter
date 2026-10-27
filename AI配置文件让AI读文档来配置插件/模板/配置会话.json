@@ -1,0 +1,219 @@
+{
+  "record_schema": "hzsh-ai-configuration-session/v2",
+  "record_kind": "blank_template_not_game_config",
+  "guide_version": "v0.8.2-2026-10-27-encyclopedia",
+  "plugin_version": "0.8.2",
+  "session_id": null,
+  "created_at": null,
+  "updated_at": null,
+  "previous_record_schema": null,
+  "migration_policy": "按01续配规则先保留旧原记录与字段，仅补v2当前状态；根据用户原授权与实际证据归一化模式、路径和交付范围，未知不猜；保留答案、自定义及历史，不重放预设或初始化。",
+  "intent": {
+    "kind": "lookup",
+    "kind_allowed": [
+      "lookup",
+      "modify",
+      "preset",
+      "repair",
+      "add_supported_type"
+    ],
+    "user_request": null,
+    "scope": [],
+    "target_object": null,
+    "target_levels": [],
+    "whole_configuration_requested": false
+  },
+  "phase": "understand_request",
+  "phase_allowed": [
+    "understand_request",
+    "locate",
+    "questions",
+    "explained",
+    "candidate",
+    "validated",
+    "written",
+    "delivered",
+    "awaiting_load",
+    "testing",
+    "feedback",
+    "blocked"
+  ],
+  "target": {
+    "mode": "explain_only",
+    "mode_allowed": [
+      "server_directory",
+      "work_directory",
+      "explain_only"
+    ],
+    "user_supplied_path": null,
+    "resolved_target_directory": null,
+    "target_layout": null,
+    "server_game_directory": null,
+    "relative_config_directory": "addons/sourcemod/configs/HanZombieShelter",
+    "path_verified": false,
+    "target_is_repository_example": null,
+    "repository_alias_write_rejected": false,
+    "writes_allowed_by_current_request": false,
+    "editing_baseline": "current_user_configuration",
+    "source_copy_performed": false,
+    "source_copy_reason": null,
+    "current_tree_complete_within_declared_scope": false
+  },
+  "repository_reference": {
+    "read_only": true,
+    "path": null,
+    "version": null,
+    "revision_if_available": null,
+    "source_file_hashes": [],
+    "role": "仅作来源、结构查询、首次空目标复制和局部修复参考，不用于自动恢复默认"
+  },
+  "storage": {
+    "persisted": false,
+    "record_path": null,
+    "backup_directory": null,
+    "policy": "没有目标位置时只在对话中解释，不创建输出文件或会话记录。"
+  },
+  "prerequisites": {
+    "checked_scope": "not_required_for_lookup",
+    "required_plugins": {
+      "status": "unknown",
+      "evidence": []
+    },
+    "required_resources_and_translations": {
+      "status": "unknown",
+      "evidence": []
+    },
+    "conditional_dependencies": [],
+    "all_known_required_items_ready": false,
+    "blocks_this_request": false,
+    "deployment_limitations": []
+  },
+  "maps": [],
+  "map_entry_format": {
+    "map_name": null,
+    "adaptation_status": "unknown",
+    "boss_positions_status": "unknown",
+    "boss_definitions_and_stage_status": "unknown",
+    "evidence_kind": "unknown",
+    "evidence_kind_allowed": [
+      "unknown",
+      "user_confirmed",
+      "files_checked",
+      "runtime_verified"
+    ],
+    "evidence": [],
+    "unverified_items": []
+  },
+  "selection": {
+    "preset": null,
+    "preset_allowed": [
+      null,
+      "light",
+      "heavy"
+    ],
+    "estimated_players": null,
+    "route": "on_demand",
+    "route_allowed": [
+      "on_demand",
+      "preset_initialization",
+      "detailed_optional"
+    ],
+    "future_recommendations_explicitly_accepted": false,
+    "accepted_recommendation_scope": [],
+    "preserved_scope": []
+  },
+  "question_state": {
+    "round": 0,
+    "current_question_ids": [],
+    "pending_question_ids": [],
+    "answered_question_ids": [],
+    "answers": [],
+    "maximum_independent_questions_per_round": 5
+  },
+  "modules": {},
+  "module_status_allowed": [
+    "not_in_scope",
+    "unresolved",
+    "user_defined",
+    "preset",
+    "preserved",
+    "not_enabled",
+    "blocked"
+  ],
+  "files": [],
+  "file_entry_format": {
+    "relative_path": null,
+    "role": "current_user_target",
+    "repository_reference_sha256": null,
+    "user_before_sha256": null,
+    "backup_path": null,
+    "candidate_sha256": null,
+    "written_sha256": null,
+    "decision": null,
+    "preserved_custom_data": [],
+    "in_complete_result": false,
+    "in_optional_incremental": false,
+    "unresolved_items": []
+  },
+  "changes": [],
+  "change_entry_format": {
+    "relative_file": null,
+    "kv_path": [],
+    "operation": "set",
+    "operation_allowed": [
+      "set",
+      "add_supported_block",
+      "remove_selected_cost_leaf",
+      "repair_syntax_or_structure"
+    ],
+    "old_value": null,
+    "new_value": null,
+    "source": "user_request",
+    "user_acceptance": null,
+    "reason": null,
+    "effective_when": "unverified"
+  },
+  "repair": {
+    "requested": false,
+    "damaged_original_preserved": false,
+    "comparison_sources": [],
+    "scoped_repairs": [],
+    "preserved_user_values": [],
+    "unrecoverable_values_requiring_input": [],
+    "whole_reset_explicitly_requested": false
+  },
+  "checks": [],
+  "blockers": [],
+  "delivery": {
+    "kind": "explanation",
+    "kind_allowed": [
+      "explanation",
+      "server_files_updated",
+      "work_tree_updated",
+      "complete_tree_export",
+      "complete_tree_with_optional_incremental"
+    ],
+    "request_complete": false,
+    "configuration_coverage_scope": "current_request",
+    "configuration_coverage_complete": false,
+    "full_configuration_tree_complete": false,
+    "incremental_files_complete": false,
+    "static_checks_completed": false,
+    "prerequisites_ready": false,
+    "real_deployment_ready": false,
+    "simulation_only": false,
+    "runtime_loaded": false,
+    "export_directory": null,
+    "runtime_evidence": [],
+    "remaining_test_items": []
+  },
+  "history": [],
+  "legacy_record_backup_path": null,
+  "legacy_fields": {},
+  "migration_notes": [
+    "local_accessible需按原授权区分server_directory/work_directory；relative_offline只有已有明确工作目标才成为work_directory，否则explain_only。",
+    "record_relative_path原样保留，原根已知才解析record_path；不凭未知旧路径创建文件。",
+    "complete_relative_files可能只是变化文件；旧files_complete不等于完整树或部署就绪；哈希按原来源保留分类。"
+  ]
+}
+
