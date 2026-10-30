@@ -9,6 +9,7 @@
 #define HZSH_API_PROVIDER
 #include <HanZombieShelterAPI>
 #include "HanZombieShelter/Types.inc"
+#include "HanZombieShelter/RuntimeIndex.inc"
 #include "HanZombieShelter/Construction.inc"
 #include "HanZombieShelter/RepairWeapons.inc"
 #include "HanZombieShelter/Gathering.inc"
@@ -108,6 +109,7 @@ public void OnMapStart()
     gPhase=Phase_Waiting;gDay=1;gNativeKills=0;gUID=0;gOutcomeQueued=false;gTerminationExpected=false;gVictoryReason=Victory_None;
     ResetInventories();
     for(int i=0;i<MAX_BUILDINGS;i++){gBuildings[i].used=false;gBuildings[i].alive=false;gBuildings[i].ref=INVALID_ENT_REFERENCE;}
+    InvalidateRuntimeBuildings();
     for(int i=0;i<MAX_NPCS;i++){gNPCs[i].used=false;gNPCs[i].ref=INVALID_ENT_REFERENCE;}
     for(int i=0;i<sizeof(gNPCBinding);i++){gNPCBinding[i]=0;gWorldBinding[i]=0;}
     gLeaderOffset=FindSendPropInfo("CHostage","m_leader");

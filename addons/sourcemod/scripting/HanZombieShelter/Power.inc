@@ -5,6 +5,39 @@ bool gPowerOverloadPenalty;
 ConVar gPowerOverloadCvar;
 float gGrenadeGravity=400.0,gGrenadeLifetime=6.0;
 char gGrenadeModel[PLATFORM_MAX_PATH];
+int gPowerLoadOrder[MAX_BUILDINGS],gPowerLoadCount,gPowerOrderRevision;
+int gLightObservedRef[MAX_BUILDINGS];
+bool gLightCanObserve[MAX_BUILDINGS];
+
+void EnsurePowerLoadOrder()
+{
+    EnsureRuntimeBuildings();
+    if(gPowerOrderRevision==gRuntimeBuildingRevision)return;
+    gPowerLoadCount=0;
+    for(int b=RuntimeNextBuilding(-1);b>=0;b=RuntimeNextBuilding(b))
+    {
+        if(gBuildings[b].powerDemand<=0.0)continue;
+        int at=gPowerLoadCount;
+        while(at>0)
+        {
+            int prior=gPowerLoadOrder[at-1];
+            if(gBuildings[b].powerPriority>gBuildings[prior].powerPriority
+                || (gBuildings[b].powerPriority==gBuildings[prior].powerPriority && gBuildings[b].uid>=gBuildings[prior].uid))break;
+            gPowerLoadOrder[at]=prior;at--;
+        }
+        gPowerLoadOrder[at]=b;gPowerLoadCount++;
+    }
+    gPowerOrderRevision=gRuntimeBuildingRevision;
+}
+
+// HP changes are synchronous, but cannot affect an unrelated base grid.
+void RecalculateBuildingPower(int b)
+{
+    if(gRuntimeBuildingsDirty || b<0 || b>=MAX_BUILDINGS || !gBuildings[b].gridAssigned
+        || gBuildings[b].powerCore<0 || gBuildings[b].powerCore>=gCoreCount)
+    {RecalculatePower();return;}
+    RecalculatePower(gBuildings[b].powerCore);
+}
 
 void RegisterPowerModeCvar()
 {
@@ -94,7 +127,7 @@ void BuildingPowerStateLabel(int b,char[] label,int length)
     else strcopy(label,length,BuildingPowered(b) ? "PowerOnline" : "PowerOffline");
 }
 
-void RecalculatePower()
+void RecalculatePower(int onlyCore=-1)
 {
     bool lampsActive=LampNightPowerActive();
     float beforeOutput[MAX_CORES],beforeDemand[MAX_CORES],beforeAllocated[MAX_CORES];int beforeOffline[MAX_CORES];
@@ -102,16 +135,21 @@ void RecalculatePower()
     {
         beforeOutput[c]=gGridProduction[c];beforeDemand[c]=gGridDemand[c];beforeAllocated[c]=gGridAllocated[c];beforeOffline[c]=gGridOffline[c];
     }
-    bool wasPowered[MAX_BUILDINGS];for(int b=0;b<MAX_BUILDINGS;b++)wasPowered[b]=gBuildings[b].powered;
-    ResetPowerState();int loads[MAX_BUILDINGS],loadCount;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    bool wasPowered[MAX_BUILDINGS];
+    for(int b=RuntimeNextPowerBuilding(-1,onlyCore);b>=0;b=RuntimeNextPowerBuilding(b,onlyCore))wasPowered[b]=gBuildings[b].powered;
+    if(onlyCore<0)ResetPowerState();
+    else{gGridProduction[onlyCore]=0.0;gGridDemand[onlyCore]=0.0;gGridAllocated[onlyCore]=0.0;gGridOffline[onlyCore]=0;}
+    for(int b=RuntimeNextPowerBuilding(-1,onlyCore);b>=0;b=RuntimeNextPowerBuilding(b,onlyCore))
     {
         gBuildings[b].powered=false;
         if(!BuildingOperational(b) || Resolve(gBuildings[b].ref)<0 || gBuildings[b].kind==Kind_Campfire)continue;
         if(IsBaseSupportKind(gBuildings[b].kind))
-        {gBuildings[b].powerCore=gBuildings[b].buildCore;gBuildings[b].gridAssigned=true;}
+        {
+            if(!gBuildings[b].gridAssigned || gBuildings[b].powerCore!=gBuildings[b].buildCore)
+            {gBuildings[b].powerCore=gBuildings[b].buildCore;gBuildings[b].gridAssigned=true;InvalidateRuntimeBuildings();}
+        }
         if(!gBuildings[b].gridAssigned)
-        {gBuildings[b].powerCore=gBuildings[b].kind==Kind_Base ? gBuildings[b].core : GridAt(gBuildings[b].origin);gBuildings[b].gridAssigned=true;}
+        {gBuildings[b].powerCore=gBuildings[b].kind==Kind_Base ? gBuildings[b].core : GridAt(gBuildings[b].origin);gBuildings[b].gridAssigned=true;InvalidateRuntimeBuildings();}
         int core=gBuildings[b].powerCore;
         if(!Running() || core<0 || core>=gCoreCount)continue;
         // Preserve the configured level demand, but sleeping daytime lamps do
@@ -123,18 +161,6 @@ void RecalculatePower()
         // and the power-disabled compatibility mode. Other bases stay independent.
         if(!BuildCoreAlive(core)){if(gBuildings[b].powerDemand>0.0)gGridOffline[core]++;continue;}
         if(!gPowerEnabled || gBuildings[b].powerDemand<=0.0)gBuildings[b].powered=true;
-        if(gBuildings[b].powerDemand>0.0)
-        {
-            int at=loadCount;
-            while(at>0)
-            {
-                int prior=loads[at-1];
-                if(gBuildings[b].powerPriority>gBuildings[prior].powerPriority
-                    || (gBuildings[b].powerPriority==gBuildings[prior].powerPriority && gBuildings[b].uid>=gBuildings[prior].uid))break;
-                loads[at]=prior;at--;
-            }
-            loads[at]=b;loadCount++;
-        }
     }
     // Keep the full connected demand while stopped, so an overloaded grid
     // cannot recover merely because its own loads were disconnected.
@@ -143,10 +169,14 @@ void RecalculatePower()
         for(int c=0;c<gCoreCount;c++)overloaded[c]=gGridDemand[c]>gGridProduction[c];
     // Full loads only. Smaller later loads may use leftover capacity. A reused
     // array slot must never jump ahead of older UIDs at the same priority.
-    for(int pass=0;pass<loadCount;pass++)
+    EnsurePowerLoadOrder();
+    for(int pass=0;pass<gPowerLoadCount;pass++)
     {
-        int next=loads[pass];
+        int next=gPowerLoadOrder[pass];
         int core=gBuildings[next].powerCore;if(!Running() || core<0 || core>=gCoreCount)continue;
+        if(onlyCore>=0 && core!=onlyCore)continue;
+        if(!BuildingOperational(next) || Resolve(gBuildings[next].ref)<0 || gBuildings[next].kind==Kind_Campfire
+            || !BuildCoreAlive(core) || (gBuildings[next].kind==Kind_Light && (!lampsActive || gBuildings[next].lightManualOff)))continue;
         if(overloaded[core]){gGridOffline[core]++;continue;}
         float available=gGridProduction[core]-gGridAllocated[core];
         if(!gPowerEnabled || gBuildings[next].powerDemand<=available)
@@ -154,7 +184,7 @@ void RecalculatePower()
         else gGridOffline[core]++;
     }
     bool powerLost[MAX_CORES];
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextPowerBuilding(-1,onlyCore);b>=0;b=RuntimeNextPowerBuilding(b,onlyCore))
     {
         // A fresh unpowered load is not a fault. Coalesce actual lost loads into
         // one edge per grid, including a destroyed base's surviving loads.
@@ -166,7 +196,7 @@ void RecalculatePower()
         if(wasPowered[b]!=gBuildings[b].powered)
         {
             InvalidateDefenseCache(b);
-            if(gBuildings[b].kind==Kind_Expander)MarkBuildAreasDirty();
+            if(gBuildings[b].kind==Kind_Expander)MarkBuildAreasDirty(false);
         }
         if(gBuildings[b].used && gBuildings[b].kind==Kind_Light)UpdateBuildingLight(b);
         if(gBuildings[b].used && gBuildings[b].kind==Kind_Beacon)SyncBeaconMarker(b);
@@ -181,7 +211,7 @@ void RecalculatePower()
 
 int LightCount()
 {
-    int count;for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].alive && gBuildings[b].kind==Kind_Light)count++;return count;
+    EnsureRuntimeBuildings();return gRuntimeKindCount[view_as<int>(Kind_Light)];
 }
 
 void RemoveBuildingEffect(int b)
@@ -219,9 +249,22 @@ void SyncBuildingLightTransform(int b)
 void UpdateBuildingLight(int b)
 {
     int light=Resolve(gBuildings[b].effectRef);if(light<0)return;
-    SetVariantFloat(gBuildings[b].lightRadius);AcceptEntityInput(light,"distance");
-    SetVariantInt(gBuildings[b].lightBrightness);AcceptEntityInput(light,"brightness");
-    AcceptEntityInput(light,BuildingPowered(b) ? "TurnOn" : "TurnOff");
+    if(gLightObservedRef[b]!=gBuildings[b].effectRef)
+    {
+        gLightObservedRef[b]=gBuildings[b].effectRef;
+        gLightCanObserve[b]=HasEntProp(light,Prop_Send,"m_Radius") && HasEntProp(light,Prop_Send,"m_Exponent")
+            && HasEntProp(light,Prop_Send,"m_Flags") && HasEntProp(light,Prop_Data,"m_ActualFlags") && HasEntProp(light,Prop_Data,"m_On");
+    }
+    bool observe=gLightCanObserve[b],on=BuildingPowered(b);
+    if(!observe || GetEntPropFloat(light,Prop_Send,"m_Radius")!=gBuildings[b].lightRadius)
+    {SetVariantFloat(gBuildings[b].lightRadius);AcceptEntityInput(light,"distance");}
+    if(!observe || GetEntProp(light,Prop_Send,"m_Exponent")!=gBuildings[b].lightBrightness)
+    {SetVariantInt(gBuildings[b].lightBrightness);AcceptEntityInput(light,"brightness");}
+    // CDynamicLight::InputTurnOn restores ActualFlags; TurnOff uses the two
+    // NO_*_ILLUMINATION bits. Read both state and flags to repair outside edits.
+    int flags=on && observe ? GetEntProp(light,Prop_Data,"m_ActualFlags",1):3;
+    if(!observe || (GetEntProp(light,Prop_Data,"m_On",1)!=0)!=on || GetEntProp(light,Prop_Send,"m_Flags",1)!=flags)
+        AcceptEntityInput(light,on ? "TurnOn" : "TurnOff");
 }
 
 void StopPowerEffects()
@@ -240,7 +283,7 @@ void StopPowerEffects()
 
 void PowerTick()
 {
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(Kind_Light));b>=0;b=RuntimeNextBuilding(b,view_as<int>(Kind_Light)))
         if(gBuildings[b].used && gBuildings[b].alive && gBuildings[b].kind==Kind_Light
             && Resolve(gBuildings[b].ref)>0 && Resolve(gBuildings[b].effectRef)<0)CreateBuildingLight(b);
     RecalculatePower();

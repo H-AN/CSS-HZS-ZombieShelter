@@ -214,7 +214,7 @@ bool RefuelCampfire(int client,int b)
 bool CampfireSafeAt(const float position[3])
 {
     if(!Running())return false;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(Kind_Campfire));b>=0;b=RuntimeNextBuilding(b,view_as<int>(Kind_Campfire)))
     {
         if(!CampfireActive(b))continue;
         float x=position[0]-gBuildings[b].origin[0],y=position[1]-gBuildings[b].origin[1];

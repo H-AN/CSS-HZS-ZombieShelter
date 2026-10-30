@@ -1,4 +1,4 @@
-#define SHELTER_VERSION "0.8.2"
+#define SHELTER_VERSION "0.8.3"
 #define MAX_BUILDINGS 1024 // Storage ceiling; configured quotas and edict budget still apply.
 #define MAX_NODES 80
 #define MAX_NPCS 512 // Includes the configured 250 ordinary pool, Bosses and registration headroom.
@@ -339,27 +339,29 @@ int Resolve(int ref)
 
 int FindBuilding(int entity)
 {
-    if(entity<=MaxClients || !IsValidEntity(entity))return -1;
+    if(entity<=MaxClients || entity>=sizeof(gWorldBinding) || !IsValidEntity(entity))return -1;
+    int slot=gWorldBinding[entity]-1;
+    if(slot<0 || slot>=MAX_BUILDINGS || !gBuildings[slot].used)return -1;
     int ref=EntIndexToEntRef(entity);
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(gBuildings[i].used && gBuildings[i].ref==ref)return i;
-    return -1;
+    return gWorldBindingRef[entity]==ref && gBuildings[slot].ref==ref ? slot : -1;
 }
 
 int FindNPC(int entity)
 {
-    if(entity<=MaxClients || !IsValidEntity(entity))return -1;
+    if(entity<=MaxClients || entity>=sizeof(gNPCBinding) || !IsValidEntity(entity))return -1;
+    int slot=gNPCBinding[entity]-1;
+    if(slot<0 || slot>=MAX_NPCS || !gNPCs[slot].used)return -1;
     int ref=EntIndexToEntRef(entity);
-    for(int i=0;i<MAX_NPCS;i++)if(gNPCs[i].used && gNPCs[i].ref==ref)return i;
-    return -1;
+    return gNPCBindingRef[entity]==ref && gNPCs[slot].ref==ref ? slot : -1;
 }
 
 int FindNode(int entity)
 {
-    if(entity<=MaxClients || !IsValidEntity(entity))return -1;
+    if(entity<=MaxClients || entity>=sizeof(gWorldBinding) || !IsValidEntity(entity))return -1;
+    int binding=gWorldBinding[entity];if(binding>=0 || binding< -gNodeCount)return -1;
+    int slot=-binding-1;if(!gNodes[slot].used)return -1;
     int ref=EntIndexToEntRef(entity);
-    for(int i=0;i<gNodeCount;i++)if(gNodes[i].used && gNodes[i].ref==ref)return i;
-    return -1;
+    return gWorldBindingRef[entity]==ref && gNodes[slot].ref==ref ? slot : -1;
 }
 
 int FindMaterial(const char[] id)

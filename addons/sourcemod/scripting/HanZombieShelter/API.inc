@@ -199,7 +199,7 @@ public int NativeShelterPower(Handle plugin,int params)
 public int NativeShelterBuilding(Handle plugin,int params)
 {
     int uid=GetNativeCell(1),b=-1;if(!gEnabled || uid<1)return false;
-    for(int i=0;i<MAX_BUILDINGS;i++)if(gBuildings[i].used && gBuildings[i].uid==uid){b=i;break;}
+    b=RuntimeFindBuildingUID(uid);
     if(b<0)return false;
     SetNativeCellRef(2,gBuildings[b].kind);SetNativeCellRef(3,gBuildings[b].kind==Kind_Base ? gBuildings[b].core : gBuildings[b].powerCore);
     SetNativeCellRef(4,gBuildings[b].level);SetNativeCellRef(5,gBuildings[b].hp);SetNativeCellRef(6,gBuildings[b].maxHP);

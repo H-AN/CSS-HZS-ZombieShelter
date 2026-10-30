@@ -56,7 +56,7 @@ bool LoadBuildAreaSettings()
     gBuildAreasDirty=true;gNextBuildDisplay=0.0;return true;
 }
 
-void MarkBuildAreasDirty(){gBuildAreasDirty=true;}
+void MarkBuildAreasDirty(bool structure=true){gBuildAreasDirty=true;if(structure)InvalidateRuntimeBuildings();}
 
 bool BuildCoreAlive(int core)
 {
@@ -75,7 +75,7 @@ void RefreshBuildAreas()
 {
     if(!gBuildAreasDirty)return;gBuildAreasDirty=false;
     float bonus[MAX_CORES];int extra[MAX_CORES],counts[MAX_CORES];
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1);b>=0;b=RuntimeNextBuilding(b))
     {
         if(!gBuildings[b].used || !gBuildings[b].alive || gBuildings[b].kind==Kind_Base)continue;
         int c=gBuildings[b].buildCore;if(c<0 || c>=gCoreCount)continue;

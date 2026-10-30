@@ -31,6 +31,13 @@ int gAmplifierCount,gProgressionLevels,gProgressionDamageCap;
 bool gProgressionEnabled;
 // Scoped by DamageNPC; the NPC EntRef must also match before this is consulted.
 bool gDamageIsDefense;
+// Fixed-size current-level snapshots: no allocation proportional to max_level.
+int gAmplifierCacheUID[MAX_BUILDINGS],gAmplifierCacheLevel[MAX_BUILDINGS],gAmplifierCacheRevision[MAX_BUILDINGS];
+bool gAmplifierCacheValid[MAX_BUILDINGS];
+float gAmplifierCacheBonus[MAX_BUILDINGS][PROGRESSION_CHANNELS];
+int gProgressionCacheLevel[PROGRESSION_CHANNELS],gProgressionCacheRevision[PROGRESSION_CHANNELS];
+bool gProgressionCacheValid[PROGRESSION_CHANNELS];
+float gProgressionCacheBase[PROGRESSION_CHANNELS];
 
 bool LoadProgression()
 {
@@ -265,16 +272,40 @@ int ProgressionChannel(bool defense,bool boss)
     return (defense ? 2 : 0)+(boss ? 1 : 0);
 }
 
+bool CachedAmplifierBonuses(int building)
+{
+    if(gAmplifierCacheUID[building]!=gBuildings[building].uid
+        || gAmplifierCacheLevel[building]!=gBuildings[building].level
+        || gAmplifierCacheRevision[building]!=gConfigRevision)
+    {
+        int required;float bonuses[PROGRESSION_CHANNELS];
+        gAmplifierCacheValid[building]=AmplifierLevelInfo(gBuildings[building].type,gBuildings[building].level,required,bonuses);
+        for(int channel=0;channel<PROGRESSION_CHANNELS;channel++)gAmplifierCacheBonus[building][channel]=bonuses[channel];
+        gAmplifierCacheUID[building]=gBuildings[building].uid;gAmplifierCacheLevel[building]=gBuildings[building].level;
+        gAmplifierCacheRevision[building]=gConfigRevision;
+    }
+    return gAmplifierCacheValid[building];
+}
+
+bool CachedProgressionBaseMultiplier(int channel,int level,float &value)
+{
+    if(gProgressionCacheLevel[channel]!=level || gProgressionCacheRevision[channel]!=gConfigRevision)
+    {
+        gProgressionCacheValid[channel]=ReadProgressionBaseMultiplier(channel,level,gProgressionCacheBase[channel]);
+        gProgressionCacheLevel[channel]=level;gProgressionCacheRevision[channel]=gConfigRevision;
+    }
+    value=gProgressionCacheBase[channel];return gProgressionCacheValid[channel];
+}
+
 float AmplifierBonus(int channel,int &count)
 {
     count=0;float total=0.0;
-    for(int building=0;building<MAX_BUILDINGS;building++)
+    for(int building=RuntimeNextBuilding(-1,view_as<int>(Kind_Amplifier));building>=0;building=RuntimeNextBuilding(building,view_as<int>(Kind_Amplifier)))
     {
         if(!gBuildings[building].used || !gBuildings[building].alive || gBuildings[building].kind!=Kind_Amplifier
             || gBuildings[building].hp<=0 || !BuildingPowered(building))continue;
-        int required;float bonuses[PROGRESSION_CHANNELS];
-        if(!AmplifierLevelInfo(gBuildings[building].type,gBuildings[building].level,required,bonuses))continue;
-        count++;total+=bonuses[channel];
+        if(!CachedAmplifierBonuses(building))continue;
+        count++;total+=gAmplifierCacheBonus[building][channel];
     }
     return total;
 }
@@ -292,7 +323,7 @@ void GetProgressionStats(bool defense,bool boss,float &multiplier,int &lockedDam
     if(level>gProgressionLevels)level=gProgressionLevels;
     if(bonus>gProgressionRules[channel].maxAmplifierBonus)bonus=gProgressionRules[channel].maxAmplifierBonus;
     float baseMultiplier;
-    if(!ReadProgressionBaseMultiplier(channel,level,baseMultiplier))
+    if(!CachedProgressionBaseMultiplier(channel,level,baseMultiplier))
     {lockedDamage=gProgressionRules[channel].lockedDamage;multiplier=0.0;return;}
     multiplier=baseMultiplier+bonus;
     if(multiplier>gProgressionRules[channel].maxMultiplier)multiplier=gProgressionRules[channel].maxMultiplier;

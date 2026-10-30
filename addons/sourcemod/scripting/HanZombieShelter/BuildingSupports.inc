@@ -6,9 +6,7 @@ BuildingSupportIdentity gBuildingSupportQueue[MAX_BUILDINGS];
 
 int BuildingSupportFindUID(int uid)
 {
-    if(uid<=0)return -1;
-    for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].uid==uid)return b;
-    return -1;
+    return RuntimeFindBuildingUID(uid);
 }
 
 bool BuildingSupportLiving(int b)
@@ -157,7 +155,7 @@ void PruneOrphanedBuildingSupports()
 {
     if(gBuildingSupportsSuspended || gRebuilding || !Running())return;
     int epoch=gEpoch,runtime=gBuildingSupportRuntime;
-    for(int child=0;child<MAX_BUILDINGS;child++)
+    for(int child=RuntimeNextBuilding(-1);child>=0;child=RuntimeNextBuilding(child))
     {
         if(epoch!=gEpoch || runtime!=gBuildingSupportRuntime || gBuildingSupportsSuspended || !Running())return;
         if(!BuildingSupportLiving(child) || gBuildings[child].supportUID<=0)continue;
@@ -187,7 +185,7 @@ void BuildingSupportParentLost(int uid,int ref,int generation)
     {
         BuildingSupportIdentity parent;parent=gBuildingSupportQueue[gBuildingSupportQueueHead++];
         if(parent.epoch!=gEpoch)continue;
-        for(int child=0;child<MAX_BUILDINGS;child++)
+        for(int child=RuntimeNextBuilding(-1);child>=0;child=RuntimeNextBuilding(child))
         {
             if(runtime!=gBuildingSupportRuntime || epoch!=gEpoch || gBuildingSupportsSuspended || !Running())break;
             if(!BuildingSupportLiving(child) || gBuildings[child].supportUID!=parent.uid)continue;

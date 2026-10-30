@@ -150,6 +150,8 @@ bool SpawnBuildingBody(int index)
         if(HasEntProp(entity,Prop_Send,"m_nBody"))SetEntProp(entity,Prop_Send,"m_nBody",gBuildings[index].meta.body);
     }
     gBuildings[index].ref=EntIndexToEntRef(entity);gBuildings[index].nextFire=GetGameTime()+0.5;gBuildings[index].lastAttackAt=0.0;
+    // Publish lookup identity before animation/collision inputs can reenter.
+    if(entity<sizeof(gWorldBinding)){gWorldBinding[entity]=index+1;gWorldBindingRef[entity]=gBuildings[index].ref;}
     if(gBuildings[index].meta.idleAnimation[0])
     {
         SetVariantString(gBuildings[index].meta.idleAnimation);AcceptEntityInput(entity,"SetDefaultAnimation");
@@ -161,7 +163,6 @@ bool SpawnBuildingBody(int index)
     float worldMin[3],worldMax[3];ModelWorldBounds(entity,gBuildings[index].origin,gBuildings[index].angles,worldMin,worldMax);
     for(int a=0;a<3;a++){gBuildings[index].restoreMins[a]=worldMin[a]-gBuildings[index].origin[a];gBuildings[index].restoreMaxs[a]=worldMax[a]-gBuildings[index].origin[a];}
     gBuildings[index].boundsKnown=true;
-    if(entity<sizeof(gWorldBinding)){gWorldBinding[entity]=index+1;gWorldBindingRef[entity]=gBuildings[index].ref;}
     SDKHook(entity,SDKHook_OnTakeDamage,BuildingDamageHook);SDKHook(entity,SDKHook_Touch,BuildingTouch);
     if(gBuildings[index].kind==Kind_Light && !CreateBuildingLight(index))
     {
@@ -243,7 +244,7 @@ bool SpawnResourceBody(int node)
         gNodes[node].growing=true;gNodes[node].remaining=0;
         gNodes[node].elapsed=gMaterials[material].hold+gMaterials[material].grow;
     }
-    SDKHook(entity,SDKHook_OnTakeDamage,ResourceDamageHook);UpdateResourceVisual(node);
+    SDKHook(entity,SDKHook_OnTakeDamage,ResourceDamageHook);UpdateResourceVisual(node,true);
     return true;
 }
 
@@ -279,12 +280,12 @@ bool ResolveResourceReroll(int node)
     if(entity>0)
     {
         AcceptEntityInput(entity,"DisableCollision");
-        ApplyResourceModel(node,entity);UpdateResourceVisual(node);
+        ApplyResourceModel(node,entity);UpdateResourceVisual(node,true);
     }
     return true;
 }
 
-void UpdateResourceVisual(int node)
+void UpdateResourceVisual(int node,bool forceCollision=false)
 {
     int entity=Resolve(gNodes[node].ref);if(entity<0)return;
     int m=gNodes[node].material,alpha=255;
@@ -294,11 +295,18 @@ void UpdateResourceVisual(int node)
         if(p<0.0)p=0.0;if(p>1.0)p=1.0;if(gMaterials[m].ease)p*=p;
         alpha=RoundToNearest(255.0*p);
     }
-    SetEntityRenderColor(entity,gMaterials[m].rgb[0],gMaterials[m].rgb[1],gMaterials[m].rgb[2],alpha);
+    int r,g,b,a;GetEntityRenderColor(entity,r,g,b,a);
+    if(r!=gMaterials[m].rgb[0] || g!=gMaterials[m].rgb[1] || b!=gMaterials[m].rgb[2] || a!=alpha)
+        SetEntityRenderColor(entity,gMaterials[m].rgb[0],gMaterials[m].rgb[1],gMaterials[m].rgb[2],alpha);
     // Native inputs update the collision partition as well as the solid flags.
     // Directly writing m_usSolidFlags left stale engine traces against physics props.
-    AcceptEntityInput(entity,gNodes[node].growing ? "DisableCollision" : "EnableCollision");
-    SetEntityCollisionGroup(entity,2); // Mature resources stay traceable without blocking players or native NPCs.
+    // CDynamicProp inputs toggle FSOLID_NOT_SOLID (1<<2). Observe the actual
+    // entity so an outside writer is corrected; model/scale changes force an
+    // input even if that bit stayed unchanged, to refresh the partition.
+    bool nonSolid=(GetEntProp(entity,Prop_Send,"m_usSolidFlags") & (1<<2))!=0;
+    if(forceCollision || nonSolid!=gNodes[node].growing)
+        AcceptEntityInput(entity,gNodes[node].growing ? "DisableCollision" : "EnableCollision");
+    if(GetEntProp(entity,Prop_Send,"m_CollisionGroup")!=2)SetEntityCollisionGroup(entity,2);
 }
 
 void ResourceTick(float elapsed)
@@ -336,7 +344,7 @@ bool ResourceSpaceOccupied(int node,int entity)
         for(int a=0;a<3;a++){mins[a]+=origin[a];maxs[a]+=origin[a];}
         if(BoxesOverlap(low,high,mins,maxs))return true;
     }
-    for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].alive && Resolve(gBuildings[b].ref)>0)
+    for(int b=RuntimeNextBuilding(-1);b>=0;b=RuntimeNextBuilding(b))if(gBuildings[b].used && gBuildings[b].alive && Resolve(gBuildings[b].ref)>0)
     {
         float mins[3],maxs[3];for(int a=0;a<3;a++){mins[a]=gBuildings[b].origin[a]+gBuildings[b].restoreMins[a];maxs[a]=gBuildings[b].origin[a]+gBuildings[b].restoreMaxs[a];}
         if(BoxesOverlap(low,high,mins,maxs))return true;
@@ -349,7 +357,7 @@ void RestoreDeferredBuildings()
     PruneOrphanedBuildingSupports();
     RestoreDynamicBaseBodies();
     if(!CanAllocateEntities(2,true))return;
-    for(int b=MAX_CORES;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(MAX_CORES-1);b>=0;b=RuntimeNextBuilding(b))
     {
         if(!gBuildings[b].used || !gBuildings[b].alive || Resolve(gBuildings[b].ref)>0)continue;
         if(GetGameTime()<gBuildings[b].restoreRetryAt)continue;
@@ -419,7 +427,7 @@ public Action BuildingDamageHook(int entity,int &attacker,int &inflictor,float &
         if(repair<1)return Plugin_Handled;
         int before=gBuildings[b].hp;gBuildings[b].hp+=repair;
         if(gBuildings[b].constructing && gBuildings[b].hp>=gBuildings[b].constructionTarget)CompleteBuildingConstruction(b,attacker);
-        if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
+        if(gBuildings[b].kind==Kind_Generator)RecalculateBuildingPower(b);
         HudRepairFeedback(attacker,b,gBuildings[b].hp-before);
         // Knife/axe already emits its own wall impact; avoid a second wall sound.
         if(!ResourceMeleeHit(attacker,inflictor))PlayInteractionSound("repair",entity,gBuildings[b].origin);
@@ -452,7 +460,7 @@ void DamageBuilding(int b,int damage,bool attacked=false,int attackerNPC=-1)
     gBuildings[b].hp-=damage;
     if(gBuildings[b].hp>0)
     {
-        if(gBuildings[b].kind==Kind_Generator)RecalculatePower();
+        if(gBuildings[b].kind==Kind_Generator)RecalculateBuildingPower(b);
     }
     else
     {

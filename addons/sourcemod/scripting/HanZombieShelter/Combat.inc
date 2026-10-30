@@ -66,7 +66,7 @@ int BlockingBuilding(int n,int client)
         int hit=TR_DidHit(trace) ? TR_GetEntityIndex(trace) : -1;delete trace;candidate=FindBuilding(hit);
     }
     if(candidate<0 && gNPCs[n].touchedUntil>GetGameTime())
-        for(int b=0;b<MAX_BUILDINGS;b++)if(gBuildings[b].used && gBuildings[b].uid==gNPCs[n].touchedUID){candidate=b;break;}
+        candidate=RuntimeFindBuildingUID(gNPCs[n].touchedUID);
     if(!BuildingOperational(candidate) || gBuildings[candidate].kind==Kind_Mine)return -1;
     int body=Resolve(gBuildings[candidate].ref);if(body<0)return -1;
     float local[3],mins[3],maxs[3],closest[3];LocalPoint(origin,gBuildings[candidate].origin,gBuildings[candidate].angles,local);
@@ -436,7 +436,7 @@ void MineTick(int b)
 
 void MineWorldTick()
 {
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(Kind_Mine));b>=0;b=RuntimeNextBuilding(b,view_as<int>(Kind_Mine)))
     {
         if(!gBuildings[b].used || !gBuildings[b].alive)continue;
         if(!Running() || gRebuilding)return;
@@ -449,7 +449,7 @@ public Action DefenseTimer(Handle timer)
     float now=GetGameTime();BuildPreviewTick(now);ConstructionSafetyTick(now);
     if(!Running() || gRebuilding || !APIAvailable())return Plugin_Continue;
     int epoch=gEpoch;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1);b>=0;b=RuntimeNextBuilding(b))
     {
         if(!Running() || gRebuilding || epoch!=gEpoch)break;
         if(!gBuildings[b].used || !gBuildings[b].alive || now+0.00001<gBuildings[b].nextFire)continue;

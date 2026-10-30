@@ -200,6 +200,7 @@ void RecoverBases()
             gBuildings[b].hp=fraction;
         }
         gBuildings[b].alive=true;
+        InvalidateRuntimeBuildings();
     }
 }
 

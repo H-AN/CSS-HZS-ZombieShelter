@@ -32,7 +32,7 @@ int BeaconCount(int core,int exclude=-1)
 {
     if(core<0 || core>=gCoreCount)return 0;
     int count;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(Kind_Beacon));b>=0;b=RuntimeNextBuilding(b,view_as<int>(Kind_Beacon)))
         if(b!=exclude && gBuildings[b].used && gBuildings[b].alive
             && gBuildings[b].kind==Kind_Beacon && gBuildings[b].buildCore==core)count++;
     return count;
@@ -58,7 +58,7 @@ int BeaconForCore(int core,int excludedCore=-1)
 {
     if(core==excludedCore || !TravelBaseAlive(core))return -1;
     int selected=-1;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(Kind_Beacon));b>=0;b=RuntimeNextBuilding(b,view_as<int>(Kind_Beacon)))
         if(gBuildings[b].buildCore==core && BeaconEffective(b)
             && (selected<0 || gBuildings[b].uid<gBuildings[selected].uid))selected=b;
     return selected;

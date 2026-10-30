@@ -11,7 +11,7 @@ int RestorationCount(int core,BuildingKind kind,int exclude=-1)
 {
     if(core<0 || core>=gCoreCount || !IsRestorationKind(kind))return 0;
     int count;
-    for(int b=0;b<MAX_BUILDINGS;b++)if(b!=exclude && gBuildings[b].used && gBuildings[b].alive
+    for(int b=RuntimeNextBuilding(-1,view_as<int>(kind));b>=0;b=RuntimeNextBuilding(b,view_as<int>(kind)))if(b!=exclude && gBuildings[b].used && gBuildings[b].alive
         && gBuildings[b].kind==kind && gBuildings[b].buildCore==core)count++;
     return count; // A logical facility awaiting its saved body still occupies its slot.
 }
@@ -169,7 +169,7 @@ int RestorationPulse(int b)
 void RestorationTick(float now)
 {
     if(!Running())return;
-    for(int b=0;b<MAX_BUILDINGS;b++)
+    for(int b=RuntimeNextBuilding(-1);b>=0;b=RuntimeNextBuilding(b))
     {
         if(!gBuildings[b].used || !gBuildings[b].alive || !IsRestorationKind(gBuildings[b].kind))continue;
         float interval=gBuildings[b].restoreInterval;

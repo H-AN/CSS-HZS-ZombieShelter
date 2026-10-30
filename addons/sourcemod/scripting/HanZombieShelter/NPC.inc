@@ -105,9 +105,9 @@ void BindNPC(int entity)
         break;
     }
     gNPCs[slot]=npc;gNextTargetFallback[slot]=0.0;
+    if(entity<sizeof(gNPCBinding)){gNPCBinding[entity]=slot+1;gNPCBindingRef[entity]=npc.ref;}
     ExpansionClearNPCFreeze(slot);
     ClearNPCRewardContext(slot);CacheNPCDrops(slot,name);
-    if(entity<sizeof(gNPCBinding)){gNPCBinding[entity]=slot+1;gNPCBindingRef[entity]=npc.ref;}
     ReadNPCAnimations(slot,name);
     // This notification runs inside HZS CreateZombie. Only visibility is changed now;
     // movement/state operations wait until HZS has completed its initialization.
