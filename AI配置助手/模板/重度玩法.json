@@ -1,0 +1,989 @@
+{
+  "format": "hzsh-ai-field-patch",
+  "format_version": 1,
+  "preset_id": "heavy_candidate_v082",
+  "display_name": "重度玩法候选",
+  "target_plugin_version": "v0.8.2",
+  "document_date": "2026-10-27",
+  "validation_status": "候选未实测；仅字段与规则静态核对，不是平衡验收",
+  "scope": "AI候选字段参考；按用户真实路径或指定工作目录维护当前完整配置树；无目标位置只解释，不生成输出",
+  "path_base": "用户明确的当前配置树；file的cstrike相对来源路径须映射到真实层级，不套作者环境",
+  "semantic_policy": {
+    "preserve_unlisted": true,
+    "preserve_unknown": true,
+    "preserve_comments_encoding_newlines": true,
+    "overwrite_baseline_with_release_defaults": false,
+    "deliver_complete_modified_files": true,
+    "rollback_requires_written_file_hash_match": true,
+    "modify_native_pool": false,
+    "modify_stage": false,
+    "modify_maps_or_bosses": false,
+    "auto_reload_restart_or_reset": false,
+    "template_operations_require_existing_unique_leaves": true,
+    "template_operations_create_missing_keys": false,
+    "separately_requested_supported_additions_allowed": true,
+    "user_current_data_has_priority": true,
+    "expected_baseline_is_reference_only": true,
+    "apply_only_user_accepted_scope": true,
+    "no_target_means_no_output": true,
+    "initialize_empty_target_once_from_complete_examples": true,
+    "subsequent_edits_use_current_target": true,
+    "local_damage_repair_only": true,
+    "deliver_complete_configuration_tree": true,
+    "include_unchanged_in_full_result": true,
+    "include_unchanged_in_incremental": false
+  },
+  "baseline_requirements": {
+    "baseline_kind": "2026-10-27仓库v0.8.2所见字段，仅用来识别差量，不代表用户现场或已平衡配置",
+    "schemas": {
+      "mode.cfg": "1",
+      "lifecycle.cfg": "1",
+      "resources.cfg": "2",
+      "bases.cfg": "1",
+      "days.cfg": "1",
+      "skills.cfg": "1",
+      "power.cfg": "1"
+    },
+    "resources": {
+      "pool_id": "desert_mixed",
+      "required_map_reference": true,
+      "RegrowWeights": "来源样例没有此表；用户当前存在且合法时保留，仅在本轮明确要求修改再生权重时检查/调整它，不停止无关编辑，也不忽略或删除"
+    },
+    "fixed_base": {
+      "profile": "shelter_basic",
+      "levels": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "growth_max_level": "4",
+      "growth_anchor_level": "4"
+    },
+    "day_stages": [
+      {
+        "id": "day_01",
+        "from_day": "1",
+        "to_day": "1"
+      },
+      {
+        "id": "day_02_04",
+        "from_day": "2",
+        "to_day": "4"
+      },
+      {
+        "id": "day_05_09",
+        "from_day": "5",
+        "to_day": "9"
+      },
+      {
+        "id": "day_10_plus",
+        "from_day": "10",
+        "to_day": "0"
+      }
+    ],
+    "native_pool": {
+      "file": "addons/sourcemod/configs/HanZombieShelter/zombies.cfg",
+      "initial_ordinary_count": "100",
+      "raider_alive_limit": "100",
+      "policy": "来源值只读参考；保持用户当前合法池和上限，按实际预算检查接受的目标，不为模板改池或Stage。"
+    },
+    "bosses": "至少一条有效启用定义，数量/类型/顺序/坐标/Stage全部保持并校验现有匹配",
+    "runtime_overrides": "每日技能点和缺电策略若覆盖配置，暂停相关模块的生效承诺；不自行发送Cvar命令",
+    "policy": "以下只描述仓库来源样例，不能据此覆盖用户合法不同值；仅对本轮接受字段按当前结构与约束适配。"
+  },
+  "apply_rules": [
+    "按 [AI工作流程](../01_AI工作流程.md) 识别三种工作模式。真实路径直接改该处；指定工作目录只改该处当前副本；没有任何目标位置时只解释cfg/字段和建议，不生成文件。只补问缺失或互相冲突的信息，每轮最多五问。",
+    "用户已提供的数值、当前配置和明确修改范围优先于模板。选择轻度/重度只提供可选参考；仅应用用户接受的字段，未接受项保留当前值；明确要求“其余用推荐”才可记录相应推荐为已接受，不把沉默当回答。",
+    "JSON的file按目标树的实际层级映射，其来源写法相对于cstrike；先识别目标已经位于cstrike、addons或配置子目录，避免重复套目录。只解析完整kv_path，不做全文件字符串替换。",
+    "本JSON的62项operations只允许set已有且唯一的叶；缺失结构先解释并按当前合法结构映射，不能借本模板擅建块。用户另行要求的受支持新类型/配方按 [自然语言修改与新增炮塔](../07_自然语言修改与新增炮塔.md) 处理，属于独立修改范围，不受本62项set清单限制。",
+    "expected_baseline和baseline_requirements中的数值只是仓库来源对照，不是用户必须恢复的值。当前值不同但合法时照旧保留；仅对用户接受的修改比较当前值、建议值和范围，再检查真实schema/类型/引用。结构不兼容时补问或适配，不能把合法自定义判成损坏。",
+    "现有目标完整树是持续维护的结果；先备份本次会改的原件并记录哈希，只最小合并本轮接受的差量，未改文件原字节保留。无需为了只改一个值先套整套模板或重新导出六份文件。",
+    "仅空目标首次初始化可复制完整示例配置树并标明来源；其后以用户当前副本为准，不重复覆盖。仓库示例只读溯源，局部损坏只对照修该块/文件，不整套还原；无法取得完整基线时只给字段方案与缺失清单。",
+    "用户要求导出时默认提供完整最终配置树：用户本次确认的完整基线副本加接受差量，未变文件原字节保留。可另给增量覆盖树，后者才只含实际变化的完整cfg。原始备份和最终结果分开；完整配置不等于插件/HZS/地图/资源齐全的完整安装。",
+    "资源字段只作用于用户接受的当前资源池。desert_mixed是来源样例；当前池名不同就按实际引用映射。已有RegrowWeights时解释其独立整表语义，未获对应修改要求就保留，不能删除或被初始权重表静默替代。",
+    "落盘前重新比对来源文件哈希，有后续变化就重新合并。落盘后重解析并复核最小diff；恢复整份备份前确认目标仍匹配本次写后哈希，若已有用户或其他工具后续修改则停止自动恢复，展示差异后局部合并，不覆盖后来变动。",
+    "保留用户现有原生池、Stage、Boss和地图。模板中的池100/活动上限100是来源参考；当前合法值不同则保持，针对用户接受的怪物目标检查实际预算，必要时给适配建议，不为凑模板改原生池或Stage。",
+    "这些模板没有执行器，也不授权发送游戏命令。多数cfg按战役锁定，技能变化需要新地图会话；写盘或导出不等于加载，不重启、切图、强制卸载、回放回调或重置库存/战役。",
+    "分别记录已解释/已修改/未加载/已实测状态。无真实服的演练明确标“仅模拟”；复制完整示例不使样图Boss占位或地图Stage变成已验收。候选未实测，只有真实前置与本图要求通过后才可安排真人测试。"
+  ],
+  "preserve": [
+    "以下是仅采用本62项模板时的保留范围；用户另行明确要求的受支持修改/新增另记范围。所有未接受修改的文件、块、叶、注释、未知字段、编码和换行保留；当前完整树包含未变原件，增量导出才排除未变文件；不拿仓库或发行默认替换用户现件。",
+    "地图BSP/NAV、ShelterMap全部内容、基地坐标/安全盒/资源区/点数/资源池引用、BossSpawnPoints及各Boss定义顺序、数量和启停。",
+    "bosses.cfg全部字段、原生HZS的ZombieData/Stage/主体/API/gamedata与普通近战基础伤害、Boss技能；不得用模板创建/复活NPC。",
+    "zombies.cfg全部内容：原生池、活动上限、停车点、普通怪建筑攻击；所有原生custom类型与总实体预算。",
+    "days.cfg未列字段：阶段名称/范围、Cvars、白夜批次/间隔、最大怪HP、夜间上限及额外数量增长；不得为匹配模板擅改原生Stage。",
+    "resources.cfg其余字段：Gathering冷却、背包与仓库容量、每轮次数/每次产量、模型/外观；已有其他资源池及RegrowWeights不删除不覆盖。",
+    "bases.cfg其余字段：Growth锚点/等级上限/增长率、升级费用、建造范围与上限；shelters.cfg玩家自建基地全部保持。",
+    "skills.cfg其余字段：启停、技能等级/费用/效果/免疫概率/半径/脉冲/洗点费；weapons.cfg全部施工维修采集规则与HWS武器数据/命令。",
+    "所有建筑类型/配方/费用/放置/模型/供需与上限：炮塔、火塔、围栏、地雷、增强器、发电机、灯、榴弹塔、扩大器、修理/治疗/护甲站、信标、篝火、Tesla、等离子塔、瞭望塔、合成台。",
+    "materials.cfg、zombie_drops.cfg、drops.cfg、progression.cfg、entities.cfg、management.cfg、weapon_crafting.cfg、material_crafting.cfg、sounds.cfg全部内容。",
+    "HanZombieShelterEnvironment配置/地图配置、所有可选插件与外部插件、翻译、下载表、模型材质声音、SMX/源码及资源包；不启用失败补丁或BOT/FakeClient。",
+    "服务器启动参数、密码、地址端口、权限、插件清单、用户进程和现有战役/库存/建筑/HP；只使用服主明确的目标安装位置并遵守该安装已有的本地约定，不擅自套用作者环境。"
+  ],
+  "cross_file_checks": [
+    "配置根与schema、重复键、整数/有限小数/范围有效；每条set精确指向存在叶，所有未列叶语义保持。",
+    "阶段按当前四个ID精确匹配并保持1—1/2—4/5—9/10以上连续覆盖；其他结构须适配，不仅按相似名字套用。",
+    "模板来源池100/活动上限100只供对照；按用户当前池、活动上限、阶段Cvars和MAX_NPCS预算检查本轮接受的目标。当前合法不同值保持，不为模板改池或Stage。",
+    "至少一条有效启用Boss；其native key数量与原生Stage精确匹配，五槽完整且属于该BSP。本模板对Boss/地图全部保持，因此只继承既有验证状态，不声称新地图或新Boss路线通过。",
+    "来源完整候选的权重合计100仅便于阅读；用户权重可为其他正总和，有限且非负并按总和归一化即可，不强制改成100。所有材料已注册、grow>=0.25、hold>=0；只检查本轮接受的权重与当前RegrowWeights/资源池引用是否一致，未要求修改的合法当前值保留。",
+    "固定基地一级initial_hp<=max_hp；四级HP曲线与原升级费用、Growth和玩家自建基地分别核对。降低HP不得通过模板清局或回填现存实体。",
+    "伤害倍率上限>=该阶段基础值、日增长非负；普通怪HP上限/max_raider_hp保持。普通怪HP倍率不套到BossHP；普通近战对玩家倍率可能同时影响Boss普通近战，技能及Boss建筑伤害独立保持。",
+    "确认技能规则已启用且运行每日点数覆盖遵循配置（sm_zsh_skill_points_per_day=-1）；若有覆盖，仅记录实际生效值并询问安排，不擅改运行Cvar或补发历史点。",
+    "确认实际电网覆盖（sm_zsh_power_overload=-1）、发电机有效输出与全部正功耗之和；若有覆盖先记录和澄清。workbenches等消费者功耗不随模板降低，合成台仍须足额供电。",
+    "缺电策略0按较低power_priority及较旧UID顺序分配完整需求，可能剩余碎片电力；策略1一旦总需求超过输出，全部正功耗设备停止。两者都不是有电就全设备运行。",
+    "采用完整候选时救援30天，用户另有明确天数则其值优先；全部有效启用Boss死亡仍是胜利通路。rollback_one_day是策略名，实际回退来自rollback_days；最高天数技能点不因回退重复领取。",
+    "测试前另核对完整资源、HZS/API、插件加载与外部武器命令；配置静态通过不替代真人E菜单、供电/扣款、自然阶段与实际路径验证。"
+  ],
+  "confirmation_policy": {
+    "questions_per_round_max": 5,
+    "wait_for_user_response": true,
+    "template_selection_is_candidate": true,
+    "explicit_use_recommendations_allowed": true,
+    "unknown_or_silence_is_not_consent": true,
+    "user_specified_values_override_template": true,
+    "only_ask_missing_or_conflicting_information": true
+  },
+  "operations_count": 62,
+  "operations": [
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "day_seconds"
+      ],
+      "expected_baseline": "180",
+      "value": "180"
+    },
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "night_seconds"
+      ],
+      "expected_baseline": "180",
+      "value": "180"
+    },
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "warning_seconds_before_night"
+      ],
+      "expected_baseline": "30",
+      "value": "30"
+    },
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "night_exposure_enabled"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "night_exposure_damage"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "昼夜与暴露",
+      "file": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "kv_path": [
+        "ShelterMode",
+        "Rules",
+        "night_exposure_interval_seconds"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "Campaign",
+        "failure_policy"
+      ],
+      "expected_baseline": "rollback_one_day",
+      "value": "rollback_one_day"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "Campaign",
+        "rollback_days"
+      ],
+      "expected_baseline": "0",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "Campaign",
+        "survival_day_limit"
+      ],
+      "expected_baseline": "30",
+      "value": "30"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "Campaign",
+        "minimum_day"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "Campaign",
+        "destroy_summons_on_failure"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "胜负与恢复",
+      "file": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "kv_path": [
+        "ShelterLifecycle",
+        "BaseRecovery",
+        "upgraded_hp_fraction"
+      ],
+      "expected_baseline": "0.5",
+      "value": "0.5"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "reroll_on_regrow"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "Weights",
+        "wood"
+      ],
+      "expected_baseline": "55",
+      "value": "60"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "Weights",
+        "iron"
+      ],
+      "expected_baseline": "25",
+      "value": "25"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "Weights",
+        "copper"
+      ],
+      "expected_baseline": "12",
+      "value": "10"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "Weights",
+        "silver"
+      ],
+      "expected_baseline": "6",
+      "value": "4"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Pools",
+        "desert_mixed",
+        "Weights",
+        "gold"
+      ],
+      "expected_baseline": "2",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "wood",
+        "hold_seconds"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "wood",
+        "grow_seconds"
+      ],
+      "expected_baseline": "45",
+      "value": "60"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "iron",
+        "hold_seconds"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "iron",
+        "grow_seconds"
+      ],
+      "expected_baseline": "60",
+      "value": "75"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "copper",
+        "hold_seconds"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "copper",
+        "grow_seconds"
+      ],
+      "expected_baseline": "90",
+      "value": "105"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "silver",
+        "hold_seconds"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "silver",
+        "grow_seconds"
+      ],
+      "expected_baseline": "120",
+      "value": "150"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "gold",
+        "hold_seconds"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "资源经济",
+      "file": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "kv_path": [
+        "ShelterResources",
+        "Gatherables",
+        "gold",
+        "grow_seconds"
+      ],
+      "expected_baseline": "180",
+      "value": "210"
+    },
+    {
+      "op": "set",
+      "module": "固定基地",
+      "file": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "kv_path": [
+        "ShelterBases",
+        "Profiles",
+        "shelter_basic",
+        "Levels",
+        "1",
+        "max_hp"
+      ],
+      "expected_baseline": "1250",
+      "value": "1250"
+    },
+    {
+      "op": "set",
+      "module": "固定基地",
+      "file": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "kv_path": [
+        "ShelterBases",
+        "Profiles",
+        "shelter_basic",
+        "Levels",
+        "2",
+        "max_hp"
+      ],
+      "expected_baseline": "2000",
+      "value": "2000"
+    },
+    {
+      "op": "set",
+      "module": "固定基地",
+      "file": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "kv_path": [
+        "ShelterBases",
+        "Profiles",
+        "shelter_basic",
+        "Levels",
+        "3",
+        "max_hp"
+      ],
+      "expected_baseline": "3500",
+      "value": "3500"
+    },
+    {
+      "op": "set",
+      "module": "固定基地",
+      "file": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "kv_path": [
+        "ShelterBases",
+        "Profiles",
+        "shelter_basic",
+        "Levels",
+        "4",
+        "max_hp"
+      ],
+      "expected_baseline": "5000",
+      "value": "5000"
+    },
+    {
+      "op": "set",
+      "module": "固定基地",
+      "file": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "kv_path": [
+        "ShelterBases",
+        "Profiles",
+        "shelter_basic",
+        "Levels",
+        "1",
+        "initial_hp"
+      ],
+      "expected_baseline": "1250",
+      "value": "1250"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "day_target_alive"
+      ],
+      "expected_baseline": "8",
+      "value": "8"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "night_target_alive"
+      ],
+      "expected_baseline": "50",
+      "value": "50"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "raider_hp_multiplier"
+      ],
+      "expected_baseline": "1.0",
+      "value": "1.0"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "raider_player_damage_multiplier"
+      ],
+      "expected_baseline": "1.00",
+      "value": "1.00"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "extra_player_damage_multiplier_per_day"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_01",
+        "player_damage_multiplier_cap"
+      ],
+      "expected_baseline": "1.00",
+      "value": "1.00"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "day_target_alive"
+      ],
+      "expected_baseline": "10",
+      "value": "10"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "night_target_alive"
+      ],
+      "expected_baseline": "80",
+      "value": "80"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "raider_hp_multiplier"
+      ],
+      "expected_baseline": "1.2",
+      "value": "1.2"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "raider_player_damage_multiplier"
+      ],
+      "expected_baseline": "1.05",
+      "value": "1.05"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "extra_player_damage_multiplier_per_day"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_02_04",
+        "player_damage_multiplier_cap"
+      ],
+      "expected_baseline": "1.05",
+      "value": "1.05"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "day_target_alive"
+      ],
+      "expected_baseline": "12",
+      "value": "12"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "night_target_alive"
+      ],
+      "expected_baseline": "90",
+      "value": "90"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "raider_hp_multiplier"
+      ],
+      "expected_baseline": "1.6",
+      "value": "1.6"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "raider_player_damage_multiplier"
+      ],
+      "expected_baseline": "1.10",
+      "value": "1.10"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "extra_player_damage_multiplier_per_day"
+      ],
+      "expected_baseline": "0",
+      "value": "0"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_05_09",
+        "player_damage_multiplier_cap"
+      ],
+      "expected_baseline": "1.10",
+      "value": "1.10"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "day_target_alive"
+      ],
+      "expected_baseline": "12",
+      "value": "12"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "night_target_alive"
+      ],
+      "expected_baseline": "100",
+      "value": "100"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "raider_hp_multiplier"
+      ],
+      "expected_baseline": "2.0",
+      "value": "2.0"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "raider_player_damage_multiplier"
+      ],
+      "expected_baseline": "1.15",
+      "value": "1.15"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "extra_player_damage_multiplier_per_day"
+      ],
+      "expected_baseline": "0.01",
+      "value": "0.01"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "player_damage_multiplier_cap"
+      ],
+      "expected_baseline": "1.50",
+      "value": "1.50"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "extra_hp_multiplier_per_day"
+      ],
+      "expected_baseline": "0.1",
+      "value": "0.1"
+    },
+    {
+      "op": "set",
+      "module": "普通怪阶段",
+      "file": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "kv_path": [
+        "ShelterDays",
+        "Stages",
+        "day_10_plus",
+        "hp_multiplier_cap"
+      ],
+      "expected_baseline": "5.0",
+      "value": "5.0"
+    },
+    {
+      "op": "set",
+      "module": "技能点预算",
+      "file": "addons/sourcemod/configs/HanZombieShelter/skills.cfg",
+      "kv_path": [
+        "ShelterSkills",
+        "Rules",
+        "points_per_day"
+      ],
+      "expected_baseline": "2",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "电网",
+      "file": "addons/sourcemod/configs/HanZombieShelter/power.cfg",
+      "kv_path": [
+        "ShelterPower",
+        "Rules",
+        "enabled"
+      ],
+      "expected_baseline": "1",
+      "value": "1"
+    },
+    {
+      "op": "set",
+      "module": "电网",
+      "file": "addons/sourcemod/configs/HanZombieShelter/power.cfg",
+      "kv_path": [
+        "ShelterPower",
+        "Rules",
+        "overload_penalty"
+      ],
+      "expected_baseline": "0",
+      "value": "1"
+    }
+  ],
+  "audit_examples": {
+    "difficulty_is_not_player_scaling": true,
+    "ordinary_pool_unchanged": 100,
+    "day_1": {
+      "ordinary_hp_multiplier": 1,
+      "player_melee_multiplier": 1
+    },
+    "day_10": {
+      "ordinary_hp_multiplier": 2,
+      "player_melee_multiplier": 1.15
+    },
+    "day_30": {
+      "ordinary_hp_multiplier": 4,
+      "player_melee_multiplier": 1.35
+    },
+    "new_campaign_skill_points_by_day_30": 30,
+    "exposure_nominal_hp_per_second": 1,
+    "example_limits": "仅在完整采用这些候选值时按配置公式计算；用户自定值优先并重算。Exposure受安全/免疫门禁，近战受护甲/取整等影响，技能只在新最高日记一次且受覆盖影响；未推断实战胜率。"
+  },
+  "work_modes": {
+    "real_path": {
+      "condition": "用户给出真实配置位置并要求修改",
+      "action": "读取该位置现有文件并在原位置最小修改；用户当前数据优先，不另建模拟输出。"
+    },
+    "working_path": {
+      "condition": "用户指定一个工作目录，要求在其中修改",
+      "action": "该目录已有配置时继续改当前副本；仅目标为空且用户要求初始化时，初次复制完整示例配置树并记录来源，再在该副本上合并接受的修改。后续不重复复制。"
+    },
+    "no_path": {
+      "condition": "未给真实配置位置或工作目录",
+      "action": "只解释对应cfg、类型和字段，给可复制建议并请用户提供目录；不创建输出、会话或模拟文件。"
+    }
+  }
+}

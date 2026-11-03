@@ -1,5 +1,9 @@
 # CSS-HZS-ZombieShelter
 
+> **用 AI 帮你配置插件：[打开 AI 配置助手](AI配置助手/README.md)**
+>
+> 用自然语言查询配置、调整数值和配方、修改炮塔，或选择轻度／重度玩法模板。将这套指南交给 AI 即可开始。当前仓库配置位于 [`plugin/addons/sourcemod/configs/`](plugin/addons/sourcemod/configs/)。
+
 **Counter-Strike: Source 合作昼夜求生插件 · v0.8.3**
 
 白天搜集材料、修建基地和防御设施，夜间守住供电与安全区；升级角色技能、制作工具，与队友共同击败地图 Boss，或坚持到救援到来。
