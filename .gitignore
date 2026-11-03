@@ -4,13 +4,13 @@
 /development/
 /optional/server-compat/
 /.codex/
+/tools/
+/tests/
+/build.ps1
 
 # Generated builds, release archives and test environments.
 /build/
 /dist/
-/tests/compiled/
-/tests/reports/
-/tests/runtime/
 
 # Python caches and logs.
 __pycache__/
