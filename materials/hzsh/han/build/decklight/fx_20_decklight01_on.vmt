@@ -1,8 +1,0 @@
-"VertexLitGeneric"
-{
-    "$basetexture" "hzsh/han/build/decklight/fx_20_decklight01_on"
-    "$surfaceprop" "metal"
-    "$alphatest" "0"
-    "$alphatestreference" "0.5"
-    "$nocull" "1"
-}

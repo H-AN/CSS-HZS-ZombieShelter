@@ -1,8 +1,0 @@
-"VertexLitGeneric"
-{
-    "$basetexture" "hzsh/han/build/watchtower_2/ttower_light"
-    "$surfaceprop" "wood"
-    "$alphatest" "1"
-    "$alphatestreference" "0.24"
-    "$nocull" "1"
-}

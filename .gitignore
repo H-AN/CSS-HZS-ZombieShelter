@@ -1,6 +1,34 @@
+# Local-only instructions, records and integration files.
+/AGENTS.md
+**/AGENTS*.md
+/development/
+/examples/ai-configuration/
+/optional/server-compat/
+/.codex/
+
+# Generated builds, release archives and test environments.
+/build/
+/dist/
+/tests/compiled/
+/tests/reports/
+/tests/runtime/
+
+# Python caches and logs.
 __pycache__/
-tests/compiled/
+*.py[cod]
+.pytest_cache/
 *.log
-tests/reports/
-tests/runtime/
-dist/
+
+# Local backups and temporary files.
+/backups/
+*.bak
+*.orig
+*.rej
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

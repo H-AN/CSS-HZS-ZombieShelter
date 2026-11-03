@@ -1,2 +1,11 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep packaged file hashes stable across platforms.
+/optional/npc-follow-range/** -text
+
+# Runtime/resource manifests verify exact bytes, including original cfg line endings.
+/plugin/addons/** -text
+/resources/** -text
+/optional/server-compat/** -text
+/src/** -text

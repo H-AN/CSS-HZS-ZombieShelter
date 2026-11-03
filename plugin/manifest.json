@@ -1,0 +1,348 @@
+{
+  "schema_version": 1,
+  "shelter_version": "0.8.3",
+  "distribution_revision": "server-defaults-20261103",
+  "default_maps": [
+    "zsh_desert_han_dn",
+    "zsh_deadcity_han_dn"
+  ],
+  "file_count": 56,
+  "files": [
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioConfig.cfg",
+      "bytes": 1503,
+      "sha256": "104740b0f17ea14d53b5042098e74a428035f2e0b7bce69a1c232a5e9f03adbc",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioDamageConfig.cfg",
+      "bytes": 538,
+      "sha256": "332965607e010eeca6d887f5266e21649cc7d2d2ad42ce4bd0e2e4cb625f9b1f",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioGrenadeSysCFG.cfg",
+      "bytes": 1425,
+      "sha256": "10c3f28e0ea41eb45d68c108a025163a47ec4537d9f65bb265f6a002ecd5b45c",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioStage.cfg",
+      "bytes": 1373,
+      "sha256": "06c5cca37c289aeb2d4faa05c3d49317f0fff493c137e7cf6000e2adfdcfc457",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioVoxConfig.cfg",
+      "bytes": 1299,
+      "sha256": "941b0558016a1d2591704ecf1ef73d6e9976c3e8d8e142297d59c6d39f097d43",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/HanZombieScenarioZombieData.cfg",
+      "bytes": 23646,
+      "sha256": "d990005adad7f7243ecf18802b7fdfef2238a6605bf8d72ba7d6a2f54ab081f0",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/zsh_deadcity_han_dn/HanZombieScenarioStage.cfg",
+      "bytes": 683,
+      "sha256": "e61da159be5016655116d8d6d948ac1bf84fab8eb0d50628923551439ee40fff",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieScenario/zsh_desert_han_dn/HanZombieScenarioStage.cfg",
+      "bytes": 724,
+      "sha256": "26b3ffc36dc7d41cb210adfad595deb9a6eb2d0f76012aaeb9a78fdd8bd7e9b2",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/amplifiers.cfg",
+      "bytes": 4213,
+      "sha256": "0fcdec7005cb6c3e6c1798680c8687e242f2ddb0a73bb1f252e9eec536c72078",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/armor_stations.cfg",
+      "bytes": 6466,
+      "sha256": "a8470ffe942d4b3d3172bc57be2eba82a95ec81ecfc5a1b95b3b6fe45051c6df",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/bases.cfg",
+      "bytes": 18152,
+      "sha256": "552e6b14ed34411659c06ec32b07d98f529ac5c117ef31bb7518cbd11338c693",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/beacons.cfg",
+      "bytes": 3679,
+      "sha256": "b1b58eecbfb03ae1ccdaf4de4ea28c49a528f35b549cf8aadf61d7c6d6d9ccf1",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/bosses.cfg",
+      "bytes": 908,
+      "sha256": "64c2872cfa24885e0b1b2687a2f611e3d40c4821bfb0f548db268883cf2b8a7d",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/campfires.cfg",
+      "bytes": 3535,
+      "sha256": "0143ce85523f331bd2617cf1a98b7b3ef85335ff9ebe7d20c7723daf630061e1",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/days.cfg",
+      "bytes": 2947,
+      "sha256": "9d1ec2791e2d5328387ee9bf31d435e1ef44cf7dc40fbc22e709acee546a0cb3",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/downloads.txt",
+      "bytes": 28566,
+      "sha256": "f331bb5d5452b984f6f6251bfcde8ffe6a616f51bfcf1939ae31a81a351e5066",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/entities.cfg",
+      "bytes": 877,
+      "sha256": "9dd91338b0a7ac9a075571c1caf1dd93ecc16740a8c356f42e50bf567c2457df",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/expanders.cfg",
+      "bytes": 3183,
+      "sha256": "d88a7d0cc06c69396b3155d51f37a520b9f75dd81304dc4e12371f123e354986",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/fences.cfg",
+      "bytes": 14622,
+      "sha256": "c2186ba3cebdb51b11c7feec00003dc897c63d7f303800ae85eeed3de6196e45",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/flame_turrets.cfg",
+      "bytes": 4472,
+      "sha256": "eb29df71ccc8a501baa810f6e7a8c264370ffb3a954830baba34969467240511",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/generators.cfg",
+      "bytes": 12375,
+      "sha256": "1e0a299d5ee1a2dd1f088656583c5097134fa55f9827007150f37892c90fca5e",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/grenade_turrets.cfg",
+      "bytes": 7209,
+      "sha256": "0ea31a107ac67e713316aebf31ba6b64e056a6773674caaa1643b715fd78c9ad",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/heal_stations.cfg",
+      "bytes": 7521,
+      "sha256": "107ddbda764418a1f19f453ee585dd363ac0bf8e3500668531fe76fd837ac69f",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/lifecycle.cfg",
+      "bytes": 565,
+      "sha256": "2cea62d992cc2243747bafa2ec6c56156d1fd65d7c6c9cc6aa28d9ac8f889926",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/lights.cfg",
+      "bytes": 8000,
+      "sha256": "92f925ab003c7a4c8dadd28faab0e25749b3cf5f07d4d85725157859e02fc61a",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/lightstyle_audits/zsh_deadcity_han_dn.cfg",
+      "bytes": 988,
+      "sha256": "d43b1b26305cb356a38206799db989bc19a197466b8dbc0da05eab6867b8c76e",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/lightstyle_audits/zsh_desert_han_dn.cfg",
+      "bytes": 980,
+      "sha256": "0c1114f292041a8c34c21e70ef34637cf269df280f752d0ae429c5e9f9f0de4f",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/management.cfg",
+      "bytes": 796,
+      "sha256": "351e4ad2e5be51c18031dde19eab0bd6d6d1fba7006824a6e570fb39b00c6c5a",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/maps/zsh_deadcity_han_dn.cfg",
+      "bytes": 32756,
+      "sha256": "686fb488fd09c51b87b4d49034d4cd1593c2ceeb1fb0ab679dd28b0bb42f5c88",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/maps/zsh_desert_han_dn.cfg",
+      "bytes": 30019,
+      "sha256": "15acf009f11c20c52df5171d240b465721e3eb5958646605b66ce1fe9a705205",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/material_crafting.cfg",
+      "bytes": 1452,
+      "sha256": "d820462ed519dd1522cbb38207cae2c08a9aabe464b33b7a93759cc312adf0d7",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/materials.cfg",
+      "bytes": 1285,
+      "sha256": "c10856e028e251b3592f7dd474e140d27eb4541e6888d428959d8ae04fbd156a",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/mines.cfg",
+      "bytes": 9711,
+      "sha256": "c6764a7fda5c6b1b66d8195fb62272539c135b4e5d6e53ef18239dd952e8a24c",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/mode.cfg",
+      "bytes": 1270,
+      "sha256": "7a008960b3c387414be1bdc33b68b272b84b9e9032f28c9964f3a7eb05bc315d",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/plasma_turrets.cfg",
+      "bytes": 5528,
+      "sha256": "5873b3a2b04f2c3e125e377fef9a4525c654bb0afbebcfa329d822de10a742ef",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/power.cfg",
+      "bytes": 322,
+      "sha256": "31414e2cce408eeb1aae1d757b50e3cb04abb65184824505310864c50748aa2a",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/progression.cfg",
+      "bytes": 3018,
+      "sha256": "3ab34b6e3a4af802d6c9417a0a72feb56de800a90ee83fa5b486d3e67d8c54e8",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/repair_stations.cfg",
+      "bytes": 6249,
+      "sha256": "d0b5849348245557c07ecade59c655ee1fd781377098af9539686b357e698114",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/resources.cfg",
+      "bytes": 2564,
+      "sha256": "491c7becee51486871e173673fa6b7d4b00f85cc235f8455f8d6052d8e53ac1f",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/shelters.cfg",
+      "bytes": 11808,
+      "sha256": "b482cdaefba8704e01b690e5728ac284eb55aa57a5450aa5d03e11c6fba82b33",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/skills.cfg",
+      "bytes": 2811,
+      "sha256": "d0650fa79211d450e94fef227bb14593ed4ef2165348f61ecf4b00c67d59f167",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/sounds.cfg",
+      "bytes": 2499,
+      "sha256": "14e71b6a64a7a67e1f803db956b48079e88342dc46aecf1d41042a7474708c1c",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/tesla_coils.cfg",
+      "bytes": 4966,
+      "sha256": "1cd6e733a306d89a1b21e8fb02c58f5687afe15865d382c7fe496a11a38d6a2c",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/turrets.cfg",
+      "bytes": 8517,
+      "sha256": "30d40f33c048d767350dff11577caeecb88ce50b45dafb471818793d1de468ce",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/watchtowers.cfg",
+      "bytes": 7476,
+      "sha256": "4e3ebebf3839d2cbf73dc9f71bc8c2eea96c798ce66e5b9729c51d2b0eba1d6a",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/weapon_crafting.cfg",
+      "bytes": 3472,
+      "sha256": "0a0d323712899dfae3f3807c5683c52ad72a398d2edcce7f6278bb4e7d8149d5",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/weapons.cfg",
+      "bytes": 2758,
+      "sha256": "d6cdd1190780aaef8bd06043a77e3a3594c08cd2bd36cf415aca952c1adb2e17",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/workbenches.cfg",
+      "bytes": 3227,
+      "sha256": "d42ec2ffef525e2a040da149c8a29e4f8a60e82185c16134d84985f15b7ab7a8",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/zombie_drops.cfg",
+      "bytes": 2479,
+      "sha256": "09694fcd76c7b1baccd4dcae7aef7e5d3a6abd3f2ddc75926015210171c44962",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelter/zombies.cfg",
+      "bytes": 780,
+      "sha256": "3dced16f542ca4acdbf68ce62f3ed5f32105e1fe035bee69999d52ab9bceee57",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelterEnvironment/Environment.cfg",
+      "bytes": 570,
+      "sha256": "fde9a2dd7ad2c779f6482afc45cfdf6b5d980fc283349b0377f2e9021cbc350b",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelterEnvironment/maps/zsh_deadcity_han_dn.cfg",
+      "bytes": 138,
+      "sha256": "5cd35ac17f8d76a018cc41f84ce51e64ac08e2370a1162afb6f8290a765e80ea",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/configs/HanZombieShelterEnvironment/maps/zsh_desert_han_dn.cfg",
+      "bytes": 138,
+      "sha256": "5cd35ac17f8d76a018cc41f84ce51e64ac08e2370a1162afb6f8290a765e80ea",
+      "source_label": "test-server-defaults-2026-11-03"
+    },
+    {
+      "path": "addons/sourcemod/plugins/HanZombieShelter.smx",
+      "bytes": 322786,
+      "sha256": "b58af652fadbe3569a15fd45aa824ed2d3455229f3a02cf8d4cb6bbe64ebf7d1",
+      "source_label": "reviewed-production-binary"
+    },
+    {
+      "path": "addons/sourcemod/plugins/HanZombieShelterEnvironment.smx",
+      "bytes": 12046,
+      "sha256": "42134d44d2bb92f45a9fbeca6e8add12d132bf3e344041536ea8c89bfb536b07",
+      "source_label": "reviewed-production-binary"
+    },
+    {
+      "path": "addons/sourcemod/translations/HanZombieShelter.phrases.txt",
+      "bytes": 64275,
+      "sha256": "1de16e1da400262db2cf21c8ad4cb4db9386161241cf22a1f811b570ddf77bcb",
+      "source_label": "test-server-defaults-2026-11-03"
+    }
+  ]
+}
