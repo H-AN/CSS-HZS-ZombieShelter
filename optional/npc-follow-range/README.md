@@ -4,7 +4,7 @@
 
 ## 适用环境
 
-- Counter-Strike: Source Windows x64、SourceMod 1.12。
+- Counter-Strike: Source Windows x64、SourceMod 1.12 或更高版本。
 - 配套 `hzsh_npc_follow.gamedata.txt`。
 - 已核对的 `server.dll` SHA256：`b42edb61cfa13aef6397eb0278fb38656f1eb71e7ac306f00343c671ab2a6cae`。
 
@@ -31,4 +31,4 @@ Win32、Linux 尚未适配。游戏更新后应重新核对签名和原始指令
 
 ## 源码与许可
 
-源码位于 `addons/sourcemod/scripting/HanZombieShelterNPCFollow.sp`，使用 SourceMod 1.12 编译器及其标准 include 编译即可。来源、作者和许可见 [CREDITS](CREDITS.md) 与 [MIT 许可](LICENSE.upstream-MIT.txt)。
+源码位于 `addons/sourcemod/scripting/HanZombieShelterNPCFollow.sp`，放入自己的 SourceMod 1.12 或更高版本编译环境，使用该版本的编译器及标准 include 编译即可。来源、作者和许可见 [CREDITS](CREDITS.md) 与 [MIT 许可](LICENSE.upstream-MIT.txt)。

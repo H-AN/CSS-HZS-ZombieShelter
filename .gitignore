@@ -7,6 +7,10 @@
 /tools/
 /tests/
 /build.ps1
+/resources/dependencies.json
+/resources/manifest.json
+/plugin/manifest.json
+/optional/npc-follow-range/manifest.json
 
 # Generated builds, release archives and test environments.
 /build/

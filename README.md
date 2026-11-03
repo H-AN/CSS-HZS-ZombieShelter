@@ -75,18 +75,17 @@
 
 ## 安装
 
-准备好可正常运行的 **CS:S 服务端、Metamod:Source、SourceMod 和 HZS 主体**。现有配套以 SourceMod 1.12 为基准。
+准备好可正常运行的 **CS:S 服务端、Metamod:Source、SourceMod 1.12 或更高版本，以及 HZS 主体**。
 
-使用默认组合时，下载同一版本的 `runtime.zip`、`resources.zip`、`server-compat.zip` 三个包。可选追击补丁另行安装；完整包名与用途见[安装说明](docs/安装与升级.md)。
+安装本仓库的插件文件，并将 `resources/` 中的 `resources.zip.001`、`resources.zip.002` 全部下载到同一目录，使用 7-Zip 从 `.001` 解压。丧尸、武器和外部技能资源从对应项目获取，详见[安装说明](docs/安装与升级.md)。
 
 | 仓库内容 | 放到服务器的位置 |
 | --- | --- |
 | `plugin/addons/` | 合并到 `cstrike/addons/` |
-| `resources/` 内的 `maps`、`models`、`materials`、`sound`、`scripts` | 各自合并到 `cstrike/` 下同名目录 |
-| `optional/server-compat/resources/` 内的资源目录 | 使用默认丧尸／Boss与刀具配置时，合并到 `cstrike/` 下同名目录 |
-| `optional/server-compat/addons/` | 使用对应 HWS／刀具功能时，合并到 `cstrike/addons/` |
+| 资源分卷解压后的 `maps`、`models`、`materials`、`sound`、`scripts` | 各自合并到 `cstrike/` 下同名目录 |
+| HZS、HWS、刀具及技能项目提供的文件 | 按对应项目的安装说明放置 |
 
-**默认丧尸资源分布在主资源包和 server-compat 中，需要一起安装。** 主资源目录中的 `putonghe` 只是其中一部分；额外普通丧尸、安哥拉和异形等模型在兼容资源目录中。 该目录提供配套配置和资源，不包含 HZS、HWS、刀具或丧尸技能插件本体。斧头及十刀配方需要相应武器命令；不使用这些功能时可在配方配置中停用。
+默认丧尸阵容还需要 HZS 的[示例模型材质包](https://github.com/H-AN/H-AN-CSS-ZombieScenario/blob/main/%E7%A4%BA%E4%BE%8B%E6%A8%A1%E5%9E%8B%E6%9D%90%E8%B4%A8/%E7%A4%BA%E4%BE%8B%E6%A8%A1%E5%9E%8B%E6%9D%90%E8%B4%A8.7z)，主资源包中的基础丧尸文件不能替代它。本仓库不附带整套外部插件资源；斧头及十刀配方需要对应 HWS／刀具插件、资源与武器命令，不使用时可在配方配置中停用。
 
 服务器文件安装后，还要配置客户端资源下载。已有服务器升级前备份原配置，只应用自己需要的改动。完整步骤、依赖和下载包选择见[安装与升级](docs/安装与升级.md)。
 
@@ -117,6 +116,6 @@
 - **换地图后玩法没有启动：** 核对地图同名配置、对应 Stage 和完整五点；新地图需单独适配。
 - **改配置没有立即生效：** 在维护时机让新地图／战役正常加载配置；技能设置需要新地图会话。
 
-部分外部配置引用的材质／音效原件仍有已知缺项，可能影响局部显示或声音，详见兼容包说明与缺项清单。反馈问题请附地图名、插件版本、复现步骤及相关错误日志。
+外部资源的版本、依赖和已知问题以对应项目说明为准。反馈问题请附地图名、插件版本、复现步骤及相关错误日志。
 
 许可证：[LICENSE](LICENSE)。可选追击插件另见其[来源与许可](optional/npc-follow-range/CREDITS.md)。

@@ -6,30 +6,22 @@
 
 ## 编译
 
-准备 SourceMod 1.12 的 SourcePawn 编译器及配套标准 include，在仓库根目录运行 PowerShell：
+使用自己的 **SourceMod 1.12 或更高版本**编译环境，并使用该版本配套的 SourcePawn 编译器和标准 include。
+
+1. 将 `src/HanZombieShelter.sp`、`src/HanZombieShelterEnvironment.sp` 和整个 `src/HanZombieShelter/` 目录复制到编译环境的 `addons/sourcemod/scripting/`，保留模块目录结构。
+2. 将 `src/include/` 中的 `HanZombieScenarioAPI.inc`、`HanZombieShelterAPI.inc` 放入该环境的 `addons/sourcemod/scripting/include/`。保留 SourceMod 自带的标准头文件。
+3. 在该环境的 `scripting/` 目录中，使用 SourceMod 自带编译器分别编译两个 `.sp` 入口。
+
+例如，在 Windows PowerShell 中切换到自己的 `scripting/` 目录后运行：
 
 ```powershell
-.\build.ps1 -SourceModRoot 'C:\SourceMod\addons\sourcemod'
+.\spcomp64.exe .\HanZombieShelter.sp -i.\include -o.\HanZombieShelter.smx
+.\spcomp64.exe .\HanZombieShelterEnvironment.sp -i.\include -o.\HanZombieShelterEnvironment.smx
 ```
 
-也可分别指定工具链文件：
+示例输出在当前 `scripting/` 目录。其他平台使用对应的 SourcePawn 编译器，源码和 include 的放置方式相同。检查编译结果后，按[安装与升级](安装与升级.md)将所需 SMX 部署到服务器。
 
-```powershell
-.\build.ps1 -Compiler 'C:\SourceMod\addons\sourcemod\scripting\spcomp64.exe' `
-    -SourceModInclude 'C:\SourceMod\addons\sourcemod\scripting\include'
-```
-
-未指定编译器时，脚本依次检查 `-SourceModRoot`、环境变量 `SOURCEMOD_ROOT` 和 PATH。未指定 include 时，使用编译器旁的 `include/`。示例路径替换为自己的工具链位置。
-
-| 目标 | 命令参数 | 输出 |
-| --- | --- | --- |
-| 主玩法 | 默认，或 `-Target Main` | `build/HanZombieShelter.smx` |
-| 昼夜环境 | `-Target Environment` | `build/HanZombieShelterEnvironment.smx` |
-| 独立追击插件 | `-Target NPCFollow` | `build/HanZombieShelterNPCFollow.smx` |
-
-第三个目标需要仓库中的 `optional/npc-follow-range/` 源码。独立主源码包只包含 Main 和 Environment 所需内容。
-
-构建输出统一在 `build/`。检查编译结果后，再按安装说明自行部署；脚本不会启动游戏或自动替换 `plugin/` 中的 SMX。
+需要自行编译可选追击插件时，将 [`HanZombieShelterNPCFollow.sp`](../optional/npc-follow-range/addons/sourcemod/scripting/HanZombieShelterNPCFollow.sp) 放到自己的编译环境 `scripting/` 后单独编译；该组件只需要 SourceMod 标准 include。安装要求见[独立追击插件说明](../optional/npc-follow-range/README.md)。
 
 ## 源码结构
 

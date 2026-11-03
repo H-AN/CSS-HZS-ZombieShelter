@@ -11,7 +11,7 @@
 | `addons/sourcemod/translations` | 正式翻译 |
 | `addons/sourcemod/scripting` | 主源码、模块与 API，服务器只运行时可不安装 |
 
-还需要安装[主资源和地图](../resources/README.md)。直接使用当前默认丧尸阵容时，需安装 [server-compat](../optional/server-compat/README.md) 中对应的额外 NPC 资源；武器和外部技能功能按需安装相应插件与配置。
+还需要下载并解压[主资源和地图分卷包](../resources/README.md)。默认丧尸阵容的模型从 HZS 上游资源包获取；武器和外部技能功能按需安装对应项目的插件、配置与资源，入口见[安装与升级](../docs/安装与升级.md)。
 
 本目录不包含 HZS 主体或 HWS／刀具／丧尸技能插件本体。`HanZombieShelterEnvironment.smx` 提供昼夜视觉；可选追击补丁单独放在 `optional/`，不要与旧同类补丁叠加。
 
