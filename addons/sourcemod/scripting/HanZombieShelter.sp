@@ -56,7 +56,14 @@
 #include "HanZombieShelter/ConstructionInput.inc"
 #include "HanZombieShelter/Admin.inc"
 
-public Plugin myinfo={name="HZS Zombie Shelter",author="H-AN",description="External cooperative day/night shelter mode; no core source changes",version=SHELTER_VERSION,url=""};
+public Plugin myinfo=
+{
+    name= "HZS Zombie Shelter",
+    author= "H-AN, 最后一眼, 浮云天若",
+    description= "External cooperative day/night shelter mode; no core source changes",
+    version=SHELTER_VERSION,
+    url="https://github.com/H-AN/ "
+};
 
 public APLRes AskPluginLoad2(Handle myself,bool late,char[] error,int maxlength)
 {
